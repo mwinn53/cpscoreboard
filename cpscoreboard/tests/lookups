@@ -1,0 +1,28 @@
+# Comma-delimited file of the teams you want to monitor your standings against.
+# The scoreboard will associate the alias with the team number for a more
+# human-identifiable description in the updates. For example, groups can be
+# within a school district, organizations, among friends, professionals, etc.
+# FORMAT:   Team number,alias
+10-3906,MySchool-2
+10-4396,GBM
+10-4398,GBM
+10-4589,CMS
+10-4600,LMS
+10-4602,LMS
+10-4756,RMS
+10-4748,RMS
+10-2995,GTM
+10-2996,GTM
+10-3421,HMS
+10-3445,HMS
+10-3464,GBM
+10-4308,SIMS
+10-4309,SIMS
+10-4310,SIMS
+10-4785,Users Unknown
+10-4784,Tax Collectors
+10-5550,SomeALSchool
+10-2746,AnotherCASchool
+10-3905,Test School 1
+10-3914,Test School 2
+10-4783,MySchool-1

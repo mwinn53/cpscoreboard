@@ -1,16 +1,19 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-from bs4 import BeautifulSoup
-from team import Team
+import argparse
+import inflect
+import logging
+import os
 import random
 from random import randrange
 import requests
 import time
-import argparse
+
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+import pandas as pd
 import tweepy
-import logging
-import os
-import inflect
+
+from team import Team
+
 
 class CPTableParser:
     ''' Retrieves the HTML scoreboard provided by the website and
@@ -309,7 +312,6 @@ def main():
                           args.url, args.team, args.alias, tw, args.refresh))
 
     # Prep: Initialize variables
-    # [TODO] Launch team objects as independent threads (next version)
     tracker = {}  # Dictionary of Team objects, identified by 'TeamNumber'
     ords = inflect.engine()
 
@@ -464,7 +466,7 @@ def main():
 
     # [TODO] Change the twitter profile pic back to the original when the competition ends.
 
-    # [TODO] Tweet a closing announcement, such as some closing stats
+    # [TODO] Detect a (manual) closing. Tweet and/or log an announcement, such as some closing stats
 
 if __name__ == "__main__":
     main()

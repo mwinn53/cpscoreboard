@@ -1,7 +1,7 @@
+from collections import OrderedDict
+from datetime import datetime, timedelta
 import inflect
 import time
-from datetime import datetime, timedelta
-from collections import OrderedDict
 
 class Team:
     ''' Tracks changes in a row extracted from the scoreboard. '''
