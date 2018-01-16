@@ -27,7 +27,8 @@ class CPTableParser:
             return []
 
         # Accumulate the responses (e.g., for simulation and debugging)
-        if (logging.getLogger().getEffectiveLevel() == 10):
+        # if (logging.getLogger().getEffectiveLevel() == 10):
+        if (logging.getLogger().getEffectiveLevel() > 0):
             if not os.path.exists('./pages'):
                 os.makedirs('./pages')
 
@@ -277,6 +278,7 @@ def main():
 
     # ## DIAGNOSTIC VARIABLES
     # # url = 'http://54.243.195.23/index.php?division=Middle%20School'
+    # # url = 'http://scoreboard.uscyberpatriot.org/index.php?division=Middle%20School'
     # url = 'http://127.0.0.1/testpage.php'
     # afile = 'lookups'
     # tfile = 'team'
@@ -343,8 +345,8 @@ def main():
 
         except IndexError as e:
             delay = (10*random.random()) * (time.time() - response)
-            if delay > 60:
-                delay = 60*random.random()
+            if delay < 1 or delay > 60:
+                delay = refresh*random.random()
             logging.warning('No score table returned in {0}. Retrying in {1:.2f} seconds.'.format(url, delay))
             time.sleep(delay)
             continue
@@ -446,7 +448,7 @@ def main():
             next = time.time() + randrange(t - (t * .1), t + (t * .1))
 
         # time.sleep(refresh)
-        time.sleep(3)
+        time.sleep(5)
         loops += 1
 
     # [TODO] Use threading to post the team updates (i.e., play-by-play)
@@ -468,3 +470,4 @@ if __name__ == "__main__":
     main()
 
 # [TODO] (LONG TERM) incorporate responses to messages (such as triggering a report)
+# [TODO] (LONG TERM) post a notification tweet if the scoring web site goes down.
