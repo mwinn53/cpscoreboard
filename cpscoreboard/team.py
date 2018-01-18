@@ -57,7 +57,7 @@ class Team:
 
         limit = datetime.strptime('06:00', '%H:%M')
 
-        if totaltime > limit:
+        if (self.live) and (totaltime > limit):
             self.live = False
 
     def buildMessage(self):

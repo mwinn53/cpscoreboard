@@ -450,10 +450,11 @@ def main():
             next = time.time() + randrange(t - (t * .1), t + (t * .1))
 
         for s in tracker:
-            if s.live == False:
+            tm = tracker[s]
+            if tm.live == False:
                 str = 'Competition time for team {} ({}) is expired. Place changes will still be posted, as other teams are still competing'.format(
-                    s.iloc[0]['TeamName'], s.iloc[0]['TeamNumber'])
-                s.live = None
+                    tm.series.iloc[0]['TeamName'], tm.series.iloc[0]['TeamNumber'])
+                tm.live = None
                 tweet(api, str)
 
         # [TODO] Use threading to post the team updates (i.e., play-by-play)
