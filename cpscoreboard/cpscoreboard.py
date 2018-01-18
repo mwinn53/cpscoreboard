@@ -449,24 +449,24 @@ def main():
             tweet(api, str, imgfile)
             next = time.time() + randrange(t - (t * .1), t + (t * .1))
 
+        # [TODO] When a team's PlayTime is up, team.live is set to False. Announce that their playtime is over, then set team.live to None
+        for s in tracker:
+            if s.live == False:
+                str = 'Competition time for team {} ({}) is expired. Place changes will still be posted, as other teams are still competing'.format(
+                    s.iloc[0]['TeamName'], s.iloc[0]['TeamNumber'])
+                s.live = None
+                tweet(api, str)
+
+        # [TODO] Use threading to post the team updates (i.e., play-by-play)
+        # add s.message to a list
+        #   launch threads to tweet all of the messages in the list
+
         # time.sleep(refresh)
         time.sleep(5)
         loops += 1
 
-    # [TODO] Use threading to post the team updates (i.e., play-by-play)
-    # [TODO] When a team's PlayTime is up, team.live is set to False. Announce that their playtime is over, then set team.live to None
-    # Both can be done in the same for loop
-    # for each s in tracker
-    #   if not(s.live):
-    #       tweet that they are done
-    #       set s.live to None
-    #   if s.post:
-    #       add s.message to a list
-    #   launch threads to tweet all of the messages in the list
-
-    # [TODO] Change the twitter profile pic back to the original when the competition ends.
-
-    # [TODO] Detect a (manual) closing. Tweet and/or log an announcement, such as some closing stats
+        # [TODO] Detect a (manual) closing. Tweet and/or log an announcement, such as some closing stats
+        # [TODO] Change the twitter profile pic back to the original when the competition ends.
 
 if __name__ == "__main__":
     main()
