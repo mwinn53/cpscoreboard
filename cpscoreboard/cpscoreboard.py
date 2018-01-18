@@ -8,6 +8,8 @@ import requests
 import time
 
 from bs4 import BeautifulSoup
+import matplotlib
+matplotlib.use('Agg')   # Used as a workaround for hosting on headless server
 import matplotlib.pyplot as plt
 import pandas as pd
 import tweepy
