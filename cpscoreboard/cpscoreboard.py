@@ -412,18 +412,16 @@ def main():
                     else:
                         name = ''
 
-                    logging.info('before on board')
                     tweet(api,
                           'Team {} {} is on the board at {} with {} points. They are in {} place in {}. '.format(cell.iloc[0]['TeamNumber'],
                                 name,
                                 time.strftime("%I:%M %p", time.localtime()),
                                 cell.iloc[0]['CurrentScore'],
                                 ords.ordinal(cell.iloc[0]['StatePlace']), l))
-                    logging.info('after on board')
             else:
                 logging.info('Team {} is not on the scoreboard'.format(s))
 
-        if time.time() > next:     # [TODO] and tm.live=TRUE for all teams in the tracker are 'live'; this suspends the 15 minute updates when all teams are done competing.
+        if (time.time() > next) and tm.live:     # [TODO] and tm.live=TRUE for all teams in the tracker are 'live'; this suspends the 15 minute updates when all teams are done competing.
             r = random.randint(1, 3)
 
             str = 'As of {}, there are {} teams competing overall, and {} teams in {}. '.format(
@@ -449,7 +447,6 @@ def main():
             tweet(api, str, imgfile)
             next = time.time() + randrange(t - (t * .1), t + (t * .1))
 
-        # [TODO] When a team's PlayTime is up, team.live is set to False. Announce that their playtime is over, then set team.live to None
         for s in tracker:
             if s.live == False:
                 str = 'Competition time for team {} ({}) is expired. Place changes will still be posted, as other teams are still competing'.format(
