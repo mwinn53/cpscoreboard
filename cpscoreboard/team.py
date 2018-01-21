@@ -8,7 +8,7 @@ class Team:
 
     # Data Structure of the series:
     #   TeamNumber          str   10-3905
-    #   State   str   CA
+    #   State               str   CA
     #   Division            str   Middle School
     #   Tier                str   Middle School
     #   ScoredImages        str   3
@@ -27,13 +27,15 @@ class Team:
         self.lastScore = time.time()
         self.maxscore = 0
         self.message = ""
+        # These properties are flags used to limit Twitter posts to one-time
         self.post = False
+        self.timewarning = True
         self.live = True
 
     def updatestats(self, newSeries):
         ''' Receives an updated row from the main scoreboard, compares with
         the existing row, records the relevant changes, and finally replaces
-         the existing row with the new row.'''
+        the existing row with the new row.'''
 
         self.scoreDiff = newSeries.CurrentScore.item() - self.series.CurrentScore.item()
         self.oPlaceDiff = self.series.OverallPlace.item() - newSeries.OverallPlace.item()
@@ -55,8 +57,11 @@ class Team:
 
         totaltime = etime + ltime
 
-        limit = datetime.strptime('06:00', '%H:%M')
+        warn = datetime.strptime('05:00', '%H:%M')  # Set the time warning flag when the team has < 1 hour remaining
+        if self.timewarning and totaltime > warn:
+            self.timewarning = False
 
+        limit = datetime.strptime('06:00', '%H:%M')  # Set the 'finished' flag when the team no more time remaining.
         if (self.live) and (totaltime > limit):
             self.live = False
 

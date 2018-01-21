@@ -177,6 +177,7 @@ def tweet(api, s, img=None):
 def report(tbl, ofile, teamfile = None, st = None, n = 10):
     ''' Generates a table of the team's standings.'''
 
+    # [TODO] The local standings were posting as top-10; need to overhaul how the report type is selected.
     t = []
     if teamfile:
         t = readteam(teamfile)
@@ -185,7 +186,7 @@ def report(tbl, ofile, teamfile = None, st = None, n = 10):
     if st:
         subtbl = tbl[tbl['State'] == st]
 
-    else:
+    if n:
         subtbl = tbl.head(n)
 
     subtbl = subtbl[['TeamNumber', 'TeamName', 'OverallPlace', 'StatePlace', 'State', 'CurrentScore', 'PlayTime']]
@@ -317,7 +318,7 @@ def main():
     tracker = {}  # Dictionary of Team objects, identified by 'TeamNumber'
     ords = inflect.engine()
 
-    t = 10  # Time interval for posting a place report (default is 15 minutes +/- 10%)
+    t = 15  # Time interval for posting a place report (default is 15 minutes +/- 10%)
     tstamp = time.time()
     next = tstamp + randrange(t - (t * .1), t + (t * .1))
 
@@ -328,17 +329,19 @@ def main():
     launchtime = time.time()
     tweets = 0
 
-    # Time (in seconds) to start the play-by-play tweets. Starts at 4 hours (14,400 seconds) for a 6-hour round.
-    # redzone = time.time() + 14400
+    # Play-by-play tweets should start at about the 2/3 mark; about 4 hours (14,400 seconds) for a 6-hour round.
+    # The result is a status update about every 3-5, or about 24-40 tweets in a 2-hour period.
+    # [TODO] Instead of hard-coding, configure the redzone to be at the 4 hour mark of the earliest team to start.
     redzone = time.time() + 30
 
     # Start monitoring the website
     # [TODO] Change the twitter profile pic to CP when the competition starts.
     # [TODO] Tweet an opening remark, such as the date, time, school, and URL of the official scoreboard
 
+    # [TODO] Extract reusable functions out to cpsbimports.py
+
     while True:
-        # Download web page and extract the table
-        # Retrieve new table every refresh interval (default 60 seconds)
+        # Retrieve new table from the web page every refresh interval (default 60 seconds)
         table = []
         cb = CPTableParser()
 
@@ -354,7 +357,6 @@ def main():
             logging.warning('No score table returned in {0}. Retrying in {1:.2f} seconds.'.format(url, delay))
             time.sleep(delay)
             continue
-
 
         # Extracts the header names from the first row & removes the first row
         table.columns = list(table.iloc[0])
@@ -389,8 +391,10 @@ def main():
                     tracker[s].updatestats(cell)
 
                     tm = tracker[s]
-                    if time.time() > redzone and tm.post:  # Only post play-by-plays later in the round.
+                    # [TODO] tweet a one-time announcement when the team's PlayTime passes the 5 hour mark (tm.timewarning = False --> None)
+                    # this should be controlled in the Team class that sets a flag property.
 
+                    if time.time() > redzone and tm.post:  # Only post play-by-plays later in the round.
                         #	Add a time tag if the update does not include a positive score
                         if tm.scoreDiff <= 0 and tm.live:
                             timediff = time.time() - tm.lastScore
@@ -401,6 +405,12 @@ def main():
                                 lasttime = time.strftime("%M minutes",time.gmtime(timediff))
 
                             tm.message = tm.message + 'The last positive score was about {} ago. '.format(lasttime)
+
+                        else if not tm.live:
+                            tm.message = tm.message + 'There are {} teams competing ({} in {}). '.format(
+                                time.strftime("%I:%M%p", time.localtime()),
+                                len(table.index),
+                                len(table[table['State'] == l].index), l)
 
                         logging.info(tm.message)
                         tweet(api, tracker[s].message)  # [TODO] Use threading to announce team updates (see below).
@@ -423,7 +433,9 @@ def main():
             else:
                 logging.info('Team {} is not on the scoreboard'.format(s))
 
-        if (time.time() > next) and tm.live:     # [TODO] and tm.live=TRUE for all teams in the tracker are 'live'; this suspends the 15 minute updates when all teams are done competing.
+        if (time.time() > next) and tm.live:
+            # [TODO] Weight the updates to have more "State" and "Local" updates (#1 and #2)
+            # [TODO] Incorporate a link to the actual scoreboard in the announcement.
             r = random.randint(1, 3)
 
             str = 'As of {}, there are {} teams competing overall, and {} teams in {}. '.format(
@@ -434,17 +446,17 @@ def main():
             if r == 1:
                 str = str + 'Local standings: '
                 logging.debug('posted report: alias teams')
-                report(table, imgfile, tfile)  # Just the teams in the alias file (tfile gets highlighted)
+                report(table, imgfile, teamfile = tfile)  # Just the teams in the alias file (tfile gets highlighted)
 
-            if r == 2:
+            elif r == 2:
                 str = str + 'State standings: '
                 logging.debug('posted report: state teams')
-                report(table, imgfile, tfile, st=l)  # Show the teams in the state (most frequent in alias file)
+                report(table, imgfile, teamfile = tfile, st=l)  # Show the teams in the state (most frequent in alias file)
 
-            if r == 3:
+            elif r == 3:
                 str = str + 'Top standings: '
                 logging.debug('posted report: top {} teams'.format(topn))
-                report(table, imgfile, tfile, n=topn)  # Show the top n teams
+                report(table, imgfile, teamfile = tfile, n=topn)  # Show the top n teams
 
             tweet(api, str, imgfile)
             next = time.time() + randrange(t - (t * .1), t + (t * .1))
@@ -452,7 +464,7 @@ def main():
         for s in tracker:
             tm = tracker[s]
             if tm.live == False:
-                str = 'Competition time for team {} ({}) is expired. Place changes will still be posted, as other teams are still competing'.format(
+                str = 'Time is almost up for team {} ({}). Place changes will still be posted as a result of other teams competing'.format(
                     tm.series.iloc[0]['TeamName'], tm.series.iloc[0]['TeamNumber'])
                 tm.live = None
                 tweet(api, str)
@@ -461,11 +473,10 @@ def main():
         # add s.message to a list
         #   launch threads to tweet all of the messages in the list
 
-        # time.sleep(refresh)
-        time.sleep(5)
+        time.sleep(refresh)
         loops += 1
 
-        # [TODO] Detect a (manual) closing. Tweet and/or log an announcement, such as some closing stats
+        # [TODO] Detect a (manual) closing. Tweet and/or log an announcement, such as some closing stats.
         # [TODO] Change the twitter profile pic back to the original when the competition ends.
 
 if __name__ == "__main__":
@@ -473,3 +484,4 @@ if __name__ == "__main__":
 
 # [TODO] (LONG TERM) incorporate responses to messages (such as triggering a report)
 # [TODO] (LONG TERM) post a notification tweet if the scoring web site goes down.
+# [TODO] Thoroughly document the classes, functions, and algorithms.
