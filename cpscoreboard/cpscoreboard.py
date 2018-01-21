@@ -320,8 +320,7 @@ def main():
 
     t = 15  # Time interval for posting a place report (default is 15 minutes +/- 10%)
     tstamp = time.time()
-    next = tstamp + randrange(t - (t * .1), t + (t * .1))
-
+    next = tstamp + randrange(t - (t * .1), t + (t * .1))       # [TODO] This might produce an error; consider another approach.
     imgfile = 'report'  # File name for the table image used in the place report
 
     topn = 10   # top n teams for the topn report
@@ -378,8 +377,7 @@ def main():
         table.OverallPlace = pd.to_numeric(table.OverallPlace).fillna(0)
         table.StatePlace = pd.to_numeric(table.StatePlace).fillna(0)
 
-        # Extract rows of interest for monitoring (managed by a class) and
-        # update the class object with each refresh
+        # Extract rows of interest for monitoring (managed by a class) and update the class object with each refresh
         f = readteam(tfile)
 
         for s in f:
@@ -459,7 +457,7 @@ def main():
                 report(table, imgfile, teamfile = tfile, n=topn)  # Show the top n teams
 
             tweet(api, str, imgfile)
-            next = time.time() + randrange(t - (t * .1), t + (t * .1))
+            next = time.time() + randrange(t - (t * .1), t + (t * .1)) # [TODO] This might produce an error; consider another approach.
 
         for s in tracker:
             tm = tracker[s]
