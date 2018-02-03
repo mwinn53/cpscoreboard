@@ -1,158 +1,62 @@
 import argparse
 import inflect
 import logging
-import os
 import random
-from random import randrange
-import requests
 import time
 
-from bs4 import BeautifulSoup
 import matplotlib
-matplotlib.use('Agg')   # Used as a workaround for hosting on headless server
+matplotlib.use('Agg')   # Used as a workaround for hosting on headless server;
+                        # DONT MOVE; it must go between these two imports
 import matplotlib.pyplot as plt
-import pandas as pd
 import tweepy
 
+import cpsbimports as cpfn
 from team import Team
-
-
-class CPTableParser:
-    ''' Retrieves the HTML scoreboard provided by the website and
-    storees it as a pandas dataframe'''
-
-    def parse_url(self, url):
-
-        try:
-            response = requests.get(url)
-
-        except requests.exceptions.RequestException as e:
-            logging.warning('No response from {} ({}).'.format(url, e))
-            logging.debug(e)
-            return []
-
-        # Accumulate the responses (e.g., for simulation and debugging)
-        # if (logging.getLogger().getEffectiveLevel() == 10):
-        if (logging.getLogger().getEffectiveLevel() > 0):
-            if not os.path.exists('./pages'):
-                os.makedirs('./pages')
-
-            fname = './pages/cpscore_' + time.strftime('%Y-%b-%d_%H%M', time.localtime()) + '.php'
-            page = open(fname, 'w')
-            page.write(response.text)
-            page.close()
-
-        soup = BeautifulSoup(response.text, 'lxml')
-
-        return [(0, self.parse_html_table(table)) for table in
-                soup.find_all('table')]
-
-    def parse_html_table(self, table):
-        n_columns = 0
-        n_rows = 0
-        column_names = []
-
-        # Find number of rows, columns, and column titles
-        for row in table.find_all('tr'):
-
-            # Determine the number of rows in the table
-            td_tags = row.find_all('td')
-            if len(td_tags) > 0:
-                n_rows += 1
-                if n_columns == 0:
-                    # Set the number of columns for our table
-                    n_columns = len(td_tags)
-
-            # Handle column names if we find them
-            th_tags = row.find_all('th')
-            if len(th_tags) > 0 and len(column_names) == 0:
-                for th in th_tags:
-                    column_names.append(th.get_text())
-
-        # Safeguard on Column Titles
-        if len(column_names) > 0 and len(column_names) != n_columns:
-            raise Exception("Column titles do not match the number of columns")
-
-        columns = column_names if len(column_names) > 0 \
-            else range(0, n_columns)
-
-        df = pd.DataFrame(columns=columns,
-                          index=range(0, n_rows))
-        row_marker = 0
-        for row in table.find_all('tr'):
-            column_marker = 0
-            columns = row.find_all('td')
-            for column in columns:
-                df.iat[row_marker, column_marker] = column.get_text()
-                column_marker += 1
-            if len(columns) > 0:
-                row_marker += 1
-
-        # Convert numberical columns to integers if possible
-        for col in df:
-            try:
-                df[col] = df[col].astype(int)
-            except ValueError:
-                pass
-
-        return df
-
-
-
-
-def addplaces(tbl):
-    # add the overall place as a column so that each row can be tracked
-    # without depending on the context of the table index
-    tbl['OverallPlace'] = [i for i in tbl.index]
-
-    d = {}
-    row = 1     # rows are 1-indexed because tbl[0] is the header row
-
-    tbl['StatePlace'] = pd.Series([], dtype=object)
-    for i in tbl['State']:   # add a column for place within states
-        if i in d:
-            d[i] += 1
-        else:
-            d[i] = 1
-        tbl.loc[row, 'StatePlace'] = d[i]
-        row += 1
-
-    return (d, tbl)
-
-def addalias(fname, tbl):
-    ''' Reads and parses the lookup file and returns the contents as a dictionary.'''
-    f = open(fname, 'r')
-    dict = {}
-
-    for line in f:
-        if line[0] == '#':
-            continue
-
-        s = line.strip().split(',')
-
-        if s[0] in dict:
-            logging.error("Duplicate alias for team {} ({}). The existing alias {} is in use.".format(s[0], s[1], dict[s[0]]))
-        try:
-            dict[s[0]] = s[1]
-        except IndexError:
-            logging.error('Error in alias file. There is no alias provided for {}'.format(s[0]))
-
-    f.close()
-
-    tbl['TeamName'] = tbl['TeamNumber'].map(dict).fillna('')
-
-    return tbl
 
 def readteam(fname):
     ''' Reads and parses the team file, and returns the contents as a list.'''
 
     t = []
-    with open(fname) as f:
-        for line in f:
-            s = line.strip()
-            if s[0] != '#':
-                t.append(s)
+    try:
+        with open(fname) as f:
+            for line in f:
+                s = line.strip()
+                if s[0] != '#':
+                    t.append(s)
+    except e:
+        logging.error(e)
+
     return t
+
+def minplace(lstTeam):
+    l = []
+    for i in lstTeam:
+        l.append(lstTeam[i].series.iloc[0]['OverallPlace'])
+    return min(l)
+
+def mintime(lstTeam):
+    l = []
+    for i in lstTeam:
+        l.append(lstTeam[i].series.iloc[0]['PlayTime'])
+    return min(l)
+
+def maxtime(lstTeam):
+    l = []
+    for i in lstTeam:
+        l.append(lstTeam[i].series.iloc[0]['PlayTime'])
+    return max(l)
+
+def stillalive(lstTeam):
+    l = 0
+
+    for i in lstTeam:
+        if lstTeam[i].live):
+            l += 1
+
+    if l > 0:
+        return True
+    else:
+        return False
 
 def tweet(api, s, img=None):
     if not api:
@@ -174,20 +78,29 @@ def tweet(api, s, img=None):
             except tweepy.error.TweepError as e:
                 logging.error(e)
 
-def report(tbl, ofile, teamfile = None, st = None, n = 10):
+def report(tbl, ofile, teamfile = None, st = None, n = None):
     ''' Generates a table of the team's standings.'''
+    # teamfile: determines which teams get highlighted (generally the ones being tracked)
+    #           by itself returns a list of the teams with an alias, which are the local teams
+    # st:
 
-    # [TODO] The local standings were posting as top-10; need to overhaul how the report type is selected.
     t = []
+    subtbl = []
     if teamfile:
         t = readteam(teamfile)
-        subtbl = tbl[tbl['TeamName'] != '']     ## TeamFile teams will be the only ones with an associated alias
-
+        subtbl = tbl[tbl['TeamName'] != '']     # Teamfile teams highlighted
+                                                # filter by the ones with an associated alias (local teams)
     if st:
-        subtbl = tbl[tbl['State'] == st]
+        subtbl = tbl[tbl['State'] == st]        # filter by state
 
     if n:
-        subtbl = tbl.head(n)
+        if subtbl:
+            subtbl = subtbl.head(n)
+        else:
+            subtbl = tbl.head(n)
+
+    if (not teamfile) and (not st) and (not n):
+        subtbl = tbl.head(25)       # if no parameters are specified, give the top 25 with no highlights
 
     subtbl = subtbl[['TeamNumber', 'TeamName', 'OverallPlace', 'StatePlace', 'State', 'CurrentScore', 'PlayTime']]
 
@@ -318,9 +231,10 @@ def main():
     tracker = {}  # Dictionary of Team objects, identified by 'TeamNumber'
     ords = inflect.engine()
 
-    t = 15  # Time interval for posting a place report (default is 15 minutes +/- 10%)
+    t = 1 # Diagnostic setting
+    # t = 15  # Time interval for posting a place report (default is 15 minutes +/- 10%)
     tstamp = time.time()
-    next = tstamp + randrange(t - (t * .1), t + (t * .1))       # [TODO] This might produce an error; consider another approach.
+    next = tstamp + random.uniform(t - (t * .1), t + (t * .1))
     imgfile = 'report'  # File name for the table image used in the place report
 
     topn = 10   # top n teams for the topn report
@@ -328,54 +242,16 @@ def main():
     launchtime = time.time()
     tweets = 0
 
-    # Play-by-play tweets should start at about the 2/3 mark; about 4 hours (14,400 seconds) for a 6-hour round.
-    # The result is a status update about every 3-5, or about 24-40 tweets in a 2-hour period.
-    # [TODO] Instead of hard-coding, configure the redzone to be at the 4 hour mark of the earliest team to start.
-    redzone = time.time() + 30
-
     # Start monitoring the website
     # [TODO] Change the twitter profile pic to CP when the competition starts.
     # [TODO] Tweet an opening remark, such as the date, time, school, and URL of the official scoreboard
 
-    # [TODO] Extract reusable functions out to cpsbimports.py
-
     while True:
         # Retrieve new table from the web page every refresh interval (default 60 seconds)
         table = []
-        cb = CPTableParser()
+        cb = cpfn.CPTableParser()
 
-        # Handle the condition when the site is not providing a score table
-        try:
-            response = time.time()
-            table = cb.parse_url(url)[0][1]  # Extract the table from the tuple
-
-        except IndexError as e:
-            delay = (10*random.random()) * (time.time() - response)
-            if delay < 1 or delay > 60:
-                delay = refresh*random.random()
-            logging.warning('No score table returned in {0}. Retrying in {1:.2f} seconds.'.format(url, delay))
-            time.sleep(delay)
-            continue
-
-        # Extracts the header names from the first row & removes the first row
-        table.columns = list(table.iloc[0])
-        table = table[1:]
-
-        # Renames the 'unfriendly' titles
-        table.rename(columns={'Play Time(HH:MM)': 'PlayTime'}, inplace=True)
-        table.rename(columns={'Location/Category': 'State'}, inplace=True)
-
-        # Enrich the table with additional columns (overall place, place by
-        # state, aliases from lookup table) and convert the data types
-        # (all strings by default) to int, time, etc.
-        (states, table) = addplaces(table)
-
-        if afile:
-            table = addalias(afile, table)
-
-        table.CurrentScore = pd.to_numeric(table.CurrentScore).fillna(0)
-        table.OverallPlace = pd.to_numeric(table.OverallPlace).fillna(0)
-        table.StatePlace = pd.to_numeric(table.StatePlace).fillna(0)
+        table = cpfn.getmaintable(url, afile)  # Extract the table from the tuple
 
         # Extract rows of interest for monitoring (managed by a class) and update the class object with each refresh
         f = readteam(tfile)
@@ -389,12 +265,17 @@ def main():
                     tracker[s].updatestats(cell)
 
                     tm = tracker[s]
-                    # [TODO] tweet a one-time announcement when the team's PlayTime passes the 5 hour mark (tm.timewarning = False --> None)
-                    # this should be controlled in the Team class that sets a flag property.
+                    if not(tm.timewarning):
+                        str = 'Less than one hour remaining in the competition for {} ({}).'.format(
+                            tm.series.iloc[0]['TeamName'],
+                            tm.series.iloc[0]['TeamNumber'])
+                        tm.timewarning = None
+                        tweet(api, str)
 
-                    if time.time() > redzone and tm.post:  # Only post play-by-plays later in the round.
+                    if redzone and tm.post:  # Only post play-by-plays later in the round.
                         #	Add a time tag if the update does not include a positive score
-                        if tm.scoreDiff <= 0 and tm.live:
+                        live = stillalive(tracker)
+                        if tm.scoreDiff <= 0 and live:
                             timediff = time.time() - tm.lastScore
 
                             if timediff < 60:
@@ -404,7 +285,7 @@ def main():
 
                             tm.message = tm.message + 'The last positive score was about {} ago. '.format(lasttime)
 
-                        else if not tm.live:
+                        elif not live:
                             tm.message = tm.message + 'There are {} teams competing ({} in {}). '.format(
                                 time.strftime("%I:%M%p", time.localtime()),
                                 len(table.index),
@@ -431,12 +312,31 @@ def main():
             else:
                 logging.info('Team {} is not on the scoreboard'.format(s))
 
-        if (time.time() > next) and tm.live:
-            # [TODO] Weight the updates to have more "State" and "Local" updates (#1 and #2)
-            # [TODO] Incorporate a link to the actual scoreboard in the announcement.
-            r = random.randint(1, 3)
+            # Play-by-play tweets should start at about the 2/3 mark of the
+            # longest playing team; 4 hours (14,400 seconds) for a 6-hour round.
+            # The result is a status update about every 3-5 minutes, or about
+            # 24-40 tweets in a 2-hour period.
 
-            str = 'As of {}, there are {} teams competing overall, and {} teams in {}. '.format(
+            h, m = maxtime(tracker).split(':')
+            if (int(h)*3600 + int(m)*60) > 3600 * 4:
+                redzone = True
+            else:
+                redzone = False
+
+        if (time.time() > next) and stillalive(tracker):
+            # weight the choices so that state [1] and local [2] get shown more often
+            # unless one of the target teams is in the top n (default = 10)
+            m = minplace(tracker)
+
+            if m <= topn:
+                choices = [1] * 3 + [2] * 2 + [3] * 4
+            else:
+                choices = [1] * 4 + [2] * 4 + [3] * 2
+
+            random.choice(choices)
+
+            str = 'Unofficial live scores: {}. As of {}, there are {} teams competing overall, and {} teams in {}.'.format(
+                url,
                 time.strftime("%I:%M%p", time.localtime()),
                 len(table.index),
                 len(table[table['State'] == l].index), l)
@@ -454,10 +354,10 @@ def main():
             elif r == 3:
                 str = str + 'Top standings: '
                 logging.debug('posted report: top {} teams'.format(topn))
-                report(table, imgfile, teamfile = tfile, n=topn)  # Show the top n teams
+                report(table, imgfile, teamfile = tfile, n = topn)  # Show the top n teams
 
             tweet(api, str, imgfile)
-            next = time.time() + randrange(t - (t * .1), t + (t * .1)) # [TODO] This might produce an error; consider another approach.
+            next = time.time() + random.uniform(t - (t * .1), t + (t * .1))
 
         for s in tracker:
             tm = tracker[s]

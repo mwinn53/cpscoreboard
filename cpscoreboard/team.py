@@ -28,9 +28,9 @@ class Team:
         self.maxscore = 0
         self.message = ""
         # These properties are flags used to limit Twitter posts to one-time
-        self.post = False
-        self.timewarning = True
-        self.live = True
+        self.post = False # Sets to true when post goes to Twitter; false when updated
+        self.timewarning = True # Set to false at time warning threshold and None when confirmed with Tweet
+        self.live = True # Set to false at time warning threshold and None when confirmed with Tweet
 
     def updatestats(self, newSeries):
         ''' Receives an updated row from the main scoreboard, compares with
