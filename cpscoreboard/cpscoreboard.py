@@ -48,11 +48,9 @@ def maxtime(lstTeam):
 
 def stillalive(lstTeam):
     l = 0
-
     for i in lstTeam:
-        if lstTeam[i].live):
+        if lstTeam[i].live:
             l += 1
-
     if l > 0:
         return True
     else:
@@ -94,7 +92,7 @@ def report(tbl, ofile, teamfile = None, st = None, n = None):
         subtbl = tbl[tbl['State'] == st]        # filter by state
 
     if n:
-        if subtbl:
+        if not subtbl.empty:
             subtbl = subtbl.head(n)
         else:
             subtbl = tbl.head(n)
@@ -181,7 +179,7 @@ def main():
         api = None
 
     if args.refresh:
-        refresh = args.refresh
+        refresh = int(args.refresh)
     else:
         refresh = 60
 
@@ -265,7 +263,7 @@ def main():
                     tracker[s].updatestats(cell)
 
                     tm = tracker[s]
-                    if not(tm.timewarning):
+                    if tm.timewarning == False:
                         str = 'Less than one hour remaining in the competition for {} ({}).'.format(
                             tm.series.iloc[0]['TeamName'],
                             tm.series.iloc[0]['TeamNumber'])
@@ -333,9 +331,9 @@ def main():
             else:
                 choices = [1] * 4 + [2] * 4 + [3] * 2
 
-            random.choice(choices)
+            r = random.choice(choices)
 
-            str = 'Unofficial live scores: {}. As of {}, there are {} teams competing overall, and {} teams in {}.'.format(
+            str = 'Unofficial live scores: {}. As of {}, there are {} teams competing overall, and {} teams in {}. '.format(
                 url,
                 time.strftime("%I:%M%p", time.localtime()),
                 len(table.index),

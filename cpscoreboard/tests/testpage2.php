@@ -62,8 +62,8 @@ jQuery(document).ready(function($) {
 <tr class='clickable' href='team.php?team=10-3904'><td>10-3904</td><td>CA</td><td>Middle School</td><td>Middle School</td><td>3</td><td>05:45</td><td>225</td><td></td></tr>
 <tr class='clickable' href='team.php?team=10-3905'><td>10-3905</td><td>CA</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:35</td><td>195</td><td></td></tr>
 <tr class='clickable' href='team.php?team=10-3903'><td>10-3903</td><td>CA</td><td>Middle School</td><td>Middle School</td><td>3</td><td>05:44</td><td>193</td><td></td></tr>
-<tr class='clickable' href='team.php?team=10-3906'><td>10-3906</td><td>TX</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:44</td><td>172</td><td></td></tr>
-<tr class='clickable' href='team.php?team=10-4783'><td>10-4783</td><td>TX</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:28</td><td>167</td><td></td></tr>
+<tr class='clickable' href='team.php?team=10-4783'><td>10-4783</td><td>TX</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:28</td><td>176</td><td></td></tr>
+<tr class='clickable' href='team.php?team=10-3906'><td>10-3906</td><td>TX</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:44</td><td>175</td><td></td></tr>
 <tr class='clickable' href='team.php?team=10-5550'><td>10-5550</td><td>AL</td><td>Middle School</td><td>Middle School</td><td>3</td><td>03:30</td><td>155</td><td></td></tr>
 <tr class='clickable' href='team.php?team=10-0269'><td>10-0269</td><td>CA</td><td>Middle School</td><td>Middle School</td><td>3</td><td>05:35</td><td>142</td><td></td></tr>
 <tr class='clickable' href='team.php?team=10-3924'><td>10-3924</td><td>CA</td><td>Middle School</td><td>Middle School</td><td>3</td><td>05:44</td><td>137</td><td></td></tr>

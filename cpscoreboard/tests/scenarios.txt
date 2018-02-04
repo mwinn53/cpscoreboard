@@ -1,0 +1,36 @@
+Test scenarios:
+
+Setup 
+Set refresh to 10 seconds ( -r 10)
+Set time (t) to 1 minute (line 234)
+
+No web site --> web site comes up
+	
+	should get "no response..." in log
+	
+	0	start server.py	
+		should get teams "on the board"
+	
+Move target teams up and down via score (place in state and overall)
+
+	1	10-3906 +3 to 175 (no change in place)
+	
+	2	10-4783	+6 to 176 (increase in both state and overall place)
+	
+	3	10-5550 +22 to 177 (drops 10-3906 in state and overall)
+	
+	should get periodic updates every minute (top 10 version)
+	
+3) Set teams time to >4 hours; Move target teams up and down via score (place in state and overall)
+
+	4	10-4783 to 04:02
+		should get reporting posts and periodic updates
+		
+	5	10-3905 to 04:29 -5 (drop in state/overall place)
+
+4) Set teams time to ~6 hours; Move other teams up and down via score (place in state and overall)
+
+	6	10-4783 to +2 to 179 (no change to place) 05:58
+	(wait ~3 minutes)
+	
+	7	10-5550 +4 to 181 (drops 1 place)
