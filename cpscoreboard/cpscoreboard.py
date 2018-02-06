@@ -92,10 +92,7 @@ def report(tbl, ofile, teamfile = None, st = None, n = None):
         subtbl = tbl[tbl['State'] == st]        # filter by state
 
     if n:
-        if not subtbl.empty:
-            subtbl = subtbl.head(n)
-        else:
-            subtbl = tbl.head(n)
+        subtbl = tbl.head(n)  # Assume that the presence of n indicates "top n"
 
     if (not teamfile) and (not st) and (not n):
         subtbl = tbl.head(25)       # if no parameters are specified, give the top 25 with no highlights
@@ -144,7 +141,7 @@ def main():
     parser = argparse.ArgumentParser(description='CyberPatriot Scorebot')
 
     parser.add_argument('url', help='URL to the Scoreboard')
-    parser.add_argument('team', help="Text file of team numbers to track (one per line")
+    parser.add_argument('team', help="Text file of team numbers to track (one per line).")
     parser.add_argument('-a', '--alias', help="CSV file of team numbers and name aliases.")
     parser.add_argument('-k', '--keys',
                         help="Twitter API Keys (separated by space): ConsumerKey SecretKey AccessToken AccessSecret)",
