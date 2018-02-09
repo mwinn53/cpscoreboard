@@ -226,8 +226,8 @@ def main():
     tracker = {}  # Dictionary of Team objects, identified by 'TeamNumber'
     ords = inflect.engine()
 
-    t = 1 # Diagnostic setting
-    # t = 15  # Time interval for posting a place report (default is 15 minutes +/- 10%)
+    # t = 1*60 # Diagnostic setting
+    t = 15*60  # Time interval for posting a place report (default is 15 minutes +/- 10%)
     tstamp = time.time()
     next = tstamp + random.uniform(t - (t * .1), t + (t * .1))
     imgfile = 'report'  # File name for the table image used in the place report
@@ -261,6 +261,7 @@ def main():
 
                     tm = tracker[s]
                     if tm.timewarning == False:
+			#[TODO] Logic error (possibly in team.py)
                         str = 'Less than one hour remaining in the competition for {} ({}).'.format(
                             tm.series.iloc[0]['TeamName'],
                             tm.series.iloc[0]['TeamNumber'])
@@ -269,6 +270,7 @@ def main():
 
                     if redzone and tm.post:  # Only post play-by-plays later in the round.
                         #	Add a time tag if the update does not include a positive score
+			# [TODO] Add an announcement of 4 hour threshold; starts play-by-play tweets
                         live = stillalive(tracker)
                         if tm.scoreDiff <= 0 and live:
                             timediff = time.time() - tm.lastScore
@@ -282,7 +284,6 @@ def main():
 
                         elif not live:
                             tm.message = tm.message + 'There are {} teams competing ({} in {}). '.format(
-                                time.strftime("%I:%M%p", time.localtime()),
                                 len(table.index),
                                 len(table[table['State'] == l].index), l)
 
