@@ -130,7 +130,7 @@ class Team:
 
             if title == 'placeS':
                 if amount > 0:
-                    message = message + '+{} {} (now {} in {}). '\
+                    message = message + '+{} {} (now {}) in {}. '\
                         .format(abs(amount),
                                 place,
                                 ords.ordinal(self.series['StatePlace'].item()),
