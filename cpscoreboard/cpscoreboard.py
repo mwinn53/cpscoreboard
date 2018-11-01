@@ -38,13 +38,19 @@ def mintime(lstTeam):
     l = []
     for i in lstTeam:
         l.append(lstTeam[i].series.iloc[0]['PlayTime'])
-    return min(l)
+    if l:
+        return min(l)
+    else:
+        return "00:00"
 
 def maxtime(lstTeam):
     l = []
     for i in lstTeam:
         l.append(lstTeam[i].series.iloc[0]['PlayTime'])
-    return max(l)
+    if l:
+        return max(l)
+    else:
+        return "00:00"
 
 def stillalive(lstTeam):
     l = 0

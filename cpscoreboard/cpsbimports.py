@@ -158,6 +158,7 @@ def getmaintable(url, afile):
     # Renames the 'unfriendly' titles
     table.rename(columns={'Play Time(HH:MM)': 'PlayTime'}, inplace=True)
     table.rename(columns={'Location/Category': 'State'}, inplace=True)
+    table.rename(columns={'CCSScore': 'CurrentScore'}, inplace=True)
 
     # Enrich the table with additional columns (overall place, place by
     # state, aliases from lookup table) and convert the data types
