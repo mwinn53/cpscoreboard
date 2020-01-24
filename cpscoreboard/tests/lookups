@@ -3,26 +3,29 @@
 # human-identifiable description in the updates. For example, groups can be
 # within a school district, organizations, among friends, professionals, etc.
 # FORMAT:   Team number,alias
-10-3906,MySchool-2
-10-4396,GBM
-10-4398,GBM
-10-4589,CMS
-10-4600,LMS
-10-4602,LMS
-10-4756,RMS
-10-4748,RMS
-10-2995,GTM
-10-2996,GTM
-10-3421,HMS
-10-3445,HMS
-10-3464,GBM
-10-4308,SIMS
-10-4309,SIMS
-10-4310,SIMS
-10-4785,Users Unknown
-10-4784,Tax Collectors
-10-5550,SomeALSchool
-10-2746,AnotherCASchool
-10-3905,Test School 1
-10-3914,Test School 2
-10-4783,MySchool-1
+12-1306,Senior Scripters
+12-1307,Dark_Knights.exe
+12-1308,Cyber.Bytes_Intellect
+12-1309,Code Red
+12-3503,CMS
+12-1602,CMS
+12-3502,CMS
+12-3544,LMS
+12-3545,LMS
+12-3546,LMS
+12-3857,LMS
+12-0147,GMS
+12-0149,GMS
+12-0151,GMS
+12-0154,GMS
+12-0155,GMS
+12-3237,GBMS
+12-3238,GBMS
+12-3239,GBMS
+12-3743,RMS
+12-3744,RMS
+12-4849,SIMS
+12-4850,SIMS
+12-4851,SIMS
+12-4853,SIMS
+12-4856,SIMS

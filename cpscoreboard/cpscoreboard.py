@@ -38,13 +38,19 @@ def mintime(lstTeam):
     l = []
     for i in lstTeam:
         l.append(lstTeam[i].series.iloc[0]['PlayTime'])
-    return min(l)
+    if l:
+        return min(l)
+    else:
+        return "00:00"
 
 def maxtime(lstTeam):
     l = []
     for i in lstTeam:
         l.append(lstTeam[i].series.iloc[0]['PlayTime'])
-    return max(l)
+    if l:
+        return max(l)
+    else:
+        return "00:00"
 
 def stillalive(lstTeam):
     l = 0
@@ -313,7 +319,7 @@ def main():
             # The result is a status update about every 3-5 minutes, or about
             # 24-40 tweets in a 2-hour period.
 
-            h, m = maxtime(tracker).split(':')
+            h, m, s = maxtime(tracker).split(':')
             if (int(h)*3600 + int(m)*60) > 3600 * 4:
                 redzone = True
             else:

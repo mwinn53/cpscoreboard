@@ -54,7 +54,7 @@ class Team:
         # (elapsed time + time since last score < 6 hours)
 
 	# [TODO] LOGIC ERROR. The time warning triggered too soon (possibly 5 hour threshold - lastScore) and possibly influences 'live' status.
-        etime = datetime.strptime(newSeries['PlayTime'].item(), '%H:%M')
+        etime = datetime.strptime(newSeries['PlayTime'].item(), '%H:%M:%S')
         ltime = timedelta(seconds = (time.time() - self.lastScore))
 
         totaltime = etime + ltime
