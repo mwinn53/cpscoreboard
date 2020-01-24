@@ -3,20 +3,30 @@
 # human-identifiable description in the updates. For example, groups can be
 # within a school district, organizations, among friends, professionals, etc.
 # FORMAT:   Team number,alias
-10-4785,Users Unknown
-10-4784,Tax Collectors
-10-4396,GBM
-10-4398,GBM
-10-4589,CMS
-10-4600,LMS
-10-4602,LMS
-10-4756,RMS
-10-4748,RMS
-10-2995,GTM
-10-2996,GTM
-10-3421,HMS
-10-3445,HMS
-10-3464,GBM
-10-4308,SIMS
-10-4309,SIMS
-10-4310,SIMS
+11-3500,Tax Collectors V2
+11-3502,Bits and Bytes
+11-3503,Digital Decoders
+11-0810,GBMS
+11-2518,GBMS
+11-2598,GBMS
+11-3006,LMS
+11-3007,LMS
+11-3008,LMS
+11-3009,LMS
+11-0605,RMS
+11-0608,RMS
+11-0609,RMS
+11-0610,RMS
+11-0611,RMS
+11-3568,GTMS
+11-3570,GTMS
+11-3571,GTMS
+11-3572,GTMS
+11-5197,GTMS
+11-0781,HMS
+11-0782,HMS
+11-0783,HMS
+11-4511,SIMS
+11-4512,SIMS
+11-4513,SIMS
+
