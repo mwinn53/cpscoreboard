@@ -21,7 +21,7 @@ def readteam(fname):
         with open(fname) as f:
             for line in f:
                 s = line.strip()
-                if s[0] != '#':
+                if (s!='\n') and (s[0] != '#'):
                     t.append(s)
     except e:
         logging.error(e)
@@ -41,7 +41,7 @@ def mintime(lstTeam):
     if l:
         return min(l)
     else:
-        return "00:00"
+        return "00:00:00"
 
 def maxtime(lstTeam):
     l = []
@@ -50,7 +50,7 @@ def maxtime(lstTeam):
     if l:
         return max(l)
     else:
-        return "00:00"
+        return "00:00:00"
 
 def stillalive(lstTeam):
     l = 0
