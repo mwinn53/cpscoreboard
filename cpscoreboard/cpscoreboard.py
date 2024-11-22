@@ -258,7 +258,7 @@ def main():
         f = readteam(tfile)
 
         for s in f:
-            cell = table[table['TeamNumber'].str.match(s)]
+            cell = table.loc[table['TeamNumber'] == s]
 
             if len(cell):
                 l = cell.iloc[0]['State']
