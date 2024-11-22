@@ -158,6 +158,7 @@ def getmaintable(url, afile):
         table = addalias(afile, table)
 
     table = table.rename(columns={'location': 'State'})
+    table = table.rename(columns={'team_id': 'TeamNumber'})
     table.CurrentScore = pd.to_numeric(table.CurrentScore).fillna(0)
     table.OverallPlace = pd.to_numeric(table.OverallPlace).fillna(0)
     table.StatePlace = pd.to_numeric(table.StatePlace).fillna(0)
