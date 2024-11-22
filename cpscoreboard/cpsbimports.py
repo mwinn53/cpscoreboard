@@ -93,7 +93,7 @@ def addplaces(tbl):
     row = 1     # rows are 1-indexed because tbl[0] is the header row
 
     tbl['StatePlace'] = pd.Series([], dtype=object)
-    for i in tbl['location']:   # add a column for place within states
+    for i in tbl['State']:   # add a column for place within states
         if i in d:
             d[i] += 1
         else:
