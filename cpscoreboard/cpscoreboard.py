@@ -50,7 +50,7 @@ def maxtime(lstTeam):
     if l:
         return max(l)
     else:
-        return "00:00"
+        return "00:00:00"
 
 def stillalive(lstTeam):
     l = 0
@@ -98,7 +98,7 @@ def report(tbl, ofile, teamfile = None, st = None, n = None):
         subtbl = tbl[tbl['State'] == st]        # filter by state
 
     if n:
-        subtbl = tbl.head(n)  # Assume that the presence of n indicates "top n"
+        subtbl = tbl.head(n)  # Assume that the presence of n indicates "top n" 
 
     if (not teamfile) and (not st) and (not n):
         subtbl = tbl.head(25)       # if no parameters are specified, give the top 25 with no highlights
@@ -197,8 +197,8 @@ def main():
         loglev = logging.INFO
 
     # ## DIAGNOSTIC VARIABLES
-    # # url = 'http://54.243.195.23/index.php?division=Middle%20School'
-    # # url = 'http://scoreboard.uscyberpatriot.org/index.php?division=Middle%20School'
+    # url = 'http://54.243.195.23/index.php?division=Middle%20School'
+    # url = 'https://scoreboard.uscyberpatriot.org/api/team/scores.php'
     # url = 'http://127.0.0.1/testpage.php'
     # afile = 'lookups'
     # tfile = 'team'

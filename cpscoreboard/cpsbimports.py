@@ -2,9 +2,9 @@ import logging
 import os
 import requests
 import time
+import json
 from random import random
 
-from bs4 import BeautifulSoup
 import pandas as pd
 
 class CPTableParser:
@@ -32,10 +32,7 @@ class CPTableParser:
             page.write(response.text)
             page.close()
 
-        soup = BeautifulSoup(response.text, 'lxml')
-
-        return [(0, self.parse_html_table(table)) for table in
-                soup.find_all('table')]
+        return json.loads(response.text)['data']
 
     def parse_html_table(self, table):
         n_columns = 0
@@ -96,7 +93,7 @@ def addplaces(tbl):
     row = 1     # rows are 1-indexed because tbl[0] is the header row
 
     tbl['StatePlace'] = pd.Series([], dtype=object)
-    for i in tbl['State']:   # add a column for place within states
+    for i in tbl['location']:   # add a column for place within states
         if i in d:
             d[i] += 1
         else:
@@ -140,7 +137,7 @@ def getmaintable(url, afile):
         # Handle the condition when the site is not providing a score table
         try:
             response = time.time()
-            table = cb.parse_url(url)[0][1]  # Extract the table from the tuple
+            table = pd.DataFrame.from_records(cb.parse_url(url))
 
         except (IndexError, UnboundLocalError) as e:
             delay = (10*random()) * (time.time() - response)
@@ -151,15 +148,6 @@ def getmaintable(url, afile):
             response = None
             continue
 
-    # Extracts the header names from the first row & removes the first row
-    table.columns = list(table.iloc[0])
-    table = table[1:]
-
-    # Renames the 'unfriendly' titles
-    table.rename(columns={'Play\xa0Timehh:mm:ss': 'PlayTime'}, inplace=True)
-    table.rename(columns={'Location/Category': 'State'}, inplace=True)
-    table.rename(columns={'CCSScore': 'CurrentScore'}, inplace=True)
-
 
     # Enrich the table with additional columns (overall place, place by
     # state, aliases from lookup table) and convert the data types
@@ -169,6 +157,7 @@ def getmaintable(url, afile):
     if afile:
         table = addalias(afile, table)
 
+    table = table.rename(columns={'location': 'State'})
     table.CurrentScore = pd.to_numeric(table.CurrentScore).fillna(0)
     table.OverallPlace = pd.to_numeric(table.OverallPlace).fillna(0)
     table.StatePlace = pd.to_numeric(table.StatePlace).fillna(0)
@@ -184,7 +173,7 @@ def getteamtable(url):
         # Handle the condition when the site is not providing a score table
         try:
             response = time.time()
-            table = cb.parse_url(url)[1][1]  # Extract the table from the tuple
+            table = cb.parse_url(url)
 
         except IndexError as e:
             delay = (10*random()) * (time.time() - response)
@@ -194,10 +183,9 @@ def getteamtable(url):
             time.sleep(delay)
 
     # Extracts the header names from the first row & removes the first row
-    table.columns = list(table.iloc[0])
-    table = table[1:]
+
 
     # Renames the 'unfriendly' titles
-    table.rename(columns={'*Warn': 'Warn'}, inplace=True)
+    table = pd.DataFrame.from_records(table)
 
     return table
