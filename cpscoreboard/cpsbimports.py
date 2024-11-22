@@ -152,6 +152,7 @@ def getmaintable(url, afile):
     table = table.rename(columns={'team_number': 'TeamNumber'})
     table = table.rename(columns={'ccs_score': 'CurrentScore'})
     table = table.rename(columns={'play_time': 'PlayTime'})
+    table = table.rename(columns={'images': 'ScoredImages'})
 
     # Enrich the table with additional columns (overall place, place by
     # state, aliases from lookup table) and convert the data types
