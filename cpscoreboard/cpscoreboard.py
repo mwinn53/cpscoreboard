@@ -62,7 +62,7 @@ def stillalive(lstTeam):
     else:
         return False
 
-def tweet(api, s, img=None):
+def tweet(api, client, s, img=None):
     if not api:
         logging.info('{}'.format(s))
 
@@ -72,14 +72,19 @@ def tweet(api, s, img=None):
                 img = img + '.png'
 
             try:
-                api.update_with_media(img, status=s)
-            except tweepy.error.TweepError as e:
+                media_path = img
+                media = api.media_upload(filename=media_path)
+                media_id = media.media_id
+                client.create_tweet(text=s, media_ids=[media_id])
+            except tweepy.errors.TweepyException as e:
+                print("Could not create Tweet w/image")
                 logging.error(e)
 
         else:
             try:
-                api.update_status(status=s)
-            except tweepy.error.TweepError as e:
+                client.create_tweet(text=s)
+            except tweepy.errors.TweepyException as e:
+                print("Could not create Tweet")
                 logging.error(e)
 
 def report(tbl, ofile, teamfile = None, st = None, n = None):
@@ -149,9 +154,12 @@ def main():
     parser.add_argument('url', help='URL to the Scoreboard')
     parser.add_argument('team', help="Text file of team numbers to track (one per line).")
     parser.add_argument('-a', '--alias', help="CSV file of team numbers and name aliases.")
+    # parser.add_argument('-k', '--keys',
+    #                     help="Twitter API Keys (separated by space): ConsumerKey SecretKey AccessToken AccessSecret)",
+    #                     nargs=4)
     parser.add_argument('-k', '--keys',
                         help="Twitter API Keys (separated by space): ConsumerKey SecretKey AccessToken AccessSecret)",
-                        nargs=4)
+                        nargs=5)
     parser.add_argument('-r', '--refresh', help="Refresh Interval (default: 60 seconds)")
     parser.add_argument('-o', '--output',
                         help="File name for output journal (default: scoreboard.txt in current directory)")
@@ -170,6 +178,7 @@ def main():
         afile = None
 
     if args.keys:
+        bearer_token = args.keys[4]
         consumer_key = args.keys[0]
         consumer_secret = args.keys[1]
         access_token = args.keys[2]
@@ -178,6 +187,12 @@ def main():
         auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
         auth.set_access_token(access_token, access_token_secret)
         api = tweepy.API(auth)
+        
+        client = tweepy.Client(bearer_token=bearer_token,
+            consumer_key=consumer_key, consumer_secret=consumer_secret,
+            access_token=access_token, access_token_secret=access_token_secret
+        )
+
     else:
         api = None
 
@@ -272,7 +287,7 @@ def main():
                             tm.series.iloc[0]['TeamName'],
                             tm.series.iloc[0]['TeamNumber'])
                         tm.timewarning = None
-                        tweet(api, str)
+                        tweet(api, client, str)
 
                     if redzone and tm.post:  # Only post play-by-plays later in the round.
                         #	Add a time tag if the update does not include a positive score
@@ -294,7 +309,7 @@ def main():
                                 len(table[table['State'] == l].index), l)
 
                         logging.info(tm.message)
-                        tweet(api, tracker[s].message)  # [TODO] Use threading to announce team updates (see below).
+                        tweet(api, client, tracker[s].message)  # [TODO] Use threading to announce team updates (see below).
                         tm.post = False
 
                 else:
@@ -305,7 +320,7 @@ def main():
                     else:
                         name = ''
 
-                    tweet(api,
+                    tweet(api, client,
                           'Team {} {} is on the board at {} with {} points. They are in {} place in {}. '.format(cell.iloc[0]['TeamNumber'],
                                 name,
                                 time.strftime("%I:%M %p", time.localtime()),
@@ -358,7 +373,7 @@ def main():
                 logging.debug('posted report: top {} teams'.format(topn))
                 report(table, imgfile, teamfile = tfile, n = topn)  # Show the top n teams
 
-            tweet(api, str, imgfile)
+            tweet(api, client, str, imgfile)
             next = time.time() + random.uniform(t - (t * .1), t + (t * .1))
 
         for s in tracker:
@@ -367,7 +382,7 @@ def main():
                 str = 'Time is almost up for team {} ({}). Place changes will still be posted as a result of other teams competing'.format(
                     tm.series.iloc[0]['TeamName'], tm.series.iloc[0]['TeamNumber'])
                 tm.live = None
-                tweet(api, str)
+                tweet(api, client, str)
 
         # [TODO] Use threading to post the team updates (i.e., play-by-play)
         # add s.message to a list
