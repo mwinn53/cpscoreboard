@@ -44,16 +44,36 @@ docker image prune -f >/dev/null
 
 # Wait for the app's Docker health check (/healthz).
 APP_CONTAINER="$(docker compose ps -q app)"
+status=unknown
 for _ in $(seq 1 30); do
   status="$(docker inspect -f '{{.State.Health.Status}}' "$APP_CONTAINER" 2>/dev/null || echo unknown)"
-  if [ "$status" = healthy ]; then
-    echo "Deployed $IMAGE (healthy)"
-    docker compose ps
-    exit 0
-  fi
+  [ "$status" = healthy ] && break
   sleep 3
 done
+if [ "$status" != healthy ]; then
+  echo "App did not become healthy (last status: $status)" >&2
+  docker compose logs --tail 50 app >&2 || true
+  exit 1
+fi
+echo "App container healthy"
 
-echo "App did not become healthy (last status: $status)" >&2
-docker compose logs --tail 50 app >&2 || true
+# End-to-end check through Caddy over HTTPS with certificate validation, run from the instance
+# itself (the site may be IP-restricted, so GitHub's runners can't reach it). Passes if any
+# configured hostname works; a brand-new hostname may still be waiting for DNS/its certificate.
+SITE_ADDRESS="$(sed -n "s/^SITE_ADDRESS='\(.*\)'$/\1/p" .env)"
+IFS=',' read -ra HOSTS <<< "$SITE_ADDRESS"
+for _ in $(seq 1 12); do
+  for host in "${HOSTS[@]}"; do
+    host="$(echo "$host" | xargs)"
+    if curl -fsS --max-time 5 --resolve "$host:443:127.0.0.1" "https://$host/healthz" >/dev/null 2>&1; then
+      echo "Deployed $IMAGE — https://$host/healthz OK via Caddy"
+      docker compose ps
+      exit 0
+    fi
+  done
+  sleep 5
+done
+
+echo "Caddy did not serve /healthz over HTTPS for: $SITE_ADDRESS" >&2
+docker compose logs --tail 30 caddy >&2 || true
 exit 1

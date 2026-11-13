@@ -18,8 +18,12 @@ data "aws_ssm_parameter" "al2023_arm64" {
 }
 
 locals {
-  account_id   = data.aws_caller_identity.current.account_id
-  site_address = "${replace(aws_eip.web.public_ip, ".", "-")}.sslip.io"
+  account_id    = data.aws_caller_identity.current.account_id
+  sslip_address = "${replace(aws_eip.web.public_ip, ".", "-")}.sslip.io"
+  # Caddy serves (and gets certificates for) every listed address. Keeping the sslip.io name
+  # alongside a custom hostname means the site stays reachable while DNS changes propagate.
+  site_address = var.site_hostname == "" ? local.sslip_address : "${var.site_hostname}, ${local.sslip_address}"
+  site_url     = "https://${var.site_hostname == "" ? local.sslip_address : var.site_hostname}"
 }
 
 resource "aws_security_group" "web" {
@@ -32,7 +36,7 @@ resource "aws_security_group" "web" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.http_cidrs != null ? var.http_cidrs : var.allowed_cidrs
   }
 
   ingress {
@@ -40,7 +44,7 @@ resource "aws_security_group" "web" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_cidrs
   }
 
   ingress {
@@ -48,7 +52,7 @@ resource "aws_security_group" "web" {
     from_port   = 443
     to_port     = 443
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_cidrs
   }
 
   egress {

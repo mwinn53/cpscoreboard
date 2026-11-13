@@ -60,6 +60,46 @@ variable "acme_email" {
   type        = string
 }
 
+variable "allowed_cidrs" {
+  description = "Who can reach the site on 443 (HTTPS/HTTP3). [\"0.0.0.0/0\"] = public."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "http_cidrs" {
+  description = <<-EOT
+    Who can reach port 80 (ACME HTTP-01 challenges + redirect to HTTPS). null = same as allowed_cidrs.
+    Certificates can only be issued/renewed if Let's Encrypt can reach port 80 (or 443), so set
+    this to ["0.0.0.0/0"] to keep certificates working while the site itself stays restricted.
+  EOT
+  type        = list(string)
+  default     = null
+}
+
+variable "site_hostname" {
+  description = "Custom hostname for the site (e.g. scores.example.com); its A record must point at the Elastic IP. Empty = sslip.io only."
+  type        = string
+  default     = ""
+}
+
+variable "mail_domain" {
+  description = "Domain to send email from via SES (e.g. example.com). Empty = no SES."
+  type        = string
+  default     = ""
+}
+
+variable "mail_from_subdomain" {
+  description = "Subdomain of mail_domain used as the SES envelope sender (bounces). Must not already have an MX or CNAME."
+  type        = string
+  default     = "bounce"
+}
+
+variable "mail_sender" {
+  description = "From address for app email, e.g. noreply@example.com (must be in mail_domain)."
+  type        = string
+  default     = ""
+}
+
 variable "app_settings" {
   description = <<-EOT
     Non-secret app settings, written to SSM as /<name>/env/<KEY> and passed to the
