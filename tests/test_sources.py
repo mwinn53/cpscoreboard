@@ -86,10 +86,10 @@ async def test_poller_parses_only_on_change_and_backs_off():
         poller = Poller(LiveSource("http://test/scores", client), interval=60)
 
         assert await poller.poll_once() is True
-        assert len(poller.state.teams) == 1478 and poller.state.changes == 1
+        assert len(poller.state.teams) == 1478 and poller.state.changes_seen == 1
 
         assert await poller.poll_once() is False  # unchanged
-        assert poller.state.changes == 1 and poller.state.polls == 2
+        assert poller.state.changes_seen == 1 and poller.state.polls == 2
         assert poller.next_delay() == 60
 
         assert await poller.poll_once() is False  # HTTP 503

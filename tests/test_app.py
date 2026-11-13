@@ -33,6 +33,17 @@ def test_health_and_api_from_replay():
         assert "raw" not in data["teams"][0]
 
 
+def test_history_endpoint_and_database_counts():
+    with make_client() as client:
+        health = wait_for_teams(client)
+        assert health["database"]["board_updates"] >= 1
+        team = client.get("/api/scores").json()["teams"][0]["team_number"]
+        hist = client.get(f"/api/teams/{team}/history").json()
+        assert hist["team_number"] == team and len(hist["snapshots"]) >= 1
+        assert "observed_at" in hist["snapshots"][0]
+        assert client.get("/api/teams/00-0000/history").status_code == 404
+
+
 def test_dashboard_renders_watchlist_and_filters():
     with make_client() as client:
         wait_for_teams(client)

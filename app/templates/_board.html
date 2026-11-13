@@ -21,21 +21,32 @@
   </thead>
   <tbody>
     {% for t in teams %}
-    <tr class="{{ 'watched' if t.team_number in watch_set }}">
+    {% set ch = changes.get(t.team_number) %}
+    {% set shown = ch and ch.visible and ch.at is recent %}
+    <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
       <td class="num">{{ t.place_overall }}</td>
       <td class="team">{{ t.team_number }}</td>
       <td>{{ t.location }}</td>
       <td>{{ t.division }}</td>
       {% if has_tier %}<td>{{ t.tier }}</td>{% endif %}
-      <td class="num">{{ t.place_division }}</td>
+      <td class="num">{{ t.place_division }}
+        {%- if shown and ch.place_delta %}
+        <span class="delta {{ 'up' if ch.place_delta > 0 else 'down' }}" title="Division places since previous change">{{ '▲' if ch.place_delta > 0 else '▼' }}{{ ch.place_delta | abs }}</span>
+        {%- endif %}</td>
       <td class="num">{{ t.place_state }}</td>
       <td class="num">{{ t.place_state_division }}</td>
       <td class="num">{{ t.images if t.images is not none }}</td>
       <td class="num mono">{{ t.play_time | hms }}</td>
       <td class="num mono">{{ t.score_time | hms }}</td>
       <td>{% if t.code %}<span class="warn">{{ t.code }}</span>{% endif %}</td>
-      <td class="num strong">{{ t.ccs_score | num }}</td>
-      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}</td>{% endif %}
+      <td class="num strong">{{ t.ccs_score | num }}
+        {%- if shown and ch.score_delta and not has_totals %}
+        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
+        {%- endif %}</td>
+      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}
+        {%- if shown and ch.score_delta %}
+        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
+        {%- endif %}</td>{% endif %}
     </tr>
     {% endfor %}
   </tbody>
@@ -50,6 +61,7 @@
     {% if status.data_as_of %}<span class="muted">({{ status.data_as_of.strftime('%Y-%m-%d %H:%M:%S UTC') }})</span>{% endif %}</span>
   <span>Last change <strong>{{ status.last_changed | ago }}</strong></span>
   {% if status.replay_position %}<span>Replay {{ status.replay_position[0] }}/{{ status.replay_position[1] }}{% if status.finished %} · finished{% endif %}</span>{% endif %}
+  {% if status.restored %}<span class="muted">Showing saved data; waiting for the live scoreboard…</span>{% endif %}
   {% if status.last_error %}<span class="error">⚠ {{ status.last_error }}</span>{% endif %}
 </section>
 

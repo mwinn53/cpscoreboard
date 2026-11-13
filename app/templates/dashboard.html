@@ -20,7 +20,17 @@
   <noscript><button type="submit">Apply</button></noscript>
 </form>
 
-<div id="board" hx-get="/partials/board" hx-trigger="every 15s" hx-include="#filters">
+<div id="board" hx-get="/partials/board" hx-trigger="refresh, every 60s" hx-include="#filters">
   {% include "_board.html" %}
 </div>
+
+<script>
+  // Refresh the board as soon as the server says it changed. The browser reconnects
+  // on its own; the 60 s htmx poll above is a fallback and keeps the "ago" times current.
+  if (window.EventSource) {
+    new EventSource("/events").addEventListener("board", function () {
+      if (window.htmx) htmx.trigger("#board", "refresh");
+    });
+  }
+</script>
 {% endblock %}

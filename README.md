@@ -13,8 +13,10 @@ See [TODO.md](TODO.md) for the roadmap.
 |---|---|
 | `app/scraper.py` | Parses `scores.php` JSON into ranked `TeamScore` rows |
 | `app/sources.py` | Where data comes from: `live`, `capture` (live + save changes), `replay` |
-| `app/poller.py` | Background poll loop with change detection and backoff |
-| `app/web.py`, `app/templates/` | Dashboard (htmx, refreshes every 15 s), `/api/scores`, `/healthz` |
+| `app/poller.py` | Background poll loop: change detection, backoff, storing changes, change indicators |
+| `app/store.py` | SQLite (SQLAlchemy Core) history: `board_updates` + change-only `team_snapshots` |
+| `app/events.py` | Server-sent events (`/events`) that tell open dashboards to refresh |
+| `app/web.py`, `app/templates/` | Dashboard (htmx), `/api/scores`, `/api/teams/{team}/history`, `/healthz` |
 | `tests/fixtures/` | Real scoreboard responses from season 17 (2024) and season 19 (2026) |
 
 ## Configuration
@@ -26,12 +28,23 @@ All settings are environment variables; see [.env.example](.env.example).
 | `APP_ENV` | `dev` | `prod` refuses any `SCRAPE_MODE` other than `live` |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
 | `POLL_INTERVAL` | `60` | Seconds between polls |
+| `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |
+| `DATABASE_URL` | — | Override the database. The default is `sqlite:///<DATA_DIR>/cpscoreboard.db`; in replay mode it's an in-memory database, so replays never mix into real history |
 | `CAPTURE_SET` | — | Replay: folder under `captures/`, or any folder path |
 | `REPLAY_SPEED` | `1` | e.g. `20` plays an hour of captures in 3 minutes |
 | `REPLAY_LOOP` | `false` | Restart the replay when it ends |
 | `COLLECT_LOCATIONS` | — (all) | Comma-separated locations to keep, e.g. `VA,MD,DC` |
 | `COLLECT_DIVISIONS` | — (all) | Comma-separated divisions to keep, e.g. `Open,Middle School` |
 | `WATCH_TEAMS` | — | Comma-separated team numbers to pin; always collected (temporary; moves to the database in milestone 3) |
+
+### What gets stored
+
+Each time the board changes, the app records one `board_updates` row with the time
+and board size. It then writes a `team_snapshots` row for each **collected** team
+whose score, images, warnings, score time or any place changed. Play time alone
+doesn't trigger a row. With the filter limited to one state and division, that
+means tens of rows per round, not thousands. On restart, the dashboard reloads the
+last known board from the database instead of starting empty.
 
 ### Collection filter
 
