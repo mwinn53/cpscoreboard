@@ -1,0 +1,70 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1b1f24;
+  --muted: #5f6b7a;
+  --border: #dde2e8;
+  --accent: #1f5fbf;
+  --watch-bg: #fff6cc;
+  --warn: #b54708;
+  --error: #b42318;
+  --dev: #6941c6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --surface: #171b21;
+    --text: #e6e9ee;
+    --muted: #94a0b0;
+    --border: #2a313b;
+    --accent: #7aa7ff;
+    --watch-bg: #3a3212;
+    --warn: #f5a35c;
+    --error: #ff7b72;
+    --dev: #b69cff;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { padding: 0 16px 24px; max-width: 1400px; margin: 0 auto; }
+h2 { font-size: 16px; margin: 20px 0 8px; }
+
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand { font-weight: 700; font-size: 16px; color: var(--text); text-decoration: none; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.badge-dev { color: var(--dev); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 8px; }
+.filters input, .filters select, .filters button {
+  font: inherit; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--surface); color: var(--text);
+}
+.filters input { min-width: 12em; }
+
+.status { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); padding: 8px 0; }
+.status strong { color: var(--text); }
+.muted { color: var(--muted); font-weight: normal; }
+.error { color: var(--error); }
+.empty { color: var(--muted); padding: 24px 0; }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
+.board th, .board td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+.board th { position: sticky; top: 0; background: var(--surface); font-size: 12px; color: var(--muted); font-weight: 600; }
+.board tbody tr:last-child td { border-bottom: none; }
+.board .num { text-align: right; font-variant-numeric: tabular-nums; }
+.board .mono { font-family: ui-monospace, Consolas, monospace; }
+.board .strong, .board .team { font-weight: 600; }
+.board tr.watched td { background: var(--watch-bg); }
+.warn { color: var(--warn); font-weight: 600; }
+
+.foot { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }

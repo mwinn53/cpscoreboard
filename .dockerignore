@@ -1,0 +1,14 @@
+.git
+.venv
+.vscode
+.idea
+.devcontainer
+**/__pycache__
+*.egg-info
+.pytest_cache
+.env
+captures
+data
+legacy
+tests
+*.png

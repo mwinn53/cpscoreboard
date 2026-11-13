@@ -1,0 +1,23 @@
+{
+  "name": "cpscoreboard",
+  "dockerComposeFile": ["docker-compose.dev.yml"],
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "app",
+  "postCreateCommand": "pip install -e '.[dev]'",
+  "forwardPorts": [8080, 8025],
+  "portsAttributes": {
+    "8080": { "label": "Scoreboard" },
+    "8025": { "label": "Mailpit (dev email inbox)" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance"],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "python.testing.pytestEnabled": true
+      }
+    }
+  }
+}

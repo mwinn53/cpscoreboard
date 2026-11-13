@@ -1,0 +1,69 @@
+{% macro team_table(teams) %}
+<div class="table-wrap">
+<table class="board">
+  <thead>
+    <tr>
+      <th class="num" title="Overall place">#</th>
+      <th>Team</th>
+      <th>State</th>
+      <th>Division</th>
+      {% if has_tier %}<th>Tier</th>{% endif %}
+      <th class="num" title="Place in division">Div #</th>
+      <th class="num" title="Place in state (all divisions)">State #</th>
+      <th class="num" title="Place in state and division">St/Div #</th>
+      <th class="num">Images</th>
+      <th class="num">Play time</th>
+      <th class="num">Score time</th>
+      <th title="Warnings">Warn</th>
+      <th class="num">CCS</th>
+      {% if has_totals %}<th class="num">Adj</th><th class="num">Total</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in teams %}
+    <tr class="{{ 'watched' if t.team_number in watch_set }}">
+      <td class="num">{{ t.place_overall }}</td>
+      <td class="team">{{ t.team_number }}</td>
+      <td>{{ t.location }}</td>
+      <td>{{ t.division }}</td>
+      {% if has_tier %}<td>{{ t.tier }}</td>{% endif %}
+      <td class="num">{{ t.place_division }}</td>
+      <td class="num">{{ t.place_state }}</td>
+      <td class="num">{{ t.place_state_division }}</td>
+      <td class="num">{{ t.images if t.images is not none }}</td>
+      <td class="num mono">{{ t.play_time | hms }}</td>
+      <td class="num mono">{{ t.score_time | hms }}</td>
+      <td>{% if t.code %}<span class="warn">{{ t.code }}</span>{% endif %}</td>
+      <td class="num strong">{{ t.ccs_score | num }}</td>
+      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+<section class="status">
+  <span><strong>{{ status.teams }}</strong> teams
+    {% if status.collecting != 'all teams' %}<span class="muted">of {{ status.board_size }} on the board · collecting {{ status.collecting }}</span>{% endif %}</span>
+  <span>Data as of <strong>{{ status.data_as_of | ago }}</strong>
+    {% if status.data_as_of %}<span class="muted">({{ status.data_as_of.strftime('%Y-%m-%d %H:%M:%S UTC') }})</span>{% endif %}</span>
+  <span>Last change <strong>{{ status.last_changed | ago }}</strong></span>
+  {% if status.replay_position %}<span>Replay {{ status.replay_position[0] }}/{{ status.replay_position[1] }}{% if status.finished %} · finished{% endif %}</span>{% endif %}
+  {% if status.last_error %}<span class="error">⚠ {{ status.last_error }}</span>{% endif %}
+</section>
+
+{% if watched or watch_missing %}
+<h2>Watchlist</h2>
+{% if watched %}{{ team_table(watched) }}{% endif %}
+{% if watch_missing %}<p class="muted">Not on the board yet: {{ watch_missing | join(', ') }}</p>{% endif %}
+{% endif %}
+
+<h2>Scoreboard <span class="muted">· showing {{ rows | length }} of {{ matched }}</span></h2>
+{% if rows %}
+  {{ team_table(rows) }}
+{% elif status.teams == 0 %}
+  <p class="empty">Waiting for scoreboard data…</p>
+{% else %}
+  <p class="empty">No teams match these filters.</p>
+{% endif %}

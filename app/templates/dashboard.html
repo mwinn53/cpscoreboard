@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<form id="filters" class="filters" method="get" action="/"
+      hx-get="/partials/board" hx-target="#board"
+      hx-trigger="change, input changed delay:300ms from:input[name=q]">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Team number…" aria-label="Search team number">
+  <select name="division" aria-label="Division">
+    <option value="">All divisions</option>
+    {% for d in divisions %}<option {% if d == filters.division %}selected{% endif %}>{{ d }}</option>{% endfor %}
+  </select>
+  <select name="state" aria-label="State">
+    <option value="">All states</option>
+    {% for s in states %}<option {% if s == filters.state %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <select name="limit" aria-label="Rows">
+    {% for n in [50, 100, 500, 0] %}
+    <option value="{{ n }}" {% if n == filters.limit %}selected{% endif %}>{{ 'All rows' if n == 0 else n ~ ' rows' }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit">Apply</button></noscript>
+</form>
+
+<div id="board" hx-get="/partials/board" hx-trigger="every 15s" hx-include="#filters">
+  {% include "_board.html" %}
+</div>
+{% endblock %}
