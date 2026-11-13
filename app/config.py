@@ -54,6 +54,28 @@ class Settings(BaseSettings):
     # Temporary until milestone 3 moves the watchlist into the database.
     watch_teams: str = ""
 
+    # --- Access control (milestone 4) ---
+    # Viewers register a browser with an emailed code; the admin approves it.
+    # Prod always requires it; dev can turn it off for convenience.
+    auth_enabled: bool = True
+    # Secret that lets a registered device claim admin at /admin/claim. Unset = no claiming.
+    admin_bootstrap_token: str | None = None
+    # Where "new device waiting for approval" emails go. Unset = admin page only.
+    admin_notify_email: str | None = None
+    device_lifetime_days: int = 365
+
+    # --- Email ---
+    mail_backend: str = "auto"  # auto | ses | smtp | console (auto: smtp if SMTP_HOST, ses in prod, else console)
+    mail_from: str = "noreply@localhost"
+    mail_from_name: str = "CP Scoreboard"
+    smtp_host: str | None = None
+    smtp_port: int = 1025
+    aws_region: str = "us-east-1"
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.app_env is AppEnv.prod
+
     @property
     def watch_team_list(self) -> list[str]:
         return [t.strip() for t in self.watch_teams.split(",") if t.strip()]
@@ -86,4 +108,10 @@ class Settings(BaseSettings):
             raise ValueError("SCRAPE_MODE=replay requires CAPTURE_SET")
         if self.poll_interval <= 0 or self.replay_speed <= 0:
             raise ValueError("POLL_INTERVAL and REPLAY_SPEED must be positive")
+        if self.app_env is AppEnv.prod and not self.auth_enabled:
+            raise ValueError("AUTH_ENABLED can't be false when APP_ENV=prod")
+        if self.mail_backend not in ("auto", "ses", "smtp", "console"):
+            raise ValueError("MAIL_BACKEND must be auto, ses, smtp or console")
+        if self.admin_bootstrap_token is not None and len(self.admin_bootstrap_token) < 16:
+            raise ValueError("ADMIN_BOOTSTRAP_TOKEN must be at least 16 characters")
         return self

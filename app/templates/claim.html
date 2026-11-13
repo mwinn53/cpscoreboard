@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Claim admin · CP Scoreboard{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Claim admin</h1>
+  {% if device %}
+  <p class="muted">This makes <strong>{{ device.email }}</strong> on this browser the site admin, and approves it.
+    The token is the <code>ADMIN_BOOTSTRAP_TOKEN</code> setting.</p>
+  {% else %}
+  <p class="muted"><a href="/register">Register this browser</a> first (email + code), then come back here.</p>
+  {% endif %}
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if device %}
+  <form method="post" action="/admin/claim" class="stack">
+    <label for="token">Admin token</label>
+    <input id="token" name="token" type="password" autocomplete="off" required autofocus>
+    <button type="submit">Claim admin</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

@@ -36,3 +36,20 @@ async def test_stream_sends_board_events_and_keepalives_until_disconnect():
     disconnected = True
     with pytest.raises(StopAsyncIteration):
         await anext(stream)
+
+
+async def test_stream_ends_when_access_is_revoked():
+    allowed = True
+
+    async def never_disconnected():
+        return False
+
+    async def still_allowed():
+        return allowed
+
+    stream = event_stream(BoardNotifier(), never_disconnected, heartbeat=0.01, still_allowed=still_allowed)
+    await anext(stream)  # retry
+    assert await anext(stream) == ": keepalive\n\n"
+    allowed = False
+    with pytest.raises(StopAsyncIteration):
+        await anext(stream)

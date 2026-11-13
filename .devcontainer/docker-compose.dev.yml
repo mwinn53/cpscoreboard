@@ -12,9 +12,15 @@ services:
     environment:
       APP_ENV: dev
       SCRAPE_MODE: live
-      # Used from milestone 4 (registration emails); open http://localhost:8025 to read them.
+      # Registration emails go to Mailpit; read them at http://localhost:8025.
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
+      MAIL_FROM: noreply@cpscoreboard.test
+      # Dev-only admin token: register at /register, then claim admin at /admin/claim.
+      ADMIN_BOOTSTRAP_TOKEN: dev-admin-token-not-secret
+      ADMIN_NOTIFY_EMAIL: admin@cpscoreboard.test
+      # Set to "false" to skip registration while developing the dashboard.
+      AUTH_ENABLED: "true"
 
   mailpit:
     image: axllent/mailpit:v1.20.0

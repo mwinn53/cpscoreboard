@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Register · CP Scoreboard{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Request access</h1>
+  <p class="muted">This scoreboard is private. Enter your email address and we'll send you a 6-digit code.
+    After you enter it, the site admin approves this browser.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/register" class="stack">
+    <label for="email">Email address</label>
+    <input id="email" name="email" type="email" autocomplete="email" required autofocus value="{{ email }}">
+    <button type="submit">Send code</button>
+  </form>
+</section>
+{% endblock %}

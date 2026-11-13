@@ -110,7 +110,7 @@ class SnapshotStore:
         # An in-memory database is one shared connection, which isn't safe to use from two
         # threads at once (poller writes vs. request reads). File databases get a connection
         # per thread from the pool, so they don't need this.
-        self._lock = threading.Lock() if self.engine.url.database in (None, "", ":memory:") else nullcontext()
+        self.lock = threading.Lock() if self.engine.url.database in (None, "", ":memory:") else nullcontext()
         metadata.create_all(self.engine)
 
     @staticmethod
@@ -136,7 +136,7 @@ class SnapshotStore:
         """Record a board change and the snapshots of teams that changed. Returns rows written."""
         at = _to_db(observed_at)
         rows = [{"observed_at": at, **{f: getattr(t, f) for f in _TEAM_FIELDS}} for t in changed]
-        with self._lock, self.engine.begin() as conn:
+        with self.lock, self.engine.begin() as conn:
             conn.execute(insert(board_updates).values(observed_at=at, board_size=board_size,
                                                       collected=collected))
             if rows:
@@ -151,7 +151,7 @@ class SnapshotStore:
                                    order_by=(team_snapshots.c.observed_at.desc(),
                                              team_snapshots.c.id.desc())).label("rn"),
         ).subquery()
-        with self._lock, self.engine.connect() as conn:
+        with self.lock, self.engine.connect() as conn:
             rows = conn.execute(select(ranked).where(ranked.c.rn <= 2)).all()
             last = conn.execute(select(board_updates)
                                 .order_by(board_updates.c.observed_at.desc(), board_updates.c.id.desc())
@@ -167,7 +167,7 @@ class SnapshotStore:
 
     def history(self, team_number: str, limit: int = 1000) -> list[Snapshot]:
         """A team's snapshots, oldest first (the most recent ``limit`` of them)."""
-        with self._lock, self.engine.connect() as conn:
+        with self.lock, self.engine.connect() as conn:
             rows = conn.execute(select(team_snapshots)
                                 .where(team_snapshots.c.team_number == team_number)
                                 .order_by(team_snapshots.c.observed_at.desc(), team_snapshots.c.id.desc())
@@ -175,7 +175,7 @@ class SnapshotStore:
         return [Snapshot(_from_db(r.observed_at), _row_to_team(r)) for r in reversed(rows)]
 
     def counts(self) -> dict[str, int]:
-        with self._lock, self.engine.connect() as conn:
+        with self.lock, self.engine.connect() as conn:
             return {
                 "board_updates": conn.scalar(select(func.count()).select_from(board_updates)),
                 "team_snapshots": conn.scalar(select(func.count()).select_from(team_snapshots)),

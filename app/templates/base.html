@@ -10,7 +10,13 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">CP Scoreboard</a>
-    {% if status.env == 'dev' %}<span class="badge badge-dev">dev · {{ status.mode }}</span>{% endif %}
+    {% if app_env == 'dev' %}<span class="badge badge-dev">dev · {{ scrape_mode }}{% if not auth_enabled %} · no auth{% endif %}</span>{% endif %}
+    {% if viewer %}
+    <nav class="nav">
+      {% if viewer.is_admin %}<a href="/admin">Admin</a>{% endif %}
+      <span class="muted" title="Signed in on this browser">{{ viewer.name }}</span>
+    </nav>
+    {% endif %}
   </header>
   <main>{% block content %}{% endblock %}</main>
   <footer class="foot">Unofficial. Scores come from the public CyberPatriot scoreboard and may lag or change.</footer>

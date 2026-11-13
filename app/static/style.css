@@ -74,3 +74,42 @@ table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .board tr.recent td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 .foot { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }
+
+/* --- Navigation, forms, registration and admin pages --- */
+h1 { font-size: 20px; margin: 20px 0 8px; }
+.nav { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+.nav a { color: var(--accent); text-decoration: none; font-weight: 600; }
+a { color: var(--accent); }
+.small { font-size: 12px; }
+.mono { font-family: ui-monospace, Consolas, monospace; }
+.strong { font-weight: 600; }
+.badge { color: var(--muted); }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; margin: 24px 0;
+}
+.card.narrow { max-width: 440px; margin: 40px auto; }
+.card h1 { margin-top: 0; }
+.stack { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.stack label { font-weight: 600; font-size: 13px; }
+.stack input, .label-form input {
+  font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text);
+}
+.code-input { font-size: 22px; letter-spacing: 0.3em; text-align: center; font-family: ui-monospace, Consolas, monospace; }
+form.inline { display: inline; margin: 0; }
+
+button {
+  font: inherit; cursor: pointer; padding: 7px 14px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.stack button, button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+button.danger { color: var(--error); }
+button.link { border: none; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+
+.devices td { vertical-align: top; white-space: normal; }
+.devices .actions { white-space: nowrap; text-align: right; }
+.devices .actions button { padding: 4px 10px; font-size: 12px; margin-left: 4px; }
+.label-form { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.label-form input { padding: 3px 6px; font-size: 12px; width: 12em; }

@@ -31,10 +31,13 @@ class BoardNotifier:
 
 
 async def event_stream(notifier: BoardNotifier, is_disconnected: Callable[[], Awaitable[bool]],
-                       heartbeat: float = 20.0) -> AsyncIterator[str]:
+                       heartbeat: float = 20.0,
+                       still_allowed: Callable[[], Awaitable[bool]] | None = None) -> AsyncIterator[str]:
     seen = notifier.version
     yield "retry: 5000\n\n"  # browser reconnect delay
     while not await is_disconnected():
+        if still_allowed is not None and not await still_allowed():
+            return  # access was revoked; the reconnect will be refused
         version = await notifier.wait(seen, heartbeat)
         if version != seen:
             seen = version
