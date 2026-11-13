@@ -1,62 +1,26 @@
-"""HTTP routes: dashboard pages, JSON API, health check."""
+"""HTTP routes for the scoreboard: dashboard pages, JSON API, events, health check.
+
+Everything except /healthz requires an approved device (see app/auth.py).
+"""
 
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
+import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.templating import Jinja2Templates
 
+from .auth import require_viewer
 from .config import Settings
 from .events import event_stream
 from .poller import Poller
-from .sources import ReplaySource, utcnow
+from .sources import ReplaySource
 from .store import SnapshotStore
+from .templating import templates
 
-RECENT_SECONDS = 300  # rows that changed within this window are highlighted
-
-router = APIRouter()
-templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-
-
-def _hms(seconds: int | None) -> str:
-    if seconds is None:
-        return ""
-    return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
-
-
-def _ago(when: datetime | None) -> str:
-    if when is None:
-        return "never"
-    secs = int((utcnow() - when).total_seconds())
-    if secs < 90:
-        return f"{max(secs, 0)}s ago"
-    if secs < 5400:
-        return f"{secs // 60}m ago"
-    if secs < 172800:
-        return f"{secs // 3600}h ago"
-    return f"{secs // 86400}d ago"
-
-
-def _num(value: float | None) -> str:
-    if value is None:
-        return ""
-    return f"{value:g}" if value == int(value) else f"{value:.2f}"
-
-
-def _signed(value: float) -> str:
-    return ("+" if value > 0 else "−") + _num(abs(value))
-
-
-def _recent(when: datetime | None) -> bool:
-    return when is not None and (utcnow() - when).total_seconds() <= RECENT_SECONDS
-
-
-templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed)
-templates.env.tests.update(recent=_recent)
+router = APIRouter(dependencies=[Depends(require_viewer)])
+public_router = APIRouter()
 
 
 def _poller(request: Request) -> Poller:
@@ -134,9 +98,23 @@ def board_partial(request: Request, q: str = "", division: str = "", state: str 
 @router.get("/events")
 async def events(request: Request) -> StreamingResponse:
     """Server-sent events: ``board`` whenever the scoreboard changes."""
-    stream = event_stream(_poller(request).notifier, request.is_disconnected)
+    device = getattr(request.state, "device", None)
+    still_allowed = None
+    if device is not None:
+        devices = request.app.state.devices
+
+        async def still_allowed() -> bool:  # a revoked device's open stream ends at the next heartbeat
+            current = await asyncio.to_thread(devices.get, device.id)
+            return current is not None and current.approved
+
+    stream = event_stream(_poller(request).notifier, request.is_disconnected, still_allowed=still_allowed)
     return StreamingResponse(stream, media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/api/status")
+def api_status(request: Request) -> dict[str, Any]:
+    return {**_status(request), "database": _store(request).counts()}
 
 
 @router.get("/api/scores")
@@ -154,6 +132,8 @@ def api_team_history(request: Request, team_number: str, limit: int = 1000) -> d
             "snapshots": [{"observed_at": s.observed_at, **s.team.to_dict()} for s in snapshots]}
 
 
-@router.get("/healthz")
+@public_router.get("/healthz")
 def healthz(request: Request) -> dict[str, Any]:
-    return {"status": "ok", **_status(request), "database": _store(request).counts()}
+    """Liveness for Docker and the deploy check. Public, so it reveals nothing about the board."""
+    _store(request).counts()  # raises (500) if the database is unusable
+    return {"status": "ok"}

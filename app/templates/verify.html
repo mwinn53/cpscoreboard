@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Enter code · CP Scoreboard{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Check your email</h1>
+  <p class="muted">We sent a 6-digit code to <strong>{{ email }}</strong>. It expires in 10 minutes.
+    If it isn't in your inbox, check your spam folder.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/verify" class="stack">
+    <label for="code">Verification code</label>
+    <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}"
+           maxlength="7" required autofocus class="code-input">
+    <button type="submit">Verify</button>
+  </form>
+  <p class="muted small"><a href="/register">Use a different address or get a new code</a></p>
+</section>
+{% endblock %}

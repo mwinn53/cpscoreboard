@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Admin · CP Scoreboard{% endblock %}
+{% block content %}
+{% macro device_rows(devices, actions) %}
+<div class="table-wrap">
+<table class="board devices">
+  <thead><tr>
+    <th>Who</th><th>Browser</th><th>IP</th><th>Registered</th><th>Last seen</th><th>Expires</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for d in devices %}
+  {% set ua_changed = d.first_ua != d.last_ua %}
+  <tr>
+    <td>
+      <div class="strong">{{ d.email }}{% if d.is_admin %} <span class="badge">admin</span>{% endif %}{% if d.id == me.id %} <span class="badge">you</span>{% endif %}</div>
+      <form method="post" action="/admin/devices/{{ d.id }}/label" class="inline label-form">
+        <input name="label" value="{{ d.label }}" placeholder="Add a label" aria-label="Label for {{ d.email }}" maxlength="100">
+        <button type="submit" class="link">Save</button>
+      </form>
+    </td>
+    <td title="{{ d.last_ua }}">{{ d.last_ua | browser }}
+      {% if ua_changed %}<div class="warn small" title="Registered with: {{ d.first_ua }}">changed since registration ({{ d.first_ua | browser }})</div>{% endif %}</td>
+    <td class="mono">{{ d.last_ip }}{% if d.first_ip != d.last_ip %}<div class="muted small">first: {{ d.first_ip }}</div>{% endif %}</td>
+    <td title="{{ d.created_at | date }}">{{ d.created_at | ago }}</td>
+    <td title="{{ d.last_seen | date }}">{{ d.last_seen | ago }}</td>
+    <td>{% if d.status == 'approved' %}{{ d.expires_at | date }}{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="actions">
+      {% for action, text, style in actions %}
+        {% if not (d.id == me.id and action in ('revoke', 'delete')) and not (action == 'make-admin' and d.is_admin) %}
+        <form method="post" action="/admin/devices/{{ d.id }}/{{ action }}" class="inline"
+              {% if action == 'delete' %}onsubmit="return confirm('Delete this device record?')"{% endif %}>
+          <button type="submit" class="{{ style }}">{{ text }}</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+<h1>Devices</h1>
+
+<h2>Waiting for approval <span class="muted">· {{ groups.pending | length }}</span></h2>
+{% if groups.pending %}
+  {{ device_rows(groups.pending, [('approve', 'Approve', 'primary'), ('revoke', 'Deny', ''), ('delete', 'Delete', 'danger')]) }}
+{% else %}<p class="empty">Nobody is waiting.</p>{% endif %}
+
+<h2>Approved <span class="muted">· {{ groups.approved | length }}</span></h2>
+{% if groups.approved %}
+  {{ device_rows(groups.approved, [('revoke', 'Revoke', ''), ('make-admin', 'Make admin', '')]) }}
+{% else %}<p class="empty">No approved devices.</p>{% endif %}
+
+<h2>Revoked or denied <span class="muted">· {{ groups.revoked | length }}</span></h2>
+{% if groups.revoked %}
+  {{ device_rows(groups.revoked, [('approve', 'Approve', ''), ('delete', 'Delete', 'danger')]) }}
+{% else %}<p class="empty">None.</p>{% endif %}
+{% endblock %}

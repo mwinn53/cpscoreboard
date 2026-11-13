@@ -9,14 +9,15 @@ from conftest import FIXTURES
 
 def make_client(**overrides):
     settings = Settings(_env_file=None, scrape_mode="replay", capture_set=str(FIXTURES),
-                        replay_speed=1000, watch_teams="17-0224, 99-9999", **overrides)
+                        replay_speed=1000, watch_teams="17-0224, 99-9999", auth_enabled=False,
+                        mail_backend="console", **overrides)
     return TestClient(create_app(settings))
 
 
 def wait_for_teams(client, timeout=5.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        health = client.get("/healthz").json()
+        health = client.get("/api/status").json()
         if health["teams"]:
             return health
         time.sleep(0.05)
@@ -26,7 +27,7 @@ def wait_for_teams(client, timeout=5.0):
 def test_health_and_api_from_replay():
     with make_client() as client:
         health = wait_for_teams(client)
-        assert health["status"] == "ok"
+        assert client.get("/healthz").json() == {"status": "ok"}
         assert health["mode"] == "replay"
         data = client.get("/api/scores").json()
         assert data["teams"][0]["place_overall"] == 1
