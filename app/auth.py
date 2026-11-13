@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import logging
+import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -26,6 +27,9 @@ log = logging.getLogger(__name__)
 
 DEVICE_COOKIE = "cpsb_device"
 REG_COOKIE = "cpsb_reg"
+
+CLAIM_MAX_FAILURES = 5          # wrong admin tokens per IP...
+CLAIM_WINDOW = 15 * 60          # ...per this many seconds
 
 router = APIRouter()
 
@@ -254,15 +258,31 @@ async def admin_action(request: Request, device_id: int, action: str, label: str
     }
     if action not in handlers:
         raise NotAllowed(404, "Unknown action.")
-    if not await asyncio.to_thread(handlers[action]):
+    before = await asyncio.to_thread(devices.get, device_id)
+    if before is None or not await asyncio.to_thread(handlers[action]):
         raise NotAllowed(404, "No such device.")
     log.info("Admin device %d: %s device %d", admin.id, action, device_id)
+    if action == "approve" and before.status != APPROVED:
+        await _send(request, before.email, "CP Scoreboard: you're approved",
+                    f"Your browser has been approved. Open the scoreboard here: {request.url_for('dashboard')}\n\n"
+                    "Use the same browser you registered with.")
     return RedirectResponse("/admin", status_code=303)
 
 
 @router.get("/admin/claim", response_class=HTMLResponse)
 async def claim_form(request: Request):
     return _page(request, "claim.html", error=None, device=await current_device(request))
+
+
+def _claim_failures(request: Request) -> list[float]:
+    """Recent failed claim times for this client IP (kept in memory; a restart clears them)."""
+    failures: dict[str, list[float]] | None = getattr(request.app.state, "claim_failures", None)
+    if failures is None:
+        failures = request.app.state.claim_failures = {}
+    now = time.monotonic()
+    recent = [t for t in failures.get(client_ip(request), []) if now - t < CLAIM_WINDOW]
+    failures[client_ip(request)] = recent
+    return recent
 
 
 @router.post("/admin/claim", response_class=HTMLResponse, dependencies=[Depends(same_origin)])
@@ -272,8 +292,13 @@ async def claim_submit(request: Request, token: str = Form("")):
     if device is None or device.expired:
         return _page(request, "claim.html", 400, device=None,
                       error="Register this browser first (email + code), then come back here.")
+    failures = _claim_failures(request)
+    if len(failures) >= CLAIM_MAX_FAILURES:
+        return _page(request, "claim.html", 429, device=device,
+                      error="Too many wrong tokens. Try again in 15 minutes.")
     if not expected or not hmac.compare_digest(token.strip().encode(), expected.encode()):
-        log.warning("Failed admin claim from %s", client_ip(request))
+        failures.append(time.monotonic())
+        log.warning("Failed admin claim from %s (%d recent)", client_ip(request), len(failures))
         await asyncio.sleep(1)  # slow down guessing
         return _page(request, "claim.html", 403, device=device, error="That token isn't right.")
     await asyncio.to_thread(_devices(request).make_admin, device.id)

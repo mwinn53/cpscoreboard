@@ -148,6 +148,24 @@ def test_admin_claim_requires_registration_and_the_right_token(site):
     assert c.get("/").status_code == 200 and 'href="/admin"' in c.get("/").text
 
 
+def test_admin_claim_is_rate_limited(site):
+    c = site()  # each wrong token costs ~1 s by design
+    register(c, site.mailer, "guesser@example.com")
+    for _ in range(5):
+        assert c.post("/admin/claim", data={"token": "wrong-token-wrong-token"}).status_code == 403
+    r = c.post("/admin/claim", data={"token": TOKEN})  # even the right token, until the window passes
+    assert r.status_code == 429 and "15 minutes" in r.text
+
+
+def test_approved_viewer_is_emailed(site):
+    viewer = site()
+    register(viewer, site.mailer, "coach@example.com")
+    admin = make_admin(site)
+    admin.post(f"/admin/devices/{device_id(admin, 'coach@example.com')}/approve")
+    to, subject, body = site.mailer.sent[-1]
+    assert to == "coach@example.com" and "approved" in subject and "http://testserver/" in body
+
+
 def test_admin_cannot_lock_themselves_out(site):
     admin = make_admin(site)
     me = device_id(admin, "admin@example.com")

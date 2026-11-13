@@ -18,7 +18,7 @@ order is M4 → M3b → M5 → M6 → M7, because the admin settings need M4's a
 | [M1 – Restructure & dev loop](https://github.com/mwinn53/cpscoreboard/milestone/6) | ✅ Done ([#1](https://github.com/mwinn53/cpscoreboard/pull/1)) | Legacy code moved, scraper ported with tests, dev container, capture/replay |
 | [M2 – Infra & pipeline](https://github.com/mwinn53/cpscoreboard/milestone/7) | ✅ Done ([#1](https://github.com/mwinn53/cpscoreboard/pull/1), [#3](https://github.com/mwinn53/cpscoreboard/pull/3)) | Terraform on EC2, GitHub Actions → ECR → SSM deploy, Caddy TLS |
 | [M3a – Persistence & live updates](https://github.com/mwinn53/cpscoreboard/milestone/8) | ✅ Done ([#2](https://github.com/mwinn53/cpscoreboard/pull/2)) | SQLite change-only snapshots, restore on restart, SSE, change indicators |
-| [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | 🚧 In progress | Email code → pending device → admin approval; gate the site; then open the allowlist |
+| [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | 🚧 In review ([#27](https://github.com/mwinn53/cpscoreboard/pull/27)) | Email code → pending device → admin approval; gate the site; then open the allowlist |
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | Planned | Watchlist, aliases and collection filter in the UI; legacy data import; Alembic |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | Planned | Legacy `tweet()` behind a notifier interface |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | Planned | Per-team score/place charts; per-team detail data |
@@ -38,6 +38,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/events.py` | Server-sent events (`/events`) that tell open dashboards to refresh |
 | `app/collection.py` | Collection filter: which teams are kept (locations, divisions, watched teams) |
 | `app/web.py`, `app/templates/` | Dashboard (htmx) and the HTTP endpoints below |
+| `app/auth.py`, `app/devices.py` | Registration (email code), device approval, admin page, access checks |
+| `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
 | `tests/fixtures/` | Real scoreboard responses from season 17 (2024) and season 19 (2026) |
 | `legacy/` | The original X-posting bot, kept for reference and the M3b/M5 ports |
 
@@ -47,10 +49,16 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 |---|---|
 | `/` | Dashboard: overall, division, state, and state-within-division rankings |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
+| `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
 | `/api/teams/{team}/history` | A team's stored snapshots, oldest first (`?limit=`, default 1000) |
-| `/healthz` | Health check used by Docker and the deploy |
+| `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
+| `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
+| `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
+
+Everything except `/healthz`, the registration pages and `/static` requires an
+approved device (see [Access control](#access-control)).
 
 ## Configuration
 
