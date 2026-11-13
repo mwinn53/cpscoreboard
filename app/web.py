@@ -6,13 +6,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
+from .events import event_stream
 from .poller import Poller
 from .sources import ReplaySource, utcnow
+from .store import SnapshotStore
+
+RECENT_SECONDS = 300  # rows that changed within this window are highlighted
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -43,7 +47,16 @@ def _num(value: float | None) -> str:
     return f"{value:g}" if value == int(value) else f"{value:.2f}"
 
 
-templates.env.filters.update(hms=_hms, ago=_ago, num=_num)
+def _signed(value: float) -> str:
+    return ("+" if value > 0 else "−") + _num(abs(value))
+
+
+def _recent(when: datetime | None) -> bool:
+    return when is not None and (utcnow() - when).total_seconds() <= RECENT_SECONDS
+
+
+templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed)
+templates.env.tests.update(recent=_recent)
 
 
 def _poller(request: Request) -> Poller:
@@ -52,6 +65,10 @@ def _poller(request: Request) -> Poller:
 
 def _settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def _store(request: Request) -> SnapshotStore:
+    return request.app.state.store
 
 
 def _status(request: Request) -> dict[str, Any]:
@@ -68,8 +85,9 @@ def _status(request: Request) -> dict[str, Any]:
         "last_changed": st.last_changed,
         "last_error": st.last_error,
         "polls": st.polls,
-        "changes": st.changes,
+        "changes": st.changes_seen,
         "finished": st.finished,
+        "restored": st.restored,
     }
     if isinstance(poller.source, ReplaySource):
         status["replay_position"] = poller.source.position
@@ -92,6 +110,7 @@ def _board(request: Request, q: str, division: str, state: str, limit: int) -> d
         "watched": [st.by_number[n] for n in watch if n in st.by_number],
         "watch_missing": [n for n in watch if n not in st.by_number],
         "watch_set": set(watch),
+        "changes": st.changes,
         "rows": rows[:limit] if limit > 0 else rows,
         "matched": len(rows),
         "has_totals": any(t.total is not None for t in st.teams),
@@ -112,12 +131,29 @@ def board_partial(request: Request, q: str = "", division: str = "", state: str 
     return templates.TemplateResponse(request, "_board.html", _board(request, q, division, state, limit))
 
 
+@router.get("/events")
+async def events(request: Request) -> StreamingResponse:
+    """Server-sent events: ``board`` whenever the scoreboard changes."""
+    stream = event_stream(_poller(request).notifier, request.is_disconnected)
+    return StreamingResponse(stream, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @router.get("/api/scores")
 def api_scores(request: Request) -> dict[str, Any]:
     st = _poller(request).state
     return {"data_as_of": st.data_as_of, "teams": [t.to_dict() for t in st.teams]}
 
 
+@router.get("/api/teams/{team_number}/history")
+def api_team_history(request: Request, team_number: str, limit: int = 1000) -> dict[str, Any]:
+    snapshots = _store(request).history(team_number, limit=max(1, min(limit, 10000)))
+    if not snapshots:
+        raise HTTPException(404, f"No history for team {team_number}")
+    return {"team_number": team_number,
+            "snapshots": [{"observed_at": s.observed_at, **s.team.to_dict()} for s in snapshots]}
+
+
 @router.get("/healthz")
 def healthz(request: Request) -> dict[str, Any]:
-    return {"status": "ok", **_status(request)}
+    return {"status": "ok", **_status(request), "database": _store(request).counts()}

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     scrape_mode: ScrapeMode = ScrapeMode.live
     data_dir: Path = Path("data")
+    # Default: SQLite at <data_dir>/cpscoreboard.db; in replay mode an in-memory database,
+    # so replays never mix into real history. Set explicitly to override either.
+    database_url: str | None = None
     capture_dir: Path = Path("captures")
     # Replay: a folder name under capture_dir, or a path to any folder of captures.
     capture_set: str | None = None
@@ -59,6 +62,14 @@ class Settings(BaseSettings):
     def collection_filter(self) -> CollectionFilter:
         return CollectionFilter.from_strings(self.collect_locations, self.collect_divisions,
                                              self.watch_team_list)
+
+    @property
+    def effective_database_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        if self.scrape_mode is ScrapeMode.replay:
+            return "sqlite://"
+        return f"sqlite:///{(self.data_dir / 'cpscoreboard.db').as_posix()}"
 
     @property
     def capture_set_path(self) -> Path | None:

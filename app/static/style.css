@@ -8,6 +8,7 @@
   --watch-bg: #fff6cc;
   --warn: #b54708;
   --error: #b42318;
+  --up: #067647;
   --dev: #6941c6;
 }
 @media (prefers-color-scheme: dark) {
@@ -21,6 +22,7 @@
     --watch-bg: #3a3212;
     --warn: #f5a35c;
     --error: #ff7b72;
+    --up: #4ade80;
     --dev: #b69cff;
   }
 }
@@ -66,5 +68,9 @@ table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .board .strong, .board .team { font-weight: 600; }
 .board tr.watched td { background: var(--watch-bg); }
 .warn { color: var(--warn); font-weight: 600; }
+.delta { font-size: 11px; font-weight: 600; margin-left: 4px; }
+.delta.up { color: var(--up); }
+.delta.down { color: var(--error); }
+.board tr.recent td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 .foot { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }

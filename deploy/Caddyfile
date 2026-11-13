@@ -4,7 +4,9 @@
 }
 
 {$SITE_ADDRESS} {
-	encode zstd gzip
+	# Don't compress the server-sent events stream; compressors buffer it.
+	@compressible not path /events
+	encode @compressible zstd gzip
 	reverse_proxy app:8080
 
 	header {
