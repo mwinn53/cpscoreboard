@@ -121,3 +121,4 @@ legacy/cpscoreboard/tests/report.png
 *.tfvars
 !*.tfvars.example
 crash.log
+tfplan
