@@ -1,0 +1,30 @@
+#!/bin/bash
+# First-boot setup: Docker + Compose plugin, and the data volume mounted at /data.
+# The app itself is installed and updated by deploy/remote-deploy.sh (via SSM).
+set -euxo pipefail
+
+dnf install -y docker
+systemctl enable --now docker
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-aarch64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+# The data volume is attached after the instance starts; wait for it.
+DEV=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${volume_serial}
+for _ in $(seq 1 60); do
+  [ -e "$DEV" ] && break
+  sleep 5
+done
+[ -e "$DEV" ] || { echo "Data volume never attached" >&2; exit 1; }
+
+# Format only if blank, so a re-attached volume keeps its data.
+blkid "$DEV" || mkfs -t xfs "$DEV"
+UUID=$(blkid -s UUID -o value "$DEV")
+mkdir -p /data
+grep -q "$UUID" /etc/fstab || echo "UUID=$UUID /data xfs defaults,nofail 0 2" >> /etc/fstab
+mount -a
+
+mkdir -p /data/app /data/caddy/data /data/caddy/config /opt/cpscoreboard
+chown 1000:1000 /data/app   # the app container runs as uid 1000

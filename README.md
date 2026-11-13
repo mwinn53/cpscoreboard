@@ -101,4 +101,17 @@ docker run -p 8080:8080 -v cpsb-data:/data cpscoreboard
 
 The default build target is `prod`. It runs as a non-root user, has a
 `/healthz` health check, and is pinned to `APP_ENV=prod`, `SCRAPE_MODE=live`,
-so it never saves pages. AWS deployment is milestone 2.
+so it never saves pages.
+
+## Deployment
+
+Every push to `master` runs the tests and builds an arm64 image, then deploys it
+to a single EC2 instance in us-east-1, behind Caddy for HTTPS. Other branches and
+pull requests only run CI. See [infra/README.md](infra/README.md) for the one-time
+Terraform and GitHub setup and for operations.
+
+| Path | Purpose |
+|---|---|
+| `infra/` | Terraform: EC2, Elastic IP, `/data` volume and snapshots, ECR, IAM/OIDC, logs, SSM settings |
+| `deploy/` | Production compose file, Caddyfile, and the SSM deploy scripts |
+| `.github/workflows/` | `ci.yml` (tests, plus an image build on PRs) and `deploy.yml` (master → AWS) |

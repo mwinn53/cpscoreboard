@@ -113,3 +113,11 @@ data/
 # Legacy scraper output
 legacy/cpscoreboard/pages/
 legacy/cpscoreboard/tests/report.png
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
