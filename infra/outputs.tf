@@ -1,5 +1,5 @@
 output "site_url" {
-  value = "https://${local.site_address}"
+  value = local.site_url
 }
 
 output "instance_id" {
@@ -20,6 +20,6 @@ output "github_variables_commands" {
     gh variable set AWS_DEPLOY_ROLE_ARN --repo ${var.github_repo} --body "${aws_iam_role.github_deploy.arn}"
     gh variable set ECR_REPOSITORY_URL --repo ${var.github_repo} --body "${aws_ecr_repository.app.repository_url}"
     gh variable set EC2_INSTANCE_ID --repo ${var.github_repo} --body "${aws_instance.web.id}"
-    gh variable set SITE_URL --repo ${var.github_repo} --body "https://${local.site_address}"
+    gh variable set SITE_URL --repo ${var.github_repo} --body "${local.site_url}"
   EOT
 }

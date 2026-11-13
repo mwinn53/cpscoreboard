@@ -66,6 +66,21 @@ aws ssm put-parameter --name /cpscoreboard/env/X_API_KEY --type SecureString --v
 Either way, the change takes effect on the next deploy. To apply it without
 pushing code, re-run the latest **Deploy** workflow.
 
+## Access restriction, custom hostname, email
+
+- **`allowed_cidrs`** limits who can reach the site on 443; the default is public. **`http_cidrs`**
+  does the same for port 80 and defaults to `allowed_cidrs`. While port 80 is restricted, certificates
+  can't be issued or renewed. To keep the site private but let certificates work, set
+  `http_cidrs = ["0.0.0.0/0"]`: port 80 only answers certificate checks and redirects to HTTPS.
+- **`site_hostname`** adds a custom name, which needs an A record pointing at the Elastic IP. Caddy serves it
+  alongside the sslip.io name.
+- **`mail_domain` / `mail_sender`** create an SES domain identity (Easy DKIM, plus a custom MAIL FROM at
+  `bounce.<domain>`) and let the instance send as that domain. `terraform output -raw dns_records_to_add`
+  prints the records to add at your DNS host. SES stays in the sandbox (verified recipients only) until
+  production access is granted.
+- Deploys verify `/healthz` over HTTPS through Caddy **from the instance itself**, so they pass even
+  when the site is IP-restricted.
+
 ## Operations
 
 - **Shell on the server:** `aws ssm start-session --target $(terraform output -raw instance_id)`

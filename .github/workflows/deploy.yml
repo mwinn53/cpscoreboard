@@ -53,12 +53,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # remote-deploy.sh verifies the container's health and /healthz over HTTPS through Caddy
+      # from the instance itself, so this works even when the site is IP-restricted.
       - name: Deploy to EC2 via SSM
         env:
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
         run: bash deploy/ssm-deploy.sh
-
-      - name: Smoke test
-        if: vars.SITE_URL != ''
-        # First deploy may take a minute while Caddy obtains the TLS certificate.
-        run: curl -fsS --retry 12 --retry-delay 10 --retry-all-errors "${{ vars.SITE_URL }}/healthz"

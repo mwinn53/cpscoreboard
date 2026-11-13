@@ -91,6 +91,8 @@ locals {
     SITE_ADDRESS = local.site_address
     ACME_EMAIL   = var.acme_email
     LOG_GROUP    = aws_cloudwatch_log_group.app.name
+    }, var.mail_sender == "" ? {} : {
+    MAIL_FROM = var.mail_sender
   })
 }
 
