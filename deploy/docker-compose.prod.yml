@@ -1,0 +1,41 @@
+# Production stack on the EC2 instance (/opt/cpscoreboard/docker-compose.yml).
+# Variables come from /opt/cpscoreboard/.env, written by remote-deploy.sh from SSM.
+name: cpscoreboard
+
+x-logging: &logging
+  driver: awslogs
+  options:
+    awslogs-region: ${AWS_REGION:?}
+    awslogs-group: ${LOG_GROUP:?}
+    tag: "{{.Name}}"
+
+services:
+  app:
+    image: ${IMAGE:?IMAGE is required}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Trust X-Forwarded-For from Caddy. Safe because the app publishes no port:
+      # only containers on this compose network can reach it.
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - /data/app:/data
+    logging: *logging
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/caddy/data:/data       # certificates: keep across deploys to avoid ACME rate limits
+      - /data/caddy/config:/config
+    logging: *logging

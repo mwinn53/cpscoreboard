@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CP Scoreboard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">CP Scoreboard</a>
+    {% if status.env == 'dev' %}<span class="badge badge-dev">dev · {{ status.mode }}</span>{% endif %}
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer class="foot">Unofficial. Scores come from the public CyberPatriot scoreboard and may lag or change.</footer>
+</body>
+</html>

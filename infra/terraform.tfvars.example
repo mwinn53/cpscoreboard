@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+github_repo = "your-github-user/cpscoreboard"
+acme_email  = "you@example.com"
+
+# Optional
+# availability_zone           = "us-east-1a"
+# create_github_oidc_provider = false   # if your account already has GitHub's OIDC provider
+
+app_settings = {
+  # COLLECT_LOCATIONS = "VA,MD,DC"
+  # COLLECT_DIVISIONS = "Open,Middle School"
+  # WATCH_TEAMS       = "19-0000,19-0001"
+}
