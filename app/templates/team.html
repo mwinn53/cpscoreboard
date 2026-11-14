@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ team_number }} · {{ site_title }}{% endblock %}
+{% block content %}
+<p class="small"><a href="/" onclick="if (history.length > 1) { history.back(); return false; }">← Back to the scoreboard</a></p>
+<div class="team-head">
+  <h1>{{ team_number }}{% if school %} <span class="muted">{{ school }}</span>{% endif %}</h1>
+  {% if current %}
+  <span>{{ current.location }} · {{ current.division }}{% if current.tier %} · {{ current.tier }}{% endif %}</span>
+  <span>Total score <strong>{{ current.ccs_score | num }}</strong></span>
+  <span>National <strong>{{ current.place_division }}</strong></span>
+  <span>State <strong>{{ current.place_state_division }}</strong></span>
+  {% endif %}
+</div>
+
+{% if not charts %}
+<p class="empty">No history stored for this team yet. History is kept for collected teams
+  (see the collection filter on the admin page) from the first time they score.</p>
+{% else %}
+{% if rounds | length > 1 %}
+<nav class="rounds" aria-label="Rounds">
+  {% for started in rounds %}
+  {% if loop.index0 == round %}<strong>{{ started | local }}</strong>
+  {% else %}<a href="?round={{ loop.index0 }}">{{ started | local }}</a>{% endif %}
+  {% endfor %}
+</nav>
+{% else %}
+<p class="muted">Since {{ rounds[0] | local }}. Each line holds its value until the next change.</p>
+{% endif %}
+<div class="charts">
+  {% for title, chart in charts %}
+  <section class="chart-card"><h3>{{ title }}</h3>{{ chart.svg | safe }}</section>
+  {% endfor %}
+</div>
+
+<details>
+  <summary>Table view ({{ rows | length }} changes)</summary>
+  <div class="table-wrap">
+  <table class="board">
+    <thead><tr><th>Time</th><th class="num">Total score</th><th class="num">National</th><th class="num">State</th>
+      <th class="num">Images</th><th class="num">Play time</th><th>Flags</th></tr></thead>
+    <tbody>
+    {% for s in rows %}
+    <tr><td>{{ s.observed_at | local(seconds=True) }}</td><td class="num">{{ s.team.ccs_score | num }}</td>
+      <td class="num">{{ s.team.place_division }}</td><td class="num">{{ s.team.place_state_division }}</td>
+      <td class="num">{{ s.team.images if s.team.images is not none }}</td><td class="num mono">{{ s.team.play_time | hms }}</td>
+      <td>{{ s.team.code }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+<script src="{{ url_for('static', path='charts.js') }}" defer></script>
+{% endif %}
+{% endblock %}

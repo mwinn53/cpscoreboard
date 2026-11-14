@@ -53,6 +53,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | Path | Returns |
 |---|---|
 | `/` | Dashboard: the live board with National (division), State (within division) and District places; opens on the collected division and state |
+| `/teams/{team}` | A team's history: total score, national and state place over time (step charts, one round at a time) plus a table |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
 | `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
