@@ -3,12 +3,16 @@
 {% block content %}
 <section class="card narrow">
   <h1>Request access</h1>
-  <p class="muted">This scoreboard is private. Enter your email address and we'll send you a 6-digit code.
+  <p class="muted">This scoreboard is private. Enter your email address and your relationship to the team,
+    and we'll send you a 6-digit code.
     After you enter it, the site admin approves this browser.</p>
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
   <form method="post" action="/register" class="stack">
     <label for="email">Email address</label>
     <input id="email" name="email" type="email" autocomplete="email" required autofocus value="{{ email }}">
+    <label for="relationship">Your relationship to the team</label>
+    <input id="relationship" name="relationship" required maxlength="200" value="{{ relationship }}"
+           placeholder="e.g. parent of a team member, coach, mentor">
     <button type="submit">Send code</button>
   </form>
 </section>

@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy import (Boolean, Column, DateTime, Integer, String, Table, and_, delete, func,
                         insert, select, update)
 
-from .store import SnapshotStore, metadata
+from .store import SnapshotStore, add_missing_columns, metadata
 
 CODE_TTL = timedelta(minutes=10)
 CODE_MAX_ATTEMPTS = 5
@@ -30,6 +30,7 @@ RESEND_COOLDOWN = timedelta(seconds=30)
 SEEN_UPDATE_EVERY = timedelta(minutes=5)
 
 PENDING, APPROVED, REVOKED = "pending", "approved", "revoked"
+RELATIONSHIP_MAX = 200  # "Your relationship to the team", asked at registration
 
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 
@@ -39,6 +40,7 @@ devices = Table(
     Column("token_hash", String(64), nullable=False, unique=True),
     Column("email", String(254), nullable=False, index=True),
     Column("label", String(100), nullable=False, default=""),
+    Column("relationship", String(RELATIONSHIP_MAX), nullable=False, server_default=""),
     Column("status", String(16), nullable=False, default=PENDING),
     Column("is_admin", Boolean, nullable=False, default=False),
     Column("created_at", DateTime, nullable=False),
@@ -58,6 +60,7 @@ email_codes = Table(
     Column("email", String(254), nullable=False, index=True),
     Column("ip", String(64), nullable=False, default=""),
     Column("code_hash", String(64), nullable=False),
+    Column("relationship", String(RELATIONSHIP_MAX), nullable=False, server_default=""),
     Column("salt", String(32), nullable=False),
     Column("created_at", DateTime, nullable=False, index=True),
     Column("expires_at", DateTime, nullable=False),
@@ -72,6 +75,10 @@ def _now() -> datetime:
 
 def _aware(dt: datetime | None) -> datetime | None:
     return None if dt is None else dt.replace(tzinfo=UTC)
+
+
+def clean_relationship(text: str) -> str:
+    return " ".join(text.split())[:RELATIONSHIP_MAX]
 
 
 def hash_token(token: str) -> str:
@@ -92,6 +99,7 @@ class Device:
     id: int
     email: str
     label: str
+    relationship: str
     status: str
     is_admin: bool
     created_at: datetime
@@ -118,7 +126,8 @@ class Device:
     @classmethod
     def from_row(cls, row: Any) -> Device:
         m = row._mapping
-        return cls(id=m["id"], email=m["email"], label=m["label"], status=m["status"],
+        return cls(id=m["id"], email=m["email"], label=m["label"], relationship=m["relationship"],
+                   status=m["status"],
                    is_admin=m["is_admin"], created_at=_aware(m["created_at"]),
                    approved_at=_aware(m["approved_at"]), expires_at=_aware(m["expires_at"]),
                    first_ip=m["first_ip"], first_ua=m["first_ua"], last_ip=m["last_ip"],
@@ -145,10 +154,11 @@ class DeviceStore:
         self.lock = store.lock
         self.lifetime = lifetime
         metadata.create_all(self.engine)  # adds these tables to an existing database
+        add_missing_columns(self.engine)
 
     # --- email codes ---
 
-    def issue_code(self, email: str, ip: str) -> IssuedCode:
+    def issue_code(self, email: str, ip: str, relationship: str = "") -> IssuedCode:
         now = _now()
         with self.lock, self.engine.begin() as conn:
             recent = conn.execute(select(func.count(), func.max(email_codes.c.created_at))
@@ -168,6 +178,7 @@ class DeviceStore:
             reg_token = secrets.token_urlsafe(32)
             conn.execute(insert(email_codes).values(
                 token_hash=hash_token(reg_token), email=email, ip=ip, code_hash=_code_hash(code, salt),
+                relationship=clean_relationship(relationship),
                 salt=salt, created_at=now, expires_at=now + CODE_TTL, attempts=0, used=False))
             # Housekeeping: codes are only useful for minutes.
             conn.execute(delete(email_codes).where(email_codes.c.created_at < now - timedelta(days=2)))
@@ -182,6 +193,15 @@ class DeviceStore:
         if row is None or row.used or row.expires_at <= _now() or row.attempts >= CODE_MAX_ATTEMPTS:
             return None
         return row.email
+
+    def relationship_for(self, reg_token: str | None) -> str:
+        """What the visitor said about themselves when requesting this code."""
+        if not reg_token:
+            return ""
+        with self.lock, self.engine.connect() as conn:
+            value = conn.scalar(select(email_codes.c.relationship)
+                                .where(email_codes.c.token_hash == hash_token(reg_token)))
+        return value or ""
 
     def check_code(self, reg_token: str | None, code: str) -> tuple[str, str | None]:
         """Returns (result, email). On OK the code is consumed."""
@@ -206,13 +226,14 @@ class DeviceStore:
 
     # --- devices ---
 
-    def create_device(self, email: str, ip: str, ua: str) -> tuple[str, Device]:
+    def create_device(self, email: str, ip: str, ua: str, relationship: str = "") -> tuple[str, Device]:
         """Register a browser as a new pending device. Returns (cookie token, device)."""
         token = secrets.token_urlsafe(32)
         now = _now()
         with self.lock, self.engine.begin() as conn:
             result = conn.execute(insert(devices).values(
                 token_hash=hash_token(token), email=email, label="", status=PENDING, is_admin=False,
+                relationship=clean_relationship(relationship),
                 created_at=now, expires_at=now + self.lifetime, first_ip=ip, first_ua=ua[:512],
                 last_ip=ip, last_ua=ua[:512], last_seen=now))
             row = conn.execute(select(devices).where(devices.c.id == result.inserted_primary_key[0])).one()
