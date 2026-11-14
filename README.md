@@ -85,6 +85,7 @@ All settings are environment variables; see [.env.example](.env.example).
 | `WATCH_TEAMS` | — | First start only: team numbers to pin; always collected |
 | `DEFAULT_DIVISION`, `DEFAULT_STATE` | — | First start only: where the dashboard opens (`all`, or blank to follow the collection filter) |
 | `WATCH_LABEL` | `Watchlist` | First start only: heading for the watched teams |
+| `WATCH_SCHOOL` | — | First start only: School column for watched teams not listed as district schools (e.g. `EMS`) |
 
 The `COLLECT_*`, `WATCH_*` and `DEFAULT_*` settings only **seed** the database the first time the app starts. After that,
 change them on the admin page (`/admin/board`); the env vars are ignored, and the

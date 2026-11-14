@@ -58,7 +58,8 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
                  chosen_divisions={v.casefold() for v in board.divisions},
                  collecting=poller.collect.describe(), default_division=board.default_division,
                  default_state=board.default_state, watch_label=board.watch_label,
-                 school_logo_link=board.school_logo_link,
+                 school_logo_link=board.school_logo_link, watch_school=board.watch_school,
+                 schools=board.schools,
                  board_size=poller.state.board_size, collected=len(poller.state.teams))
 
 
@@ -152,8 +153,9 @@ async def logo_reset(request: Request, slot: str, admin: Device = Depends(requir
 
 @router.post("/view", dependencies=[Depends(same_origin)])
 async def view_set(request: Request, default_division: str = Form(""), default_state: str = Form(""),
-                   watch_label: str = Form(""), admin: Device = Depends(require_admin)):
-    await asyncio.to_thread(_board(request).set_view, default_division, default_state, watch_label)
+                   watch_label: str = Form(""), watch_school: str = Form(""),
+                   admin: Device = Depends(require_admin)):
+    await asyncio.to_thread(_board(request).set_view, default_division, default_state, watch_label, watch_school)
     log.info("Admin device %d: default view %r / %r, watch label %r", admin.id, default_division, default_state,
              watch_label)
     return _done("Saved the scoreboard view.")

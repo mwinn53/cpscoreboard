@@ -20,6 +20,7 @@
       {% for l in known_locations %}<option {{ 'selected' if l | lower == default_state | lower }}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Heading for watched teams <input name="watch_label" value="{{ watch_label }}" maxlength="60" required></label>
+  <label>Their school <input name="watch_school" value="{{ watch_school }}" maxlength="60" placeholder="e.g. EMS"></label>
   <button type="submit" class="primary">Save view</button>
 </form>
 
@@ -33,7 +34,7 @@
   {% for number, t in watch %}
   <tr>
     <td class="team">{{ number }}</td>
-    <td>{{ dict(aliases).get(number, '') }}</td>
+    <td>{{ schools.get(number, '') }}</td>
     {% if t %}<td>{{ t.location }}</td><td>{{ t.division }}</td><td class="num">{{ t.place_overall }}</td>
     {% else %}<td colspan="3" class="muted">Not on the board yet</td>{% endif %}
     <td class="actions">

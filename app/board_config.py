@@ -52,6 +52,7 @@ team_aliases = Table(
 LOCATIONS, DIVISIONS, WATCH_SEEDED = "collect_locations", "collect_divisions", "watch_seeded"
 DEFAULT_DIVISION, DEFAULT_STATE, WATCH_LABEL = "default_division", "default_state", "watch_label"
 SCHOOL_LOGO_LINK = "school_logo_link"
+WATCH_SCHOOL = "watch_school"
 LINK_MAX = 500
 VIEW_TEXT_MAX = 60
 
@@ -91,11 +92,11 @@ class BoardConfig:
     # --- seeding ---
 
     def seed(self, watch: Iterable[str], locations: str, divisions: str, default_division: str = "",
-             default_state: str = "", watch_label: str = "Watchlist") -> None:
+             default_state: str = "", watch_label: str = "Watchlist", watch_school: str = "") -> None:
         """Copy env-var values into the database the first time only."""
         watch = list(watch)
         for key, value in ((DEFAULT_DIVISION, default_division), (DEFAULT_STATE, default_state),
-                           (WATCH_LABEL, watch_label)):
+                           (WATCH_LABEL, watch_label), (WATCH_SCHOOL, watch_school)):
             if key not in self._settings:
                 self._set(key, value.strip()[:VIEW_TEXT_MAX])
         for key, env_name, value in ((LOCATIONS, "COLLECT_LOCATIONS", locations),
@@ -151,6 +152,20 @@ class BoardConfig:
         return self._settings.get(WATCH_LABEL, "") or "Watchlist"
 
     @property
+    def watch_school(self) -> str:
+        return self._settings.get(WATCH_SCHOOL, "")
+
+    @property
+    def schools(self) -> dict[str, str]:
+        """School per team: the district schools, plus the watched teams' school for any
+        watched team that isn't listed there (so EMS teams needn't be entered twice)."""
+        schools = dict(self._aliases)
+        if self.watch_school:
+            for team in self._watch:
+                schools.setdefault(team, self.watch_school)
+        return schools
+
+    @property
     def school_logo_link(self) -> str:
         return self._settings.get(SCHOOL_LOGO_LINK, "")
 
@@ -164,10 +179,13 @@ class BoardConfig:
                 raise ValueError("Enter a full web address starting with https://, or leave it blank.")
         self._set(SCHOOL_LOGO_LINK, url)
 
-    def set_view(self, default_division: str, default_state: str, watch_label: str) -> None:
+    def set_view(self, default_division: str, default_state: str, watch_label: str,
+                 watch_school: str | None = None) -> None:
         self._set(DEFAULT_DIVISION, default_division.strip()[:VIEW_TEXT_MAX])
         self._set(DEFAULT_STATE, default_state.strip()[:VIEW_TEXT_MAX])
         self._set(WATCH_LABEL, " ".join(watch_label.split())[:VIEW_TEXT_MAX])
+        if watch_school is not None:
+            self._set(WATCH_SCHOOL, " ".join(watch_school.split())[:VIEW_TEXT_MAX])
 
     def collection_filter(self) -> CollectionFilter:
         return CollectionFilter.from_strings(",".join(self.locations), ",".join(self.divisions), self._watch)
