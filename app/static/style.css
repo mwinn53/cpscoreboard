@@ -221,3 +221,5 @@ svg.spark .end { fill: var(--series-1); }
 .info-bubble::before { content: ""; position: absolute; top: -6px; left: 12px; width: 10px; height: 10px;
   background: var(--surface); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
 .info-bubble[hidden] { display: none; }
+/* Admin forms: buttons sized to their label, not the full form width. */
+.stack.compact > button { align-self: flex-start; padding-left: 18px; padding-right: 18px; }

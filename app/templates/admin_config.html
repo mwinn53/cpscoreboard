@@ -45,7 +45,7 @@
   once it's done (time up, or no play for 20 minutes) as other teams finish. <strong>Dry run</strong> writes
   the posts to the log below without sending them, so you can see what would go out. Limits apply to real posts only;
   anything over a limit is skipped and logged.</p>
-<form method="post" action="/admin/config/posting" class="stack">
+<form method="post" action="/admin/config/posting" class="stack compact">
   <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if post.enabled }}> Posting enabled</label>
   <fieldset class="choices">
     <legend>Send to</legend>
@@ -98,7 +98,7 @@
 {% if not secrets_available %}
 <p class="empty">Keys can't be saved here: <code>SECRETS_KEY</code> isn't set on the server.</p>
 {% else %}
-<form method="post" action="/admin/config/x-credentials" class="stack" autocomplete="off">
+<form method="post" action="/admin/config/x-credentials" class="stack compact" autocomplete="off">
   {% for k, label in credentials %}
   <label for="{{ k }}">{{ label }} {% if k in saved_credentials %}<span class="muted">· saved</span>{% endif %}</label>
   <input id="{{ k }}" name="{{ k }}" type="password" autocomplete="new-password" spellcheck="false">
