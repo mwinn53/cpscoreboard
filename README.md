@@ -246,6 +246,22 @@ reversible: `aws ec2 start-instances --instance-ids <id>`. The instance role may
 snapshot its own data volume and stop its own instance (`infra/iam.tf`). Terraform
 supplies `PUBLIC_URL`, `AWS_INSTANCE_ID` and `DATA_VOLUME_ID`.
 
+**Next season: the startup listener.** While the server is stopped, a small Lambda
+(`infra/lambda/startup_listener.py`, `infra/startup_listener.tf`) runs once a day at
+14:00 UTC:
+
+- If the server isn't stopped, there's nothing to watch.
+- If it's stopped and the public scoreboard is back (a readable board with teams), it
+  emails `ADMIN_NOTIFY_EMAIL` once, with a link.
+- The link opens a confirmation page, and its **Start the server** button starts the
+  instance. A GET never starts anything, because mail scanners open links. Links are
+  HMAC-signed and expire after 7 days; the signing key is generated on first use and kept
+  in SSM (`/cpscoreboard/startup-listener/`).
+- The Lambda may only start this instance.
+- The site's address doesn't change: the instance has an Elastic IP, so DNS stays correct
+  across stop and start.
+- Cost is about $0 (free-tier Lambda and Scheduler).
+
 ### Posting to X
 
 Set up on `/admin/config`. The app posts about **watched** teams as the legacy bot

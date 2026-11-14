@@ -122,3 +122,6 @@ legacy/cpscoreboard/tests/report.png
 !*.tfvars.example
 crash.log
 tfplan
+
+# Terraform build output (Lambda zips)
+infra/.build/
