@@ -12,7 +12,8 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, web
+from . import admin_board, auth, web
+from .board_config import BoardConfig
 from .config import Settings
 from .devices import DeviceStore
 from .mail import Mailer, build_mailer
@@ -35,7 +36,10 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         source = build_source(settings, client)
         store = SnapshotStore(settings.effective_database_url)
         app.state.devices = DeviceStore(store, timedelta(days=settings.device_lifetime_days))
-        poller = Poller(source, settings.poll_interval, settings.collection_filter, store=store)
+        board = BoardConfig(store)
+        board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions)
+        app.state.board = board
+        poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store)
         poller.restore()
         app.state.poller = poller
         app.state.store = store
@@ -66,5 +70,6 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     app.include_router(web.public_router)
     app.include_router(auth.router)
+    app.include_router(admin_board.router)
     app.include_router(web.router)
     return app

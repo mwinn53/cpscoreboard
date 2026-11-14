@@ -56,6 +56,7 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
 .status strong { color: var(--text); }
 .muted { color: var(--muted); font-weight: normal; }
 .error { color: var(--error); }
+.notice { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .empty { color: var(--muted); padding: 24px 0; }
 
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
@@ -66,6 +67,11 @@ table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .board .num { text-align: right; font-variant-numeric: tabular-nums; }
 .board .mono { font-family: ui-monospace, Consolas, monospace; }
 .board .strong, .board .team { font-weight: 600; }
+.board .alias { font-weight: 400; color: var(--muted); margin-left: 4px; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; margin: 8px 0 12px; }
+.check-grid label { display: flex; gap: 6px; align-items: center; }
+.subnav { display: flex; gap: 16px; margin-bottom: 8px; }
+textarea { width: 100%; min-height: 120px; font-family: ui-monospace, monospace; }
 .board tr.watched td { background: var(--watch-bg); }
 .warn { color: var(--warn); font-weight: 600; }
 .delta { font-size: 11px; font-weight: 600; margin-left: 4px; }

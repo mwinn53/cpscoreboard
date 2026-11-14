@@ -25,7 +25,7 @@
     {% set shown = ch and ch.visible and ch.at is recent %}
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
       <td class="num">{{ t.place_overall }}</td>
-      <td class="team">{{ t.team_number }}</td>
+      <td class="team">{{ t.team_number }}{% if aliases.get(t.team_number) %} <span class="alias">{{ aliases[t.team_number] }}</span>{% endif %}</td>
       <td>{{ t.location }}</td>
       <td>{{ t.division }}</td>
       {% if has_tier %}<td>{{ t.tier }}</td>{% endif %}

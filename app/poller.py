@@ -65,6 +65,27 @@ class Poller:
         self._failures = 0
         self._stored: dict[str, TeamScore] = {}  # last version of each team written to the store
         self._pending_write: asyncio.Future | None = None
+        self._all: list[TeamScore] = []  # the full ranked board from the last change, before filtering
+
+    @property
+    def full_board(self) -> list[TeamScore]:
+        return self._all
+
+    async def reconfigure(self, collect: CollectionFilter) -> None:
+        """Switch the collection filter (or watchlist) without a restart.
+
+        The dashboard updates at once from the last full board. Teams that are newly
+        collected get stored on the next poll, which reprocesses the board even if the
+        scoreboard hasn't changed. Teams no longer collected keep their history.
+        """
+        if collect == self.collect:
+            return
+        log.info("Collection filter changed: %s -> %s", self.collect.describe(), collect.describe())
+        self.collect = collect
+        self._digest = None
+        if self._all:
+            self._set_teams(collect.apply(self._all))
+        await self.notifier.publish()
 
     async def drain(self) -> None:
         """Wait for an in-flight database write (call after cancelling run(), before closing the store)."""
@@ -153,6 +174,7 @@ class Poller:
         # On a failed write, leave the digest unset so the next poll retries even if nothing changed.
         self._digest = digest if error is None else None
         self._failures = 0
+        self._all = teams
         self._set_teams(kept)
         self.state.board_size = len(teams)
         self.state.data_as_of = fetch.fetched_at
