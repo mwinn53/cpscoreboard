@@ -86,6 +86,14 @@ def _logo_links(request: Request) -> dict[str, str]:
     return {"left": CYBERPATRIOT_LINK, "right": board.school_logo_link if board else ""}
 
 
+def _server_offered(request: Request):
+    """For the admin nav: called only when the nav renders (it reads app_settings)."""
+    def offered() -> bool:
+        monitor = getattr(request.app.state, "monitor", None)
+        return bool(monitor and monitor.shutdown_offered())
+    return offered
+
+
 def _context(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
@@ -96,6 +104,7 @@ def _context(request: Request) -> dict[str, Any]:
         "viewer": getattr(request.state, "device", None),
         "logos": _logos(request),
         "logo_links": _logo_links(request),
+        "server_offered": _server_offered(request),
     }
 
 

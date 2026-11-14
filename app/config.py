@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     # Keep the full raw scoreboard, one file per day, in <DATA_DIR>/archive (live and capture
     # modes; never in replay). See app/archive.py.
     archive_enabled: bool = True
+    # Outage alert (app/outage.py): email ADMIN_NOTIFY_EMAIL when the public scoreboard has
+    # been down this long, counting from this long after the competition starts.
+    outage_alert_hours: float = 24
+    outage_grace_hours: float = 72
+    # The site's own address, for links in emails (e.g. https://cpscores.example.org).
+    public_url: str = ""
+    # Self-shutdown from /admin/server (set by Terraform in prod; blank = not available).
+    aws_instance_id: str = ""
+    data_volume_id: str = ""
 
     # --- Access control (milestone 4) ---
     # Viewers register a browser with an emailed code; the admin approves it.

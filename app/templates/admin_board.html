@@ -107,6 +107,25 @@
   <button type="submit" class="primary">Save filter</button>
 </form>
 
+<h2 id="competition-start">Competition start</h2>
+<p class="muted">The end-of-season outage alert counts from this. Starting {{ grace_hours | int }} hours after the
+  competition starts, if the public scoreboard is unavailable for {{ alert_hours | int }} hours in a row, the admin is
+  emailed a recommendation to shut the server down, and the <strong>Server</strong> page (snapshot and shut down)
+  appears. It's recorded automatically the first time teams show play time; set it here only if that was missed or
+  is wrong. Leave it blank and save to clear it (it will be recorded again from the next board with play time).
+  Times are US Eastern.</p>
+{% if not outage %}
+<p class="empty">Outage monitoring is off here (replay mode).</p>
+{% else %}
+<p>Current: <strong>{{ outage.competition_start | local if outage.competition_start else 'not yet recorded' }}</strong>
+  {% if outage.monitoring_from %}<span class="muted">· monitoring from {{ outage.monitoring_from | local }}</span>{% endif %}
+  {% if outage.down_since %}<span class="error">· public scoreboard unavailable since {{ outage.down_since | local }}</span>{% endif %}</p>
+<form method="post" action="/admin/board/competition-start" class="inline">
+  <label>Competition start <input type="datetime-local" name="start"></label>
+  <button type="submit">Save</button>
+</form>
+{% endif %}
+
 <h2>Bulk import</h2>
 <p class="muted">Acknowledging the legacy bot config. Paste the <code>runs/team</code> (one team number per line;
   added to the watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line for the District

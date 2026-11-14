@@ -133,3 +133,37 @@ resource "aws_iam_role_policy" "github_deploy" {
   role   = aws_iam_role.github_deploy.id
   policy = data.aws_iam_policy_document.github_deploy.json
 }
+
+# --- Self-shutdown (admin → Server): snapshot /data, then stop this instance ---
+# Scoped to this instance and its data volume only.
+
+data "aws_iam_policy_document" "web_shutdown" {
+  statement {
+    sid       = "SnapshotDataVolume"
+    actions   = ["ec2:CreateSnapshot"]
+    resources = [aws_ebs_volume.data.arn, "arn:aws:ec2:${var.region}::snapshot/*"]
+  }
+
+  statement {
+    sid       = "TagNewSnapshot"
+    actions   = ["ec2:CreateTags"]
+    resources = ["arn:aws:ec2:${var.region}::snapshot/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "ec2:CreateAction"
+      values   = ["CreateSnapshot"]
+    }
+  }
+
+  statement {
+    sid       = "StopThisInstance"
+    actions   = ["ec2:StopInstances"]
+    resources = [aws_instance.web.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "web_shutdown" {
+  name   = "${var.name}-shutdown"
+  role   = aws_iam_role.web.id
+  policy = data.aws_iam_policy_document.web_shutdown.json
+}

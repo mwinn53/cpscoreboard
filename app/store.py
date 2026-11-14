@@ -211,5 +211,12 @@ class SnapshotStore:
                 "team_snapshots": conn.scalar(select(func.count()).select_from(team_snapshots)),
             }
 
+    def checkpoint(self) -> None:
+        """Fold the SQLite write-ahead log into the main file (before a volume snapshot)."""
+        if self.engine.dialect.name == "sqlite":
+            from sqlalchemy import text
+            with self.lock, self.engine.connect() as conn:
+                conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+
     def close(self) -> None:
         self.engine.dispose()

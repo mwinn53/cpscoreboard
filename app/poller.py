@@ -11,6 +11,7 @@ from datetime import datetime
 
 from .archive import Archive
 from .collection import CollectionFilter
+from .outage import OutageMonitor
 from .events import BoardNotifier
 from .scraper import ScoreboardFormatError, TeamScore, parse_scores
 from .sources import Source, utcnow
@@ -56,12 +57,13 @@ class Poller:
 
     def __init__(self, source: Source, interval: float, collect: CollectionFilter | None = None,
                  store: SnapshotStore | None = None, notifier: BoardNotifier | None = None,
-                 archive: Archive | None = None):
+                 archive: Archive | None = None, monitor: OutageMonitor | None = None):
         self.source = source
         self.interval = interval
         self.collect = collect or CollectionFilter()
         self.store = store
         self.archive = archive
+        self.monitor = monitor
         self.notifier = notifier or BoardNotifier()
         self.state = BoardState()
         self._digest: str | None = None
@@ -122,12 +124,21 @@ class Poller:
         self.state.last_error = message
         return False
 
+    async def _health(self, ok: bool, playing: bool = False) -> None:
+        if self.monitor is None:
+            return
+        try:
+            await asyncio.to_thread(self.monitor.record, ok, playing)
+        except Exception:
+            log.exception("Outage monitor failed")
+
     async def poll_once(self) -> bool:
         """Fetch once. Returns True if the board changed."""
         try:
             fetch = await self.source.fetch()
         except Exception as e:  # network, HTTP status, unreadable capture...
             log.warning("Scoreboard fetch failed: %s", e)
+            await self._health(False)
             return self._fail(f"fetch failed: {e}")
 
         if fetch is None:
@@ -137,6 +148,7 @@ class Poller:
         self.state.polls += 1
         digest = hashlib.sha256(fetch.body).hexdigest()
         if digest == self._digest:
+            await self._health(True)
             self._failures = 0
             self.state.last_error = None
             self.state.data_as_of = fetch.fetched_at
@@ -146,8 +158,10 @@ class Poller:
             teams = parse_scores(fetch.body)
         except ScoreboardFormatError as e:
             log.warning("Unexpected scoreboard response: %s", e)
+            await self._health(False)
             return self._fail(str(e))
 
+        await self._health(bool(teams), any(t.play_time for t in teams))
         if self.archive is not None and teams:
             try:  # the full raw board, before filtering; one file per day (app/archive.py)
                 await asyncio.to_thread(self.archive.save, fetch.body, fetch.fetched_at)

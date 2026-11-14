@@ -91,6 +91,10 @@ locals {
     SITE_ADDRESS = local.site_address
     ACME_EMAIL   = var.acme_email
     LOG_GROUP    = aws_cloudwatch_log_group.app.name
+    # For the outage alert email and the admin "shut down" button (app/server_control.py).
+    PUBLIC_URL      = local.site_url
+    AWS_INSTANCE_ID = aws_instance.web.id
+    DATA_VOLUME_ID  = aws_ebs_volume.data.id
     }, var.mail_sender == "" ? {} : {
     MAIL_FROM = var.mail_sender
   })
