@@ -92,7 +92,7 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
     # Right after a restart that's just the restored (collected) teams until the first poll.
     teams = poller.full_board or st.teams
     by_number = {t.team_number: t for t in teams}
-    aliases = board.aliases
+    aliases = board.schools  # district schools + the watched teams' school
     divisions = sorted({t.division for t in teams if t.division})
     states = sorted({t.location for t in teams if t.location})
     division = _default(board.default_division, board.divisions, divisions) if division is None else (division or ALL)
@@ -128,7 +128,7 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "warning_codes": WARNING_CODES,
         "aliases": aliases,
         # District = the named district schools' teams plus the watched (e.g. EMS) teams.
-        "district": district_places(teams, set(aliases) | set(watch)),
+        "district": district_places(teams, set(board.aliases) | set(watch)),
         "changes": st.changes,
         "rows": shown,
         "matched": len(rows),
@@ -179,7 +179,7 @@ def api_status(request: Request) -> dict[str, Any]:
 
 @router.get("/api/scores")
 def api_scores(request: Request) -> dict[str, Any]:
-    st, aliases = _poller(request).state, request.app.state.board.aliases
+    st, aliases = _poller(request).state, request.app.state.board.schools
     return {"data_as_of": st.data_as_of,
             "teams": [{**t.to_dict(), "alias": aliases.get(t.team_number, "")} for t in st.teams]}
 

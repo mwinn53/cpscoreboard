@@ -330,3 +330,26 @@ def test_logo_links(site):  # noqa: F811
 
     admin.post("/admin/board/logo-link", data={"url": ""})
     assert "logo-link logo-right" not in admin.get("/").text
+
+
+def test_watched_teams_get_their_school_without_a_second_entry(store):
+    cfg = BoardConfig(store)
+    cfg.seed(["19-1515", "19-1516"], "", "Middle School", watch_school="EMS")
+    cfg.set_alias("19-1516", "Evans MS (B)")  # an explicit district entry wins
+    cfg.set_alias("19-2000", "GMS")
+    assert cfg.schools == {"19-1515": "EMS", "19-1516": "Evans MS (B)", "19-2000": "GMS"}
+    assert cfg.aliases == {"19-1516": "Evans MS (B)", "19-2000": "GMS"}  # nothing duplicated
+    cfg.set_view("", "GA", "EMS teams", "")
+    assert "19-1515" not in cfg.schools
+
+
+def test_admin_sets_the_watched_school_and_it_shows_on_the_board(site):  # noqa: F811
+    admin = make_admin(site)
+    wait_for_replay(admin)
+    number = admin.get("/api/scores").json()["teams"][0]["team_number"]
+    admin.post("/admin/board/watch", data={"team": number})
+    admin.post("/admin/board/view", data={"default_division": "all", "default_state": "all",
+                                          "watch_label": "EMS teams", "watch_school": "EMS"})
+    assert '<td class="school">EMS</td>' in admin.get("/").text
+    assert f"<td>EMS</td>" in admin.get("/admin/board").text
+    assert {t["team_number"]: t["alias"] for t in admin.get("/api/scores").json()["teams"]}[number] == "EMS"

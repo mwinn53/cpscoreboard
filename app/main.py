@@ -40,7 +40,8 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         app.state.devices = DeviceStore(store, timedelta(days=settings.device_lifetime_days))
         board = BoardConfig(store)
         board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions,
-                   settings.default_division, settings.default_state, settings.watch_label)
+                   settings.default_division, settings.default_state, settings.watch_label,
+                   settings.watch_school)
         app.state.board = board
         app.state.branding = branding.Branding(store)
         archive = None

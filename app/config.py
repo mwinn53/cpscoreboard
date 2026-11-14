@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     default_division: str = ""
     default_state: str = ""
     watch_label: str = "Watchlist"
+    watch_school: str = ""  # School column for watched teams not listed as district schools
     # Keep the full raw scoreboard, one file per day, in <DATA_DIR>/archive (live and capture
     # modes; never in replay). See app/archive.py.
     archive_enabled: bool = True
