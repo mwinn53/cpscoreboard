@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,10 @@ class Settings(BaseSettings):
 
     app_env: AppEnv = AppEnv.dev
     log_level: str = "INFO"
+    # Shown in the header, browser tabs, and email subjects/sender name.
+    site_title: str = "EMS CyberPatriot Next Generation Scorebot"
+    # Time zone for times shown on the site (the database stays in UTC).
+    display_timezone: str = "America/New_York"
 
     scoreboard_url: str = DEFAULT_SCOREBOARD_URL
     poll_interval: float = 60.0
@@ -53,6 +58,12 @@ class Settings(BaseSettings):
     # Comma-separated team numbers to pin on the dashboard (always collected).
     # Temporary until milestone 3 moves the watchlist into the database.
     watch_teams: str = ""
+    # Dashboard view, first start only (then edited on /admin/board): which division and
+    # state the scoreboard opens on (blank = follow the collection filter, else all), and
+    # the heading for the watched teams.
+    default_division: str = ""
+    default_state: str = ""
+    watch_label: str = "Watchlist"
 
     # --- Access control (milestone 4) ---
     # Viewers register a browser with an emailed code; the admin approves it.
@@ -67,7 +78,7 @@ class Settings(BaseSettings):
     # --- Email ---
     mail_backend: str = "auto"  # auto | ses | smtp | console (auto: smtp if SMTP_HOST, ses in prod, else console)
     mail_from: str = "noreply@localhost"
-    mail_from_name: str = "CP Scoreboard"
+    mail_from_name: str = ""  # blank = SITE_TITLE
     smtp_host: str | None = None
     smtp_port: int = 1025
     aws_region: str = "us-east-1"
@@ -114,4 +125,8 @@ class Settings(BaseSettings):
             raise ValueError("MAIL_BACKEND must be auto, ses, smtp or console")
         if self.admin_bootstrap_token is not None and len(self.admin_bootstrap_token) < 16:
             raise ValueError("ADMIN_BOOTSTRAP_TOKEN must be at least 16 characters")
+        try:
+            ZoneInfo(self.display_timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError(f"DISPLAY_TIMEZONE {self.display_timezone!r} isn't a time zone name like America/New_York") from None
         return self

@@ -1,22 +1,25 @@
-{% macro team_table(teams) %}
+{% macro team_table(teams, cols) %}
 <div class="table-wrap">
 <table class="board">
   <thead>
+    <tr class="group">
+      <th rowspan="2">Team</th>
+      <th rowspan="2">School</th>
+      <th rowspan="2" class="num">Total Score</th>
+      {% if has_totals %}<th rowspan="2" class="num">Adj</th><th rowspan="2" class="num">Adjusted total</th>{% endif %}
+      {% if cols.state %}<th rowspan="2">State</th>{% endif %}
+      {% if cols.division %}<th rowspan="2">Division</th>{% endif %}
+      {% if cols.tier %}<th rowspan="2">Tier</th>{% endif %}
+      <th colspan="3" class="placement">Placement</th>
+      <th rowspan="2" class="num">Images</th>
+      <th rowspan="2" class="num">Score time</th>
+      <th rowspan="2" class="num">Play time</th>
+      <th rowspan="2" title="Warning flags (see the key below)">Flags</th>
+    </tr>
     <tr>
-      <th class="num" title="Overall place">#</th>
-      <th>Team</th>
-      <th>State</th>
-      <th>Division</th>
-      {% if has_tier %}<th>Tier</th>{% endif %}
-      <th class="num" title="Place in division">Div #</th>
-      <th class="num" title="Place in state (all divisions)">State #</th>
-      <th class="num" title="Place in state and division">St/Div #</th>
-      <th class="num">Images</th>
-      <th class="num">Play time</th>
-      <th class="num">Score time</th>
-      <th title="Warnings">Warn</th>
-      <th class="num">CCS</th>
-      {% if has_totals %}<th class="num">Adj</th><th class="num">Total</th>{% endif %}
+      <th class="num placement" title="Place in the division, nationally">National</th>
+      <th class="num" title="Place in the state, within the division">State</th>
+      <th class="num district" title="Place among the district schools' teams (set on the admin page), within the division">District</th>
     </tr>
   </thead>
   <tbody>
@@ -24,21 +27,8 @@
     {% set ch = changes.get(t.team_number) %}
     {% set shown = ch and ch.visible and ch.at is recent %}
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
-      <td class="num">{{ t.place_overall }}</td>
-      <td class="team">{{ t.team_number }}{% if aliases.get(t.team_number) %} <span class="alias">{{ aliases[t.team_number] }}</span>{% endif %}</td>
-      <td>{{ t.location }}</td>
-      <td>{{ t.division }}</td>
-      {% if has_tier %}<td>{{ t.tier }}</td>{% endif %}
-      <td class="num">{{ t.place_division }}
-        {%- if shown and ch.place_delta %}
-        <span class="delta {{ 'up' if ch.place_delta > 0 else 'down' }}" title="Division places since previous change">{{ '▲' if ch.place_delta > 0 else '▼' }}{{ ch.place_delta | abs }}</span>
-        {%- endif %}</td>
-      <td class="num">{{ t.place_state }}</td>
-      <td class="num">{{ t.place_state_division }}</td>
-      <td class="num">{{ t.images if t.images is not none }}</td>
-      <td class="num mono">{{ t.play_time | hms }}</td>
-      <td class="num mono">{{ t.score_time | hms }}</td>
-      <td>{% if t.code %}<span class="warn">{{ t.code }}</span>{% endif %}</td>
+      <td class="team">{{ t.team_number }}</td>
+      <td class="school">{{ aliases.get(t.team_number, '') }}</td>
       <td class="num strong">{{ t.ccs_score | num }}
         {%- if shown and ch.score_delta and not has_totals %}
         <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
@@ -47,6 +37,19 @@
         {%- if shown and ch.score_delta %}
         <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
         {%- endif %}</td>{% endif %}
+      {% if cols.state %}<td>{{ t.location }}</td>{% endif %}
+      {% if cols.division %}<td>{{ t.division }}</td>{% endif %}
+      {% if cols.tier %}<td>{{ t.tier }}</td>{% endif %}
+      <td class="num placement">{{ t.place_division }}
+        {%- if shown and ch.place_delta %}
+        <span class="delta {{ 'up' if ch.place_delta > 0 else 'down' }}" title="National places since previous change">{{ '▲' if ch.place_delta > 0 else '▼' }}{{ ch.place_delta | abs }}</span>
+        {%- endif %}</td>
+      <td class="num">{{ t.place_state_division }}</td>
+      <td class="num district">{{ district.get(t.team_number, '') }}</td>
+      <td class="num">{{ t.images if t.images is not none }}</td>
+      <td class="num mono">{{ t.score_time | hms }}</td>
+      <td class="num mono">{{ t.play_time | hms }}</td>
+      <td>{% if t.code %}<span class="warn" title="{% for c in t.code %}{{ warning_codes.get(c, c) }}{{ ', ' if not loop.last }}{% endfor %}">{{ t.code }}</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -54,11 +57,17 @@
 </div>
 {% endmacro %}
 
+{% macro warning_key() %}
+<p class="key small muted"><span class="strong">Flags:</span>
+  {% for code, meaning in warning_codes.items() %}<span><span class="warn">{{ code }}</span> = {{ meaning }}</span>{% endfor %}
+</p>
+{% endmacro %}
+
 <section class="status">
-  <span><strong>{{ status.teams }}</strong> teams
-    {% if status.collecting != 'all teams' %}<span class="muted">of {{ status.board_size }} on the board · collecting {{ status.collecting }}</span>{% endif %}</span>
+  <span><strong>{{ shown_on_board }}</strong> teams on the board
+    <span class="muted">· history kept for {{ status.collecting }}</span></span>
   <span>Data as of <strong>{{ status.data_as_of | ago }}</strong>
-    {% if status.data_as_of %}<span class="muted">({{ status.data_as_of.strftime('%Y-%m-%d %H:%M:%S UTC') }})</span>{% endif %}</span>
+    {% if status.data_as_of %}<span class="muted">({{ status.data_as_of | local(seconds=True) }})</span>{% endif %}</span>
   <span>Last change <strong>{{ status.last_changed | ago }}</strong></span>
   {% if status.replay_position %}<span>Replay {{ status.replay_position[0] }}/{{ status.replay_position[1] }}{% if status.finished %} · finished{% endif %}</span>{% endif %}
   {% if status.restored %}<span class="muted">Showing saved data; waiting for the live scoreboard…</span>{% endif %}
@@ -66,15 +75,16 @@
 </section>
 
 {% if watched or watch_missing %}
-<h2>Watchlist</h2>
-{% if watched %}{{ team_table(watched) }}{% endif %}
+<h2>{{ watch_label }}</h2>
+{% if watched %}{{ team_table(watched, watch_cols) }}{% endif %}
 {% if watch_missing %}<p class="muted">Not on the board yet: {{ watch_missing | join(', ') }}</p>{% endif %}
 {% endif %}
 
 <h2>Scoreboard <span class="muted">· showing {{ rows | length }} of {{ matched }}</span></h2>
 {% if rows %}
-  {{ team_table(rows) }}
-{% elif status.teams == 0 %}
+  {{ team_table(rows, cols) }}
+  {{ warning_key() }}
+{% elif shown_on_board == 0 %}
   <p class="empty">Waiting for scoreboard data…</p>
 {% else %}
   <p class="empty">No teams match these filters.</p>

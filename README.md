@@ -48,7 +48,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 
 | Path | Returns |
 |---|---|
-| `/` | Dashboard: overall, division, state, and state-within-division rankings |
+| `/` | Dashboard: the live board with National (division), State (within division) and District places; opens on the collected division and state |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
 | `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
@@ -56,6 +56,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): watchlist, aliases, collection filter, legacy import |
+| `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
 
@@ -71,6 +72,8 @@ All settings are environment variables; see [.env.example](.env.example).
 | `APP_ENV` | `dev` | `prod` refuses any `SCRAPE_MODE` other than `live` |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
 | `POLL_INTERVAL` | `60` | Seconds between polls |
+| `SITE_TITLE` | `EMS CyberPatriot Next Generation Scorebot` | Header, browser tab, and email subjects/sender name |
+| `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
 | `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |
 | `DATABASE_URL` | — | Override the database. The default is `sqlite:///<DATA_DIR>/cpscoreboard.db`; in replay mode it's an in-memory database, so replays never mix into real history |
 | `CAPTURE_SET` | — | Replay: folder under `captures/`, or any folder path |
@@ -79,8 +82,10 @@ All settings are environment variables; see [.env.example](.env.example).
 | `COLLECT_LOCATIONS` | — (all) | First start only: locations to keep, e.g. `VA,MD,DC` |
 | `COLLECT_DIVISIONS` | — (all) | First start only: divisions to keep, e.g. `Open,Middle School` |
 | `WATCH_TEAMS` | — | First start only: team numbers to pin; always collected |
+| `DEFAULT_DIVISION`, `DEFAULT_STATE` | — | First start only: where the dashboard opens (`all`, or blank to follow the collection filter) |
+| `WATCH_LABEL` | `Watchlist` | First start only: heading for the watched teams |
 
-The last three only **seed** the database the first time the app starts. After that,
+The `COLLECT_*`, `WATCH_*` and `DEFAULT_*` settings only **seed** the database the first time the app starts. After that,
 change them on the admin page (`/admin/board`); the env vars are ignored, and the
 startup log says so.
 

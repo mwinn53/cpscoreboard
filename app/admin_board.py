@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .auth import _page, require_admin, same_origin
 from .board_config import BoardConfig
+from .branding import SLOTS, decode_png
 from .devices import Device
 from .poller import Poller
 
@@ -47,14 +48,16 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
     board, poller = _board(request), _poller(request)
     locations, divisions = _known(request)
     by_number = {t.team_number: t for t in poller.full_board or poller.state.teams}
-    return _page(request, "admin_board.html", status_code, me=admin, error=error,
+    return _page(request, "admin_board.html", status_code, me=admin, error=error, slots=SLOTS,
+                 custom_logos={s for s, v in request.app.state.branding.versions().items() if v},
                  notice=notice or request.query_params.get("notice"),
                  watch=[(n, by_number.get(n)) for n in board.watchlist],
                  aliases=sorted(board.aliases.items()),
                  known_locations=locations, known_divisions=divisions,
                  chosen_locations={v.casefold() for v in board.locations},
                  chosen_divisions={v.casefold() for v in board.divisions},
-                 collecting=poller.collect.describe(),
+                 collecting=poller.collect.describe(), default_division=board.default_division,
+                 default_state=board.default_state, watch_label=board.watch_label,
                  board_size=poller.state.board_size, collected=len(poller.state.teams))
 
 
@@ -123,3 +126,33 @@ async def import_legacy(request: Request, team_file: str = Form(""), lookups_fil
     if result.skipped:
         notice += f" Skipped (not team numbers): {', '.join(result.skipped[:10])}."
     return _done(notice)
+
+
+@router.post("/logo/{slot}", dependencies=[Depends(same_origin)])
+async def logo_upload(request: Request, slot: str, image: str = Form(""), admin: Device = Depends(require_admin)):
+    if slot not in SLOTS:
+        return _render(request, admin, 404, error="Unknown logo.")
+    try:
+        png = decode_png(image)
+    except ValueError as e:
+        return _render(request, admin, 400, error=str(e))
+    await asyncio.to_thread(request.app.state.branding.set, slot, png)
+    log.info("Admin device %d: uploaded the %s logo (%d bytes)", admin.id, slot, len(png))
+    return _done(f"Saved the {SLOTS[slot]}.")
+
+
+@router.post("/logo/{slot}/reset", dependencies=[Depends(same_origin)])
+async def logo_reset(request: Request, slot: str, admin: Device = Depends(require_admin)):
+    if slot in SLOTS:
+        await asyncio.to_thread(request.app.state.branding.clear, slot)
+        log.info("Admin device %d: removed the %s logo", admin.id, slot)
+    return _done(f"Removed the {SLOTS.get(slot, 'logo')}.")
+
+
+@router.post("/view", dependencies=[Depends(same_origin)])
+async def view_set(request: Request, default_division: str = Form(""), default_state: str = Form(""),
+                   watch_label: str = Form(""), admin: Device = Depends(require_admin)):
+    await asyncio.to_thread(_board(request).set_view, default_division, default_state, watch_label)
+    log.info("Admin device %d: default view %r / %r, watch label %r", admin.id, default_division, default_state,
+             watch_label)
+    return _done("Saved the scoreboard view.")

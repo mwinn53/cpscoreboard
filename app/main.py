@@ -12,7 +12,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_board, auth, web
+from . import admin_board, auth, branding, templating, web
 from .board_config import BoardConfig
 from .config import Settings
 from .devices import DeviceStore
@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -> FastAPI:
     settings = settings or Settings()
+    templating.set_timezone(settings.display_timezone)
     logging.basicConfig(level=settings.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -37,8 +38,10 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         store = SnapshotStore(settings.effective_database_url)
         app.state.devices = DeviceStore(store, timedelta(days=settings.device_lifetime_days))
         board = BoardConfig(store)
-        board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions)
+        board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions,
+                   settings.default_division, settings.default_state, settings.watch_label)
         app.state.board = board
+        app.state.branding = branding.Branding(store)
         poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store)
         poller.restore()
         app.state.poller = poller
@@ -69,6 +72,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.add_exception_handler(auth.NotAllowed, auth.not_allowed_handler)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     app.include_router(web.public_router)
+    app.include_router(branding.router)
     app.include_router(auth.router)
     app.include_router(admin_board.router)
     app.include_router(web.router)
