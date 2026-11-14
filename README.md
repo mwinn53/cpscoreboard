@@ -21,7 +21,7 @@ shutdown). Next up is M5 (X notifier) and the rest of M7 (analysis).
 | [M3a – Persistence & live updates](https://github.com/mwinn53/cpscoreboard/milestone/8) | ✅ Done ([#2](https://github.com/mwinn53/cpscoreboard/pull/2)) | SQLite change-only snapshots, restore on restart, SSE, change indicators |
 | [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | ✅ Live ([#27](https://github.com/mwinn53/cpscoreboard/pull/27), [#31](https://github.com/mwinn53/cpscoreboard/pull/31)); open: geolocation [#8](https://github.com/mwinn53/cpscoreboard/issues/8), prod checks [#9](https://github.com/mwinn53/cpscoreboard/issues/9), DNS [#10](https://github.com/mwinn53/cpscoreboard/issues/10) | Email code → pending device → admin approval; the whole site is gated |
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
-| [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | Planned | Legacy `tweet()` behind a notifier interface |
+| [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); analysis planned ([#21](https://github.com/mwinn53/cpscoreboard/issues/21)) | Analysis features; season-end data retention |
 
@@ -40,6 +40,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/collection.py` | Collection filter: which teams are kept (locations, divisions, watched teams) |
 | `app/web.py`, `app/templates/` | Dashboard (htmx) and the HTTP endpoints below |
 | `app/auth.py`, `app/devices.py` | Registration (email code), device approval, admin page, access checks |
+| `app/posting.py`, `app/secret_box.py` | Posting about watched teams: planner, limits, X client (OAuth 1.0a), encrypted keys |
+| `app/admin_config.py` | Configuration page: competition start, per-image detail status, posting to X |
 | `app/board_config.py`, `app/admin_board.py` | Watchlist, district schools, collection filter and view defaults (database + admin page), legacy import |
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
 | `app/team_detail.py` | Per-image detail for watched teams (`/api/image/scores.php`), polled while they play |
@@ -63,6 +65,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
+| `/admin/config` | Configuration (admin only): competition start, per-image detail status, posting to X and its keys |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
@@ -166,6 +169,7 @@ an approved device; detailed status is at `/api/status`. In dev you can set
 | `AUTH_ENABLED` | `true` | Dev only may set `false` |
 | `ADMIN_BOOTSTRAP_TOKEN` | — | At least 16 characters; unset means nobody can claim admin |
 | `ADMIN_NOTIFY_EMAIL` | — | Where "waiting for approval" emails go |
+| `SECRETS_KEY` | — | Fernet key that encrypts the X keys saved on `/admin/config` (SSM SecureString in production) |
 | `DEVICE_LIFETIME_DAYS` | `365` | |
 | `MAIL_BACKEND` | `auto` | `ses`, `smtp`, `console`, or `auto`: SMTP if `SMTP_HOST` is set, SES in prod, otherwise the console log |
 | `MAIL_FROM` | `noreply@localhost` | Must be on the SES-verified domain in prod |
@@ -213,7 +217,7 @@ The app watches the public scoreboard. When it has been unavailable for **24 hou
 recommending a shutdown, with links to download the archive and to `/admin/server`.
 Monitoring starts **72 hours** (`OUTAGE_GRACE_HOURS`) after the competition starts,
 which is recorded automatically the first time a board shows play time (correct it
-under **Competition start** on `/admin/board`). "Unavailable" means no usable board: a fetch error, an unexpected
+under **Competition start** on `/admin/config`). "Unavailable" means no usable board: a fetch error, an unexpected
 response or an empty board.
 
 `/admin/server` exists only while those criteria are met (otherwise it's a 404 and
@@ -223,6 +227,33 @@ final EBS snapshot of `/data` and then stops the EC2 instance. Stopping is
 reversible: `aws ec2 start-instances --instance-ids <id>`. The instance role may only
 snapshot its own data volume and stop its own instance (`infra/iam.tf`). Terraform
 supplies `PUBLIC_URL`, `AWS_INSTANCE_ID` and `DATA_VOLUME_ID`.
+
+### Posting to X
+
+Set up on `/admin/config`. The app posts about **watched** teams as the legacy bot
+did:
+
+- when a team appears on the board;
+- **live changes** to its score and places while it's actively playing, from 4 hours
+  in (a slider, 0 to 6);
+- "less than one hour remaining" and "time is up";
+- once the team is **done** (time up, or play time stopped for 20 minutes),
+  **periodic place changes** as other teams finish: at most every 30 minutes
+  (adjustable), and only when a place moved.
+
+Each kind can be turned off. The first board after a restart only primes the state,
+so nothing is repeated.
+
+- **Posting enabled:** a checkbox that turns all posting on or off.
+- **Send to:** Dry run (the default: posts are logged on the page but not sent) or X.
+- **Limits:** posts per hour and per day (X's free tier allows about 500 a month).
+  Posts over a limit are skipped and logged. An optional footer (e.g. hashtags) is
+  added to each post.
+- **Keys:** the X app's API key and secret, plus an access token and secret for the
+  posting account (the app needs Read and write permission). They're encrypted with
+  `SECRETS_KEY` before they're stored and never shown again. Without `SECRETS_KEY`,
+  keys can't be saved.
+- **Test post:** sends one post in the current mode, ignoring the limits.
 
 ### Collection filter
 

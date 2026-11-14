@@ -188,16 +188,16 @@ def test_shutdown_is_admin_only_and_same_origin(site):  # noqa: F811
     assert r.status_code == 403 and not control.calls
 
 
-def test_competition_start_is_set_from_board_settings(site):  # noqa: F811
+def test_competition_start_is_set_on_configuration(site):  # noqa: F811
     admin = make_admin(site)
-    page = admin.get("/admin/board")
+    page = admin.get("/admin/config")
     assert 'id="competition-start"' in page.text and "off here (replay mode)" in page.text
-    assert admin.post("/admin/board/competition-start", data={"start": "2026-11-13T09:00"}).status_code == 400
+    assert admin.post("/admin/config/competition-start", data={"start": "2026-11-13T09:00"}).status_code == 400
     admin.app.state.monitor = monitor = OutageMonitor(admin.app.state.board, FakeMailer(), None, "Scorebot")
-    assert admin.post("/admin/board/competition-start", data={"start": "nonsense"}).status_code == 400
-    r = admin.post("/admin/board/competition-start", data={"start": "2026-11-13T09:00"})
+    assert admin.post("/admin/config/competition-start", data={"start": "nonsense"}).status_code == 400
+    r = admin.post("/admin/config/competition-start", data={"start": "2026-11-13T09:00"})
     assert r.status_code == 303
     assert monitor.status().competition_start == T0  # 9 AM EST == 14:00 UTC
-    assert "Nov 13, 2026 9:00 AM EST" in admin.get("/admin/board").text
-    admin.post("/admin/board/competition-start", data={"start": ""})
+    assert "Nov 13, 2026 9:00 AM EST" in admin.get("/admin/config").text
+    admin.post("/admin/config/competition-start", data={"start": ""})
     assert monitor.status().competition_start is None

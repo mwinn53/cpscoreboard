@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Configuration · {{ site_title }}{% endblock %}
+{% block content %}
+{% with active="/admin/config" %}{% include "_admin_nav.html" %}{% endwith %}
+<h1>Configuration</h1>
+<p class="muted">How the app runs around the scoreboard: the season, and posting to X. What the scoreboard shows
+  and collects is under <a href="/admin/board">Board settings</a>.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+<h2 id="competition-start">Competition start</h2>
+<p class="muted">The end-of-season outage alert counts from this. Starting {{ grace_hours | int }} hours after the
+  competition starts, if the public scoreboard is unavailable for {{ alert_hours | int }} hours in a row, the admin is
+  emailed a recommendation to shut the server down, and the <strong>Server</strong> page (snapshot and shut down)
+  appears. It's recorded automatically the first time teams show play time; set it here only if that was missed or
+  is wrong. Leave it blank and save to clear it (it will be recorded again from the next board with play time).
+  Times are US Eastern.</p>
+{% if not outage %}
+<p class="empty">Outage monitoring is off here (replay mode).</p>
+{% else %}
+<p>Current: <strong>{{ outage.competition_start | local if outage.competition_start else 'not yet recorded' }}</strong>
+  {% if outage.monitoring_from %}<span class="muted">· monitoring from {{ outage.monitoring_from | local }}</span>{% endif %}
+  {% if outage.down_since %}<span class="error">· public scoreboard unavailable since {{ outage.down_since | local }}</span>{% endif %}</p>
+<form method="post" action="/admin/config/competition-start" class="inline">
+  <label>Competition start <input type="datetime-local" name="start"></label>
+  <button type="submit">Save</button>
+</form>
+{% endif %}
+
+
+<h2 id="image-detail">Per-image detail</h2>
+<p class="muted">Watched teams' per-image scores are fetched every few minutes while they play (shown on each team's
+  history page).</p>
+{% if not detail %}
+<p class="empty">Off here (<code>DETAIL_ENABLED=false</code>, or a replay without an <code>images/</code> folder).</p>
+{% else %}
+<ul class="muted">
+  {% for n, at in detail_teams %}<li><a href="/teams/{{ n }}">{{ n }}</a>: {{ ('last fetched ' ~ (at | local)) if at else 'not fetched yet' }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2 id="posting">Posting to X</h2>
+<p class="muted">Posts about the watched teams during a round, like the legacy bot: when a team appears on the board,
+  live score and place changes while it's actively playing, an hour left and time up, then periodic place changes
+  once it's done (time up, or no play for 20 minutes) as other teams finish. <strong>Dry run</strong> writes
+  the posts to the log below without sending them, so you can see what would go out. Limits apply to real posts only;
+  anything over a limit is skipped and logged.</p>
+<form method="post" action="/admin/config/posting" class="stack">
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if post.enabled }}> Posting enabled</label>
+  <fieldset class="choices">
+    <legend>Send to</legend>
+    {% for m, label in [('dry_run', 'Dry run (log only)'), ('x', 'X')] %}
+    <label><input type="radio" name="mode" value="{{ m }}" {{ 'checked' if post.mode == m }}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <fieldset class="choices">
+    <legend>What to post</legend>
+    {% for k, label in kinds.items() %}
+    <label><input type="checkbox" name="kinds" value="{{ k }}" {{ 'checked' if k in post.kinds }}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+  <label for="change_after_hours">Live changes start after <output id="change_after_out" for="change_after_hours">{{ post.change_after_hours | num }}</output> hours of a team's six</label>
+  <input id="change_after_hours" name="change_after_hours" type="range" min="0" max="6" step="0.5" value="{{ post.change_after_hours }}"
+         oninput="document.getElementById('change_after_out').value = this.value">
+  <label for="place_every_minutes">Once a team is done, post its place changes at most every (minutes)</label>
+  <input id="place_every_minutes" name="place_every_minutes" type="number" min="5" max="240" step="5" value="{{ post.place_every_minutes }}">
+  <label for="per_hour">At most this many posts per hour</label>
+  <input id="per_hour" name="per_hour" type="number" min="0" value="{{ post.per_hour }}">
+  <label for="per_day">At most this many posts per day</label>
+  <input id="per_day" name="per_day" type="number" min="0" value="{{ post.per_day }}">
+  <span class="muted small">X's free API tier allows about 500 posts a month (roughly 17 a day), so keep the daily
+    limit near that unless the account is on a paid tier.</span>
+  <label for="footer">Added to the end of every post (optional, e.g. hashtags)</label>
+  <input id="footer" name="footer" maxlength="100" value="{{ post.footer }}" placeholder="#CyberPatriot">
+  <button type="submit">Save posting settings</button>
+</form>
+
+<h3 id="x-keys">X keys</h3>
+<p class="muted">From the X developer portal: an app with <strong>Read and write</strong> permission, then its API key
+  and secret, and an access token and secret generated for the account that posts. Saved keys are encrypted and never
+  shown again; leave a field blank to keep what's saved.
+  {% if credentials_ok %}<strong>All four are saved.</strong>{% elif saved_credentials %}<strong>Some keys are missing.</strong>{% else %}No keys saved yet.{% endif %}</p>
+{% if not secrets_available %}
+<p class="empty">Keys can't be saved here: <code>SECRETS_KEY</code> isn't set on the server.</p>
+{% else %}
+<form method="post" action="/admin/config/x-credentials" class="stack" autocomplete="off">
+  {% for k, label in credentials %}
+  <label for="{{ k }}">{{ label }} {% if k in saved_credentials %}<span class="muted">· saved</span>{% endif %}</label>
+  <input id="{{ k }}" name="{{ k }}" type="password" autocomplete="new-password" spellcheck="false">
+  {% endfor %}
+  <button type="submit">Save keys</button>
+</form>
+{% if saved_credentials %}
+<form method="post" action="/admin/config/x-credentials" class="inline"
+      onsubmit="return confirm('Remove all saved X keys?')">
+  <input type="hidden" name="clear" value="1"><button type="submit" class="danger">Clear all keys</button>
+</form>
+{% endif %}
+{% endif %}
+
+<h3 id="recent-posts">Recent posts</h3>
+<form method="post" action="/admin/config/test-post" class="inline">
+  <label>Test post <input name="text" maxlength="280" placeholder="Test post from {{ site_title }}."></label>
+  <button type="submit">Send</button>
+</form>
+<p class="muted small">A test post goes out in the current mode (to the log in dry run) and ignores the limits.</p>
+{% if not recent %}
+<p class="empty">Nothing posted yet.</p>
+{% else %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Time</th><th>Kind</th><th>Post</th><th>To</th><th>Result</th></tr></thead>
+  <tbody>
+  {% for r in recent %}
+  <tr><td>{{ r.at | local }}</td><td>{{ r.kind }}</td><td>{{ r.text }}</td><td>{{ r.target }}</td>
+    <td>{{ r.status }}{% if r.detail and r.detail != 'dry run' %} <span class="muted small">{{ r.detail }}</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
