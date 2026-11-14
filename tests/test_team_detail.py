@@ -121,7 +121,9 @@ def test_multi_chart_and_sparkline():
 
 def test_team_page_shows_images(site):  # noqa: F811
     from test_auth import make_admin
+    from test_board import wait_for_replay
     admin = make_admin(site)
+    wait_for_replay(admin)
     app = admin.app
     team = app.state.poller.state.teams[0].team_number
     store = DetailStore(app.state.store)

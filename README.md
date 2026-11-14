@@ -45,6 +45,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/board_config.py`, `app/admin_board.py` | Watchlist, district schools, collection filter and view defaults (database + admin page), legacy import |
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
 | `app/team_detail.py` | Per-image detail: stored for watched teams while they play; fetched on demand (images and the 5-minute image chart) for any team's page |
+| `app/schema.py`, `app/migrations/` | Alembic migrations, run at startup |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
 | `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
@@ -200,9 +201,12 @@ play time is moving, and writes an `image_snapshots` row per image whose score,
 found/remaining counts, penalties or warnings changed. Time on the image alone
 doesn't trigger a row.
 
-The schema comes from SQLAlchemy `create_all`, plus a small startup step that adds new
-columns with defaults to existing tables. Anything more (renames, type changes) waits
-for Alembic ([#16](https://github.com/mwinn53/cpscoreboard/issues/16)).
+The schema is managed by **Alembic** (`app/schema.py`, `app/migrations/`): the app
+upgrades the database to the latest revision at startup. A database from before
+Alembic is brought up to the baseline and stamped the first time it starts. To change
+the schema, edit the table definition, then run
+`alembic revision --autogenerate -m "what changed"` from the repo root, review the
+generated file (SQLite ALTERs use batch mode), and commit it.
 
 ### Season archive
 

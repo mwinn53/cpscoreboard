@@ -19,4 +19,7 @@
 
 - Merging to `master` deploys to production (`.github/workflows/deploy.yml`).
 - Tests: `pytest -q`.
+- Schema changes are Alembic revisions (`alembic revision --autogenerate -m ...`); see
+  `app/schema.py`. Take an EBS snapshot of `/data` before deploying a migration that
+  alters existing tables.
 - Write files as UTF-8 (on Windows, Python's default encoding is cp1252).

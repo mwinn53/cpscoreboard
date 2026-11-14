@@ -362,7 +362,6 @@ class Poster:
         self.planner = PostPlanner(tz)
         self.credentials = Credentials(board, box)
         self._factory = notifier_factory  # tests: settings -> Notifier
-        metadata.create_all(store.engine, tables=[posts])
 
     def settings(self) -> PostSettings:
         return PostSettings.load(self.board)

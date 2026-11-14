@@ -19,7 +19,7 @@ from typing import Any
 from sqlalchemy import (Boolean, Column, DateTime, Integer, String, Table, and_, delete, func,
                         insert, select, update)
 
-from .store import SnapshotStore, add_missing_columns, metadata
+from .store import SnapshotStore, metadata
 
 CODE_TTL = timedelta(minutes=10)
 CODE_MAX_ATTEMPTS = 5
@@ -153,8 +153,6 @@ class DeviceStore:
         self.engine = store.engine
         self.lock = store.lock
         self.lifetime = lifetime
-        metadata.create_all(self.engine)  # adds these tables to an existing database
-        add_missing_columns(self.engine)
 
     # --- email codes ---
 
