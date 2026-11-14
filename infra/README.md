@@ -52,6 +52,15 @@ Caddy needs about 30 seconds to get the TLS certificate. Then open the site:
 terraform output site_url
 ```
 
+## Startup listener
+
+`startup_listener.tf` adds a daily Lambda that, while the instance is stopped, emails
+the admin a signed start link once the public scoreboard is back (see the main
+README). It's created only when SES is configured (`mail_domain`, `mail_sender`) and
+`ADMIN_NOTIFY_EMAIL` is in `app_settings`. Test it with the command in
+`terraform output startup_listener`; with the instance running it answers
+"nothing to watch".
+
 ## Changing app settings
 
 Non-secret settings go in `app_settings` in `terraform.tfvars`, followed by
