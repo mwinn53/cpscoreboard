@@ -211,3 +211,9 @@ svg.spark .end { fill: var(--series-1); }
 .charts.placement { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .charts.scoring { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 .charts.scoring + .table-wrap { margin-top: 16px; }
+.callout { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 14px; padding: 10px 12px;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--surface);
+  font-size: 13px; max-width: 72ch; }
+.callout p { margin: 0; }
+.callout-icon { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--accent);
+  color: var(--accent); font: italic 700 12px/15px Georgia, serif; text-align: center; margin-top: 1px; }

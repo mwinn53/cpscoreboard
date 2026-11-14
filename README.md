@@ -266,7 +266,7 @@ so nothing is repeated.
 - **Limits:** posts per hour and per day (X's free tier allows about 500 a month).
   Posts over a limit are skipped and logged. An optional footer (e.g. hashtags) is
   added to each post.
-- **Keys:** the X app's API key and secret, plus an access token and secret for the
+- **Keys:** the four OAuth 1.0 keys from the X Developer Console (Consumer Key and Secret, Access Token and Secret) for the
   posting account (the app needs Read and write permission). They're encrypted with
   `SECRETS_KEY` before they're stored and never shown again. Without `SECRETS_KEY`,
   keys can't be saved.

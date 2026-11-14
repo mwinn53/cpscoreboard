@@ -76,10 +76,22 @@
 </form>
 
 <h3 id="x-keys">X keys</h3>
-<p class="muted">From the X developer portal: an app with <strong>Read and write</strong> permission, then its API key
-  and secret, and an access token and secret generated for the account that posts. Saved keys are encrypted and never
-  shown again; leave a field blank to keep what's saved.
+<p class="muted">The four <strong>OAuth 1.0 Keys</strong> from the X Developer Console: the Consumer Key and secret,
+  and an Access Token and secret for the account that posts, with <strong>Read and write</strong> permission. The
+  Bearer Token and the OAuth 2.0 keys aren't used. Saved keys are encrypted and never shown again; leave a field blank
+  to keep what's saved.
   {% if credentials_ok %}<strong>All four are saved.</strong>{% elif saved_credentials %}<strong>Some keys are missing.</strong>{% else %}No keys saved yet.{% endif %}</p>
+<aside class="callout" aria-label="Getting or regenerating the X keys">
+  <span class="callout-icon" aria-hidden="true">i</span>
+  <p><strong>Getting or regenerating the keys.</strong> Sign in at
+    <a href="https://developer.x.com" rel="noopener" target="_blank">developer.x.com</a> as the account that posts, open
+    the app, then <strong>Keys &amp; Tokens</strong>. Under <strong>OAuth 1.0 Keys</strong>, <em>Regenerate</em> next to
+    <strong>Consumer Key</strong> shows the key and its secret; <em>Regenerate</em> next to <strong>Access Token</strong>
+    shows the token and its secret, and its line must say <strong>Read and write</strong> (if it says Read, set the app's
+    permissions to Read and write under its user authentication settings, then regenerate the token). X shows each
+    secret only once, and regenerating replaces the old values, so anything else using them, such as the legacy bot,
+    needs the new ones. Paste all four here and save.</p>
+</aside>
 {% if not secrets_available %}
 <p class="empty">Keys can't be saved here: <code>SECRETS_KEY</code> isn't set on the server.</p>
 {% else %}
