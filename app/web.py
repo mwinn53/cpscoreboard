@@ -110,12 +110,13 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
     watch = board.watchlist
     watched = [by_number[n] for n in watch if n in by_number]
 
-    def columns(shown: list[TeamScore]) -> dict[str, bool]:
+    def columns(shown: list[TeamScore], school: bool = True) -> dict[str, bool]:
         """State/division columns only when the filter doesn't already say what they are."""
         return {
             "state": state == ALL or any(t.location.casefold() != state.casefold() for t in shown),
             "division": division == ALL or any(t.division.casefold() != division.casefold() for t in shown),
             "tier": any(t.tier for t in shown) and division == ALL,
+            "school": school,
         }
 
     shown = rows[:limit] if limit > 0 else rows
@@ -134,7 +135,7 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "matched": len(rows),
         "shown_on_board": len(teams),
         "cols": columns(shown),
-        "watch_cols": columns(watched),
+        "watch_cols": columns(watched, school=False),  # all one school; it's in the heading
         "has_totals": any(t.total is not None for t in teams),
         "divisions": divisions,
         "states": states,
