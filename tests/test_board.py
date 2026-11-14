@@ -281,3 +281,48 @@ def test_dropdowns_have_headings_and_the_page_has_the_title(site):  # noqa: F811
     assert "<title>EMS CyberPatriot Next Generation Scorebot</title>" in page
     assert re.search(r"\((\w{3} \d+, \d{4} \d+:\d\d:\d\d [AP]M E[SD]T)\)", page)
     assert any("EMS CyberPatriot Next Generation Scorebot" in subject for _, subject, _ in site.mailer.sent)
+
+
+def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noqa: F811
+    admin = make_admin(site)
+    deadline = time.monotonic() + 10
+    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
+        time.sleep(0.05)
+    teams = admin.get("/api/scores").json()["teams"]
+    ms = [t for t in teams if t["division"] == "Middle School"][:3]
+    admin.post("/admin/board/alias", data={"team": ms[1]["team_number"], "alias": "Other MS"})
+    admin.post("/admin/board/watch", data={"team": ms[2]["team_number"]})  # watched, no school
+    page = admin.get("/partials/board", params={"division": "Middle School", "state": "all"}).text
+
+    def district(number):
+        row = page[page.index(f'<td class="team">{number}</td>'):]
+        return re.search(r'<td class="num placement-start district">(\d*)</td>', row).group(1)
+    assert district(ms[1]["team_number"]) == "1" and district(ms[2]["team_number"]) == "2"
+    assert district(ms[0]["team_number"]) == ""
+
+
+def test_placement_order_and_trend_slots(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/").text
+    head = page[page.index("<thead>"):page.index("</thead>")]
+    sub = head[head.rindex("<tr>"):]  # the row under "Placement"
+    assert sub.index(">District<") < sub.index(">State<") < sub.index(">National<")
+    row = page[page.index("<tbody>"):]
+    assert '<span class="trend trend-place">' in row  # reserved even without a trend, so numbers align
+
+
+def test_logo_links(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/").text
+    assert 'href="https://scoreboard.uscyberpatriot.org/" target="_blank" rel="noopener"' in page
+    assert 'alt="School logo"' in page and "logo-link logo-right" not in page  # no link yet
+
+    assert admin.post("/admin/board/logo-link", data={"url": "javascript:alert(1)"}).status_code == 400
+    r = admin.post("/admin/board/logo-link", data={"url": " https://www.example.org/ems "})
+    assert r.status_code == 303
+    page = admin.get("/").text
+    assert '<a class="logo-link logo-right" href="https://www.example.org/ems" target="_blank" rel="noopener">' in page
+    assert 'value="https://www.example.org/ems"' in admin.get("/admin/board").text
+
+    admin.post("/admin/board/logo-link", data={"url": ""})
+    assert "logo-link logo-right" not in admin.get("/").text

@@ -51,6 +51,8 @@ team_aliases = Table(
 
 LOCATIONS, DIVISIONS, WATCH_SEEDED = "collect_locations", "collect_divisions", "watch_seeded"
 DEFAULT_DIVISION, DEFAULT_STATE, WATCH_LABEL = "default_division", "default_state", "watch_label"
+SCHOOL_LOGO_LINK = "school_logo_link"
+LINK_MAX = 500
 VIEW_TEXT_MAX = 60
 
 
@@ -147,6 +149,20 @@ class BoardConfig:
     @property
     def watch_label(self) -> str:
         return self._settings.get(WATCH_LABEL, "") or "Watchlist"
+
+    @property
+    def school_logo_link(self) -> str:
+        return self._settings.get(SCHOOL_LOGO_LINK, "")
+
+    def set_school_logo_link(self, url: str) -> None:
+        """Blank removes the link. Raises ValueError unless it's an http(s) address."""
+        url = url.strip()
+        if url:
+            from urllib.parse import urlsplit
+            parts = urlsplit(url)
+            if parts.scheme not in ("http", "https") or not parts.netloc or len(url) > LINK_MAX:
+                raise ValueError("Enter a full web address starting with https://, or leave it blank.")
+        self._set(SCHOOL_LOGO_LINK, url)
 
     def set_view(self, default_division: str, default_state: str, watch_label: str) -> None:
         self._set(DEFAULT_DIVISION, default_division.strip()[:VIEW_TEXT_MAX])

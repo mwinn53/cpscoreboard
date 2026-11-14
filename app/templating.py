@@ -80,6 +80,12 @@ def _logos(request: Request) -> dict[str, str]:
     return {slot: f"/brand/{slot}" + (f"?v={v}" if (v := versions.get(slot)) else "") for slot in SLOTS}
 
 
+def _logo_links(request: Request) -> dict[str, str]:
+    from .branding import CYBERPATRIOT_LINK
+    board = getattr(request.app.state, "board", None)
+    return {"left": CYBERPATRIOT_LINK, "right": board.school_logo_link if board else ""}
+
+
 def _context(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
@@ -89,6 +95,7 @@ def _context(request: Request) -> dict[str, Any]:
         "auth_enabled": settings.auth_enabled,
         "viewer": getattr(request.state, "device", None),
         "logos": _logos(request),
+        "logo_links": _logo_links(request),
     }
 
 

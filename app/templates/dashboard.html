@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block content %}
+{% block header_tools %}
 <form id="filters" class="filters" method="get" action="/"
       hx-get="/partials/board" hx-target="#board"
       hx-trigger="change, input changed delay:300ms from:input[name=q]">
@@ -23,6 +23,9 @@
   </select></label>
   <noscript><button type="submit">Apply</button></noscript>
 </form>
+{% endblock %}
+{% block content %}
+
 
 <div id="board" hx-get="/partials/board" hx-trigger="refresh, every {{ refresh }}s" hx-include="#filters">
   {% include "_board.html" %}

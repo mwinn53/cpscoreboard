@@ -1,3 +1,20 @@
+{# A trend sits in a fixed-width slot to the right of its number, present even when empty,
+   so the numbers in a column line up whether or not a row has a trend. #}
+{% macro score_trend(ch) -%}
+<span class="trend trend-score">
+  {%- if ch and ch.score_delta -%}
+  <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
+  {%- endif -%}
+</span>
+{%- endmacro %}
+{% macro place_trend(ch) -%}
+<span class="trend trend-place">
+  {%- if ch and ch.place_delta -%}
+  <span class="delta {{ 'up' if ch.place_delta > 0 else 'down' }}" title="National places since previous change">{{ '▲' if ch.place_delta > 0 else '▼' }}{{ ch.place_delta | abs }}</span>
+  {%- endif -%}
+</span>
+{%- endmacro %}
+
 {% macro team_table(teams, cols) %}
 <div class="table-wrap">
 <table class="board">
@@ -17,9 +34,9 @@
       <th rowspan="2" title="Warning flags (see the key below)">Flags</th>
     </tr>
     <tr>
-      <th class="num placement" title="Place in the division, nationally">National</th>
+      <th class="num placement-start" title="Place among the district schools' teams and {{ watch_label }}, within the division">District</th>
       <th class="num" title="Place in the state, within the division">State</th>
-      <th class="num district" title="Place among the district schools' teams (set on the admin page), within the division">District</th>
+      <th class="num placement-end" title="Place in the division, nationally">National</th>
     </tr>
   </thead>
   <tbody>
@@ -29,23 +46,14 @@
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
       <td class="team">{{ t.team_number }}</td>
       <td class="school">{{ aliases.get(t.team_number, '') }}</td>
-      <td class="num strong">{{ t.ccs_score | num }}
-        {%- if shown and ch.score_delta and not has_totals %}
-        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
-        {%- endif %}</td>
-      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}
-        {%- if shown and ch.score_delta %}
-        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
-        {%- endif %}</td>{% endif %}
+      <td class="num strong">{{ t.ccs_score | num }}{{ score_trend(ch if shown and not has_totals else none) }}</td>
+      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}{{ score_trend(ch if shown else none) }}</td>{% endif %}
       {% if cols.state %}<td>{{ t.location }}</td>{% endif %}
       {% if cols.division %}<td>{{ t.division }}</td>{% endif %}
       {% if cols.tier %}<td>{{ t.tier }}</td>{% endif %}
-      <td class="num placement">{{ t.place_division }}
-        {%- if shown and ch.place_delta %}
-        <span class="delta {{ 'up' if ch.place_delta > 0 else 'down' }}" title="National places since previous change">{{ '▲' if ch.place_delta > 0 else '▼' }}{{ ch.place_delta | abs }}</span>
-        {%- endif %}</td>
+      <td class="num placement-start district">{{ district.get(t.team_number, '') }}</td>
       <td class="num">{{ t.place_state_division }}</td>
-      <td class="num district">{{ district.get(t.team_number, '') }}</td>
+      <td class="num placement-end">{{ t.place_division }}{{ place_trend(ch if shown else none) }}</td>
       <td class="num">{{ t.images if t.images is not none }}</td>
       <td class="num mono">{{ t.score_time | hms }}</td>
       <td class="num mono">{{ t.play_time | hms }}</td>

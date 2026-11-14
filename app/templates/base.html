@@ -9,8 +9,10 @@
 </head>
 <body>
   <header class="topbar">
-    <img class="logo" src="{{ logos.left }}" alt="CyberPatriot logo" width="48" height="48">
+    <a class="logo-link" href="{{ logo_links.left }}" target="_blank" rel="noopener" title="CyberPatriot scoreboard">
+      <img class="logo" src="{{ logos.left }}" alt="CyberPatriot logo" width="48" height="48"></a>
     <a class="brand" href="/">{{ site_title }}</a>
+    {% block header_tools %}{% endblock %}
     {% if app_env == 'dev' %}<span class="badge badge-dev">dev · {{ scrape_mode }}{% if not auth_enabled %} · no auth{% endif %}</span>{% endif %}
     {% if viewer %}
     <nav class="nav">
@@ -18,7 +20,9 @@
       <span class="muted" title="Signed in on this browser">{{ viewer.name }}</span>
     </nav>
     {% endif %}
-    <img class="logo logo-right" src="{{ logos.right }}" alt="School logo" width="48" height="48">
+    {% if logo_links.right %}<a class="logo-link logo-right" href="{{ logo_links.right }}" target="_blank" rel="noopener">
+      <img class="logo" src="{{ logos.right }}" alt="School logo" width="48" height="48"></a>
+    {% else %}<img class="logo logo-right" src="{{ logos.right }}" alt="School logo" width="48" height="48">{% endif %}
   </header>
   <main>{% block content %}{% endblock %}</main>
   <footer class="foot">Unofficial. Scores come from the public CyberPatriot scoreboard and may lag or change.</footer>

@@ -127,7 +127,8 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "watch_label": board.watch_label,
         "warning_codes": WARNING_CODES,
         "aliases": aliases,
-        "district": district_places(teams, set(aliases)),
+        # District = the named district schools' teams plus the watched (e.g. EMS) teams.
+        "district": district_places(teams, set(aliases) | set(watch)),
         "changes": st.changes,
         "rows": shown,
         "matched": len(rows),

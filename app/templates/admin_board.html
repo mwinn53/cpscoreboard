@@ -6,29 +6,6 @@
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 
-<h2>Logos</h2>
-<p class="muted">Shown at the top left and top right of every page. Choose an image, drag it to position it,
-  and zoom with the slider or the mouse wheel; the square is what gets saved.</p>
-<div class="logo-grid">
-{% for slot, label in slots.items() %}
-  <form method="post" action="/admin/board/logo/{{ slot }}" enctype="multipart/form-data" class="logo-card" data-cropper>
-    <h3>{{ label }} <span class="muted small">({{ 'top left' if slot == 'left' else 'top right' }})</span></h3>
-    <div class="logo-current">Current: <img class="logo" src="{{ logos[slot] }}" alt="Current {{ label }}"></div>
-    <input type="file" accept="image/*" aria-label="Choose an image for the {{ label }}">
-    <canvas width="320" height="320" class="crop" aria-label="Crop area"></canvas>
-    <label class="small">Zoom <input type="range" min="1" max="8" step="0.01" value="1" disabled></label>
-    <input type="hidden" name="image">
-    <div class="row">
-      <button type="submit" class="primary" disabled>Save logo</button>
-      {% if slot in custom_logos %}
-      <button type="submit" formaction="/admin/board/logo/{{ slot }}/reset" formnovalidate class="danger">Use placeholder</button>
-      {% endif %}
-    </div>
-  </form>
-{% endfor %}
-</div>
-<script src="{{ url_for('static', path='cropper.js') }}" defer></script>
-
 <h2>Scoreboard view</h2>
 <p class="muted">What the scoreboard shows when it opens. Viewers can still change the dropdowns.</p>
 <form method="post" action="/admin/board/view" class="inline">
@@ -77,8 +54,8 @@
 
 <h2>District schools <span class="muted">· {{ aliases | length }}</span></h2>
 <p class="muted">Enter each district team's school. It appears in the scoreboard's <strong>School</strong> column,
-  search matches it, and these teams are ranked against each other in the <strong>District</strong> column
-  (within their division). Clear a school and save to remove the team.</p>
+  search matches it, and these teams are ranked against each other and the {{ watch_label }} above in the
+  <strong>District</strong> column (within their division). No need to list the {{ watch_label }} here too. Clear a school and save to remove the team.</p>
 {% if aliases %}
 <div class="table-wrap">
 <table class="board">
@@ -129,10 +106,10 @@
   <button type="submit" class="primary">Save filter</button>
 </form>
 
-<h2>Import from the legacy bot</h2>
-<p class="muted">Paste the contents of the old bot's <code>runs/team</code> file (one team number per line; added to the
-  watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line). Lines starting with
-  <code>#</code> are ignored. Importing twice is safe.</p>
+<h2>Bulk import</h2>
+<p class="muted">Acknowledging the legacy bot config. Paste the <code>runs/team</code> (one team number per line;
+  added to the watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line for the District
+  Schools). Just as before, lines starting with <code>#</code> are ignored. Importing twice is safe.</p>
 <form method="post" action="/admin/board/import" class="stack">
   <label for="team_file"><code>runs/team</code></label>
   <textarea id="team_file" name="team_file" placeholder="19-1515"></textarea>
@@ -140,4 +117,38 @@
   <textarea id="lookups_file" name="lookups_file" placeholder="19-1515,Knights"></textarea>
   <button type="submit">Import</button>
 </form>
+
+<h2>Logos</h2>
+<p class="muted">Shown at the top left and top right of every page. Choose an image, drag it to position it,
+  and zoom with the slider or the mouse wheel; the square is what gets saved.</p>
+<div class="logo-grid">
+{% for slot, label in slots.items() %}
+  <div class="logo-card">
+  <h3>{{ label }} <span class="muted small">({{ 'top left' if slot == 'left' else 'top right' }})</span></h3>
+  <div class="logo-current">Current: <img class="logo" src="{{ logos[slot] }}" alt="Current {{ label }}"></div>
+  {% if slot == 'left' %}
+  <p class="muted small">Links to the <a href="{{ logo_links.left }}" target="_blank" rel="noopener">CyberPatriot scoreboard</a>.</p>
+  {% else %}
+  <form method="post" action="/admin/board/logo-link" class="inline">
+    <label class="small">Link (optional)
+      <input name="url" type="url" value="{{ school_logo_link }}" placeholder="https://www.example.org/" maxlength="500"></label>
+    <button type="submit" class="link">Save link</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/admin/board/logo/{{ slot }}" enctype="multipart/form-data" class="logo-form" data-cropper>
+    <input type="file" accept="image/*" aria-label="Choose an image for the {{ label }}">
+    <canvas width="320" height="320" class="crop" aria-label="Crop area"></canvas>
+    <label class="small">Zoom <input type="range" min="1" max="8" step="0.01" value="1" disabled></label>
+    <input type="hidden" name="image">
+    <div class="row">
+      <button type="submit" class="primary" disabled>Save logo</button>
+      {% if slot in custom_logos %}
+      <button type="submit" formaction="/admin/board/logo/{{ slot }}/reset" formnovalidate class="danger">Use placeholder</button>
+      {% endif %}
+    </div>
+  </form>
+  </div>
+{% endfor %}
+</div>
+<script src="{{ url_for('static', path='cropper.js') }}" defer></script>
 {% endblock %}
