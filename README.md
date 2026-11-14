@@ -10,9 +10,9 @@ AWS. The original command-line bot that posts to X lives in [legacy/](legacy/).
 ## Roadmap
 
 The plan is tracked in [GitHub Issues](https://github.com/mwinn53/cpscoreboard/issues),
-grouped by [milestone](https://github.com/mwinn53/cpscoreboard/milestones). M4 and M3b
-are in production. Next up is M5 → M6 → M7; the time-sensitive season-end retention
-([#20](https://github.com/mwinn53/cpscoreboard/issues/20)) comes first.
+grouped by [milestone](https://github.com/mwinn53/cpscoreboard/milestones). M4, M3b and M6
+are in production, as is season-end retention (the daily archive plus the outage alert and
+shutdown). Next up is M5 (X notifier) and the rest of M7 (analysis).
 
 | Milestone | Status | What it covers |
 |---|---|---|
@@ -22,8 +22,8 @@ are in production. Next up is M5 → M6 → M7; the time-sensitive season-end re
 | [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | ✅ Live ([#27](https://github.com/mwinn53/cpscoreboard/pull/27), [#31](https://github.com/mwinn53/cpscoreboard/pull/31)); open: geolocation [#8](https://github.com/mwinn53/cpscoreboard/issues/8), prod checks [#9](https://github.com/mwinn53/cpscoreboard/issues/9), DNS [#10](https://github.com/mwinn53/cpscoreboard/issues/10) | Email code → pending device → admin approval; the whole site is gated |
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | Planned | Legacy `tweet()` behind a notifier interface |
-| [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | Planned | Per-team score/place charts; per-team detail data |
-| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season archive live ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)); rest planned | Analysis features; **season-end data retention (time-sensitive)** |
+| [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40)); open: per-team detail data [#19](https://github.com/mwinn53/cpscoreboard/issues/19) | `/teams/{team}`: score, national and state place over time, one round at a time |
+| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); analysis planned ([#21](https://github.com/mwinn53/cpscoreboard/issues/21)) | Analysis features; season-end data retention |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -86,7 +86,9 @@ approved device (see [Access control](#access-control)).
   State, Division and Tier columns appear only when the filter is set to All.
 - **Trends:** ▲▼ for place and +/− for score since the last change, in fixed slots so
   numbers line up.
-- **Watched teams** are pinned under their own heading (default "Watchlist").
+- **Watched teams** are pinned under their own heading (default "Watchlist"), without the
+  School column; the main table still shows their school.
+- **Team history:** each team number links to `/teams/{team}`.
 - **Live updates:** the board refreshes on every change (via `/events`) and every polling
   interval. Times are shown in `DISPLAY_TIMEZONE`.
 - **Logos:** a square logo sits at each end of the header. Each can link somewhere:
@@ -118,7 +120,6 @@ All settings are environment variables; see [.env.example](.env.example).
 | `DEFAULT_DIVISION`, `DEFAULT_STATE` | — | First start only: where the dashboard opens (`all`, or blank to follow the collection filter) |
 | `WATCH_LABEL` | `Watchlist` | First start only: heading for the watched teams |
 | `WATCH_SCHOOL` | — | First start only: School column for watched teams that aren't listed as district schools (e.g. `EMS`) |
-| `WATCH_SCHOOL` | — | First start only: School column for watched teams not listed as district schools (e.g. `EMS`) |
 
 The `COLLECT_*`, `WATCH_*` and `DEFAULT_*` settings only **seed** the database the first time the app starts. After that,
 change them on the admin page (`/admin/board`); the env vars are ignored, and the
