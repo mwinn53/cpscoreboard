@@ -8,8 +8,16 @@ terraform {
     }
   }
 
-  # State is local (infra/terraform.tfstate, gitignored). Keep a backup of it,
-  # or move it to an S3 backend before more than one person runs Terraform.
+  # State lives in S3 (versioned, encrypted, private), with S3-native locking.
+  # The bucket was created by hand, outside this config, so Terraform can't delete
+  # its own state.
+  backend "s3" {
+    bucket       = "cpscoreboard-tfstate-224066956748"
+    key          = "cpscoreboard/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {

@@ -89,8 +89,12 @@ pushing code, re-run the latest **Deploy** workflow.
 - **Logs:** `aws logs tail /cpscoreboard --follow`
 - **Replace the instance** (e.g. for a newer AMI): `terraform apply -replace=aws_instance.web`,
   then re-run Deploy. `/data` is reattached, and existing data is never reformatted.
-- **Terraform state** is local (`infra/terraform.tfstate`, gitignored). Keep a
-  backup, or move it to an S3 backend if anyone else will run Terraform.
+- **Terraform state** is in S3: `s3://cpscoreboard-tfstate-224066956748/cpscoreboard/terraform.tfstate`.
+  The bucket is versioned (any earlier state can be restored), encrypted and private,
+  and locks with S3-native locking, so two runs can't collide. It was created by hand,
+  outside Terraform, so `terraform destroy` can't delete it. On a new machine,
+  `terraform init` is all you need. An old local `terraform.tfstate` from before the
+  move is only a backup; don't apply against it.
 - **Tearing down:** `terraform destroy` refuses to delete the data volume
   because of `prevent_destroy`. Remove that line first if you really mean it.
 
