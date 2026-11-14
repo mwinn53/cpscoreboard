@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Board settings · {{ site_title }}{% endblock %}
 {% block content %}
-<nav class="subnav"><a href="/admin">Devices</a><strong>Board settings</strong></nav>
+{% with active="/admin/board" %}{% include "_admin_nav.html" %}{% endwith %}
 <h1>Board settings</h1>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}

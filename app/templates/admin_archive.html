@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Archive · {{ site_title }}{% endblock %}
+{% block content %}
+{% with active="/admin/archive" %}{% include "_admin_nav.html" %}{% endwith %}
+<h1>Scoreboard archive</h1>
+<p class="muted">The complete public scoreboard (every team and division), saved once per day: each day keeps the
+  last board seen that day, so a competition day's file is the board as the round closed. This is what survives
+  when the public scoreboard is taken down after the season. Files are gzipped JSON in the same format as the
+  API, and a folder of them can be replayed in the dev container.</p>
+
+{% if not enabled %}
+<p class="empty">Archiving is off here (replay mode, or <code>ARCHIVE_ENABLED=false</code>).</p>
+{% elif not files %}
+<p class="empty">Nothing archived yet; the first file is written on the next scoreboard poll.</p>
+{% else %}
+<p>{{ files | length }} day{{ 's' if files | length != 1 }} · {{ (total / 1024) | round | int }} KB in all.</p>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Day</th><th>Board as of</th><th class="num">Size</th><th></th></tr></thead>
+  <tbody>
+  {% for f in files %}
+  <tr>
+    <td>{{ f.day.strftime('%a %b') }} {{ f.day.day }}, {{ f.day.year }}</td>
+    <td>{{ f.saved_at | local }}</td>
+    <td class="num">{{ (f.size / 1024) | round(1) }} KB</td>
+    <td><a href="/admin/archive/{{ f.name }}" download>Download</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

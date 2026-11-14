@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from .archive import Archive
 from .collection import CollectionFilter
 from .events import BoardNotifier
 from .scraper import ScoreboardFormatError, TeamScore, parse_scores
@@ -54,11 +55,13 @@ class Poller:
     MAX_BACKOFF = 600.0
 
     def __init__(self, source: Source, interval: float, collect: CollectionFilter | None = None,
-                 store: SnapshotStore | None = None, notifier: BoardNotifier | None = None):
+                 store: SnapshotStore | None = None, notifier: BoardNotifier | None = None,
+                 archive: Archive | None = None):
         self.source = source
         self.interval = interval
         self.collect = collect or CollectionFilter()
         self.store = store
+        self.archive = archive
         self.notifier = notifier or BoardNotifier()
         self.state = BoardState()
         self._digest: str | None = None
@@ -144,6 +147,12 @@ class Poller:
         except ScoreboardFormatError as e:
             log.warning("Unexpected scoreboard response: %s", e)
             return self._fail(str(e))
+
+        if self.archive is not None and teams:
+            try:  # the full raw board, before filtering; one file per day (app/archive.py)
+                await asyncio.to_thread(self.archive.save, fetch.body, fetch.fetched_at)
+            except Exception:
+                log.exception("Failed to archive the scoreboard")
 
         kept = self.collect.apply(teams)  # after parse_scores ranked the full board
         if teams and not kept:

@@ -56,6 +56,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): watchlist, aliases, collection filter, legacy import |
+| `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
@@ -138,6 +139,20 @@ whose score, images, warnings, score time or any place changed. Play time alone
 doesn't trigger a row. With the filter limited to one state and division, that
 means tens of rows per round, not thousands. On restart, the dashboard reloads the
 last known board from the database instead of starting empty.
+
+### Season archive
+
+The public scoreboard is taken down after the season, and the database only keeps
+history for collected teams. So the app also saves the **complete raw scoreboard**
+(every team and division, the API's JSON, gzipped) to `<DATA_DIR>/archive/`, one
+file per day: each time the board changes, that day's file is replaced, so it holds
+the last board seen that day. On a competition day, that's the board as the round
+closed. A day is about 70 KB.
+
+Files are named like dev captures (`YYYYmmddTHHMMSSZ.json.gz`), so a folder of them
+replays with `SCRAPE_MODE=replay CAPTURE_SET=<folder>`. Admins can download them at
+`/admin/archive`. On the server they live on the `/data` volume, which has daily EBS
+snapshots. Set `ARCHIVE_ENABLED=false` to turn this off; it's always off in replay mode.
 
 ### Collection filter
 
