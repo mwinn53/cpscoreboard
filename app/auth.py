@@ -206,7 +206,8 @@ async def pending(request: Request):
         return RedirectResponse("/", status_code=303)
     if device.status == REVOKED:
         return RedirectResponse("/blocked", status_code=303)
-    return _page(request, "pending.html", device=device)
+    return _page(request, "pending.html", device=device,
+                 can_claim=bool(request.app.state.settings.admin_bootstrap_token))
 
 
 @router.get("/pending/status")

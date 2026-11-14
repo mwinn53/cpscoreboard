@@ -10,5 +10,8 @@
   <form method="post" action="/forget" class="inline">
     <button type="submit" class="link">Start over with a different email</button>
   </form>
+  {% if can_claim %}
+  <p class="muted">Are you the site admin? <a href="/admin/claim">Claim admin with the bootstrap token</a>.</p>
+  {% endif %}
 </section>
 {% endblock %}

@@ -114,6 +114,7 @@ def test_register_verify_approve_revoke(site):
     assert viewer.get("/").headers["location"] == "/pending"
     assert viewer.get("/api/scores").status_code == 403
     assert "Waiting for approval" in viewer.get("/pending").text
+    assert "/admin/claim" in viewer.get("/pending").text
     assert viewer.get("/pending/status").status_code == 204
 
     admin = make_admin(site)
