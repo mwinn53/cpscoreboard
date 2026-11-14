@@ -75,6 +75,7 @@ table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .board thead tr:nth-child(2) th { top: 29px; }
 .board th.placement[colspan] { text-align: center; color: var(--text); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 .board .placement { border-left: 1px solid var(--border); }
+.key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; }
 .board .district { border-right: 1px solid var(--border); }
 .board tbody tr:last-child td { border-bottom: none; }
 .board .num { text-align: right; font-variant-numeric: tabular-nums; }

@@ -61,13 +61,18 @@ def _status(request: Request) -> dict[str, Any]:
 
 ALL = "all"  # filter value meaning "every division" / "every state"
 
+# The public scoreboard's own key for the warning letters.
+WARNING_CODES = {"M": "Multiple Instances", "S": "Clock Skew", "T": "Time Exceeded", "U": "Multiple UIDs"}
 
-def _default(configured: tuple[str, ...], options: list[str]) -> str:
-    """The dashboard opens on the collection filter's division/state when it names exactly one."""
-    if len(configured) != 1:
+
+def _default(chosen: str, configured: tuple[str, ...], options: list[str]) -> str:
+    """Where the dashboard opens: the admin's default view; if unset, the collection filter's
+    division/state when it names exactly one; otherwise all."""
+    value = chosen or (configured[0] if len(configured) == 1 else ALL)
+    if value.casefold() == ALL:
         return ALL
-    match = [o for o in options if o.casefold() == configured[0].casefold()]
-    return match[0] if match else configured[0]
+    match = [o for o in options if o.casefold() == value.casefold()]
+    return match[0] if match else value
 
 
 def district_places(teams: list[TeamScore], district: set[str]) -> dict[str, int]:
@@ -90,8 +95,8 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
     aliases = board.aliases
     divisions = sorted({t.division for t in teams if t.division})
     states = sorted({t.location for t in teams if t.location})
-    division = _default(board.divisions, divisions) if division is None else (division or ALL)
-    state = _default(board.locations, states) if state is None else (state or ALL)
+    division = _default(board.default_division, board.divisions, divisions) if division is None else (division or ALL)
+    state = _default(board.default_state, board.locations, states) if state is None else (state or ALL)
 
     rows = teams
     if division != ALL:
@@ -119,6 +124,8 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "watched": watched,
         "watch_missing": [n for n in watch if n not in by_number],
         "watch_set": set(watch),
+        "watch_label": board.watch_label,
+        "warning_codes": WARNING_CODES,
         "aliases": aliases,
         "district": district_places(teams, set(aliases)),
         "changes": st.changes,
@@ -137,13 +144,13 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, q: str = "", division: str | None = None, state: str | None = None,
-              limit: int = 100):
+              limit: int = 0):
     return templates.TemplateResponse(request, "dashboard.html", _board(request, q, division, state, limit))
 
 
 @router.get("/partials/board", response_class=HTMLResponse)
 def board_partial(request: Request, q: str = "", division: str | None = None, state: str | None = None,
-                  limit: int = 100):
+                  limit: int = 0):
     return templates.TemplateResponse(request, "_board.html", _board(request, q, division, state, limit))
 
 

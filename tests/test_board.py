@@ -216,3 +216,42 @@ def test_dashboard_defaults_to_the_collected_division_and_state(site):  # noqa: 
     head = everything[everything.index("<thead>"):everything.index("</thead>")]
     assert 'rowspan="2">State</th>' in head and 'rowspan="2">Division</th>' in head
     assert everything.count('<td class="team">') > 1000  # the full board, not just what's stored
+
+
+def test_view_settings_seed_once_and_drive_the_default_view(store):
+    cfg = BoardConfig(store)
+    cfg.seed([], "", "Middle School", default_state="GA", watch_label="EMS teams")
+    assert (cfg.default_division, cfg.default_state, cfg.watch_label) == ("", "GA", "EMS teams")
+    cfg.set_view("all", "SC", "  Our   teams ")
+    again = BoardConfig(store)
+    again.seed([], "", "Middle School", default_state="GA", watch_label="EMS teams")
+    assert (again.default_division, again.default_state, again.watch_label) == ("all", "SC", "Our teams")
+
+    from app.web import ALL, _default
+    assert _default("", ("Middle School",), ["Middle School", "Open"]) == "Middle School"  # follows the filter
+    assert _default("ga", (), ["GA", "SC"]) == "GA"
+    assert _default("all", ("Middle School",), ["Middle School"]) == ALL
+    assert _default("", ("GA", "SC"), ["GA", "SC"]) == ALL
+
+
+def test_dashboard_columns_school_key_and_label(site):  # noqa: F811
+    admin = make_admin(site)
+    deadline = time.monotonic() + 10
+    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
+        time.sleep(0.05)
+    number = admin.get("/api/scores").json()["teams"][0]["team_number"]
+    admin.post("/admin/board/alias", data={"team": number, "alias": "Evans MS"})
+    admin.post("/admin/board/watch", data={"team": number})
+    admin.post("/admin/board/view", data={"default_division": "all", "default_state": "all",
+                                          "watch_label": "EMS teams"})
+
+    page = admin.get("/").text
+    assert "<h2>EMS teams</h2>" in page
+    head = page[page.index("<thead>"):page.index("</thead>")]
+    order = [head.index(h) for h in ("Team</th>", "School</th>", "Total Score</th>", "Placement",
+                                     "Score time", "Play time", "Flags</th>")]
+    assert order == sorted(order)
+    assert '<td class="school">Evans MS</td>' in page
+    assert "Flags:" in page and "Clock Skew" in page
+    assert re.search(r'<option value="0"\s+selected>All rows</option>', page)
+    assert page.index('value="0"') < page.index('value="50"')

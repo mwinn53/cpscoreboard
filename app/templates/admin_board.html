@@ -29,12 +29,29 @@
 </div>
 <script src="{{ url_for('static', path='cropper.js') }}" defer></script>
 
-<h2>Watchlist <span class="muted">· {{ watch | length }}</span></h2>
+<h2>Scoreboard view</h2>
+<p class="muted">What the scoreboard shows when it opens. Viewers can still change the dropdowns.</p>
+<form method="post" action="/admin/board/view" class="inline">
+  <label>Division
+    <select name="default_division">
+      <option value="all" {{ 'selected' if default_division | lower == 'all' }}>All divisions</option>
+      {% for d in known_divisions %}<option {{ 'selected' if d | lower == default_division | lower }}>{{ d }}</option>{% endfor %}
+    </select></label>
+  <label>State
+    <select name="default_state">
+      <option value="all" {{ 'selected' if default_state | lower == 'all' }}>All states</option>
+      {% for l in known_locations %}<option {{ 'selected' if l | lower == default_state | lower }}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Heading for watched teams <input name="watch_label" value="{{ watch_label }}" maxlength="60" required></label>
+  <button type="submit" class="primary">Save view</button>
+</form>
+
+<h2>{{ watch_label }} <span class="muted">· {{ watch | length }}</span> <span class="muted small">(watched teams)</span></h2>
 <p class="muted">Watched teams are pinned on the scoreboard and always collected, even outside the filter below.</p>
 {% if watch %}
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Team</th><th>Name</th><th>State</th><th>Division</th><th class="num">Overall #</th><th></th></tr></thead>
+  <thead><tr><th>Team</th><th>School</th><th>State</th><th>Division</th><th class="num">Overall #</th><th></th></tr></thead>
   <tbody>
   {% for number, t in watch %}
   <tr>
@@ -58,14 +75,14 @@
   <button type="submit" class="primary">Watch team</button>
 </form>
 
-<h2>District teams <span class="muted">· {{ aliases | length }}</span></h2>
-<p class="muted">Give each team in your district a name. Named teams are ranked against each other in the
-  scoreboard's <strong>District</strong> column (within their division), the name is shown next to the team
-  number, and search matches it. Clear a name and save to remove the team.</p>
+<h2>District schools <span class="muted">· {{ aliases | length }}</span></h2>
+<p class="muted">Enter each district team's school. It appears in the scoreboard's <strong>School</strong> column,
+  search matches it, and these teams are ranked against each other in the <strong>District</strong> column
+  (within their division). Clear a school and save to remove the team.</p>
 {% if aliases %}
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Team</th><th>Name</th></tr></thead>
+  <thead><tr><th>Team</th><th>School</th></tr></thead>
   <tbody>
   {% for number, alias in aliases %}
   <tr>
@@ -85,7 +102,7 @@
 {% endif %}
 <form method="post" action="/admin/board/alias" class="inline">
   <input name="team" placeholder="19-1515" aria-label="Team number" pattern="\d{2}-\d{4}" required>
-  <input name="alias" placeholder="Name, e.g. Evans MS" aria-label="Name" maxlength="60" required>
+  <input name="alias" placeholder="School, e.g. Evans MS" aria-label="School" maxlength="60" required>
   <button type="submit" class="primary">Add district team</button>
 </form>
 

@@ -4,21 +4,22 @@
   <thead>
     <tr class="group">
       <th rowspan="2">Team</th>
+      <th rowspan="2">School</th>
+      <th rowspan="2" class="num">Total Score</th>
+      {% if has_totals %}<th rowspan="2" class="num">Adj</th><th rowspan="2" class="num">Adjusted total</th>{% endif %}
       {% if cols.state %}<th rowspan="2">State</th>{% endif %}
       {% if cols.division %}<th rowspan="2">Division</th>{% endif %}
       {% if cols.tier %}<th rowspan="2">Tier</th>{% endif %}
       <th colspan="3" class="placement">Placement</th>
       <th rowspan="2" class="num">Images</th>
-      <th rowspan="2" class="num">Play time</th>
       <th rowspan="2" class="num">Score time</th>
-      <th rowspan="2" title="Warnings">Warn</th>
-      <th rowspan="2" class="num">Total Score</th>
-      {% if has_totals %}<th rowspan="2" class="num">Adj</th><th rowspan="2" class="num">Adjusted total</th>{% endif %}
+      <th rowspan="2" class="num">Play time</th>
+      <th rowspan="2" title="Warning flags (see the key below)">Flags</th>
     </tr>
     <tr>
       <th class="num placement" title="Place in the division, nationally">National</th>
       <th class="num" title="Place in the state, within the division">State</th>
-      <th class="num district" title="Place among the district teams (named on the admin page), within the division">District</th>
+      <th class="num district" title="Place among the district schools' teams (set on the admin page), within the division">District</th>
     </tr>
   </thead>
   <tbody>
@@ -26,7 +27,16 @@
     {% set ch = changes.get(t.team_number) %}
     {% set shown = ch and ch.visible and ch.at is recent %}
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
-      <td class="team">{{ t.team_number }}{% if aliases.get(t.team_number) %} <span class="alias">{{ aliases[t.team_number] }}</span>{% endif %}</td>
+      <td class="team">{{ t.team_number }}</td>
+      <td class="school">{{ aliases.get(t.team_number, '') }}</td>
+      <td class="num strong">{{ t.ccs_score | num }}
+        {%- if shown and ch.score_delta and not has_totals %}
+        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
+        {%- endif %}</td>
+      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}
+        {%- if shown and ch.score_delta %}
+        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
+        {%- endif %}</td>{% endif %}
       {% if cols.state %}<td>{{ t.location }}</td>{% endif %}
       {% if cols.division %}<td>{{ t.division }}</td>{% endif %}
       {% if cols.tier %}<td>{{ t.tier }}</td>{% endif %}
@@ -37,22 +47,20 @@
       <td class="num">{{ t.place_state_division }}</td>
       <td class="num district">{{ district.get(t.team_number, '') }}</td>
       <td class="num">{{ t.images if t.images is not none }}</td>
-      <td class="num mono">{{ t.play_time | hms }}</td>
       <td class="num mono">{{ t.score_time | hms }}</td>
-      <td>{% if t.code %}<span class="warn">{{ t.code }}</span>{% endif %}</td>
-      <td class="num strong">{{ t.ccs_score | num }}
-        {%- if shown and ch.score_delta and not has_totals %}
-        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
-        {%- endif %}</td>
-      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}
-        {%- if shown and ch.score_delta %}
-        <span class="delta {{ 'up' if ch.score_delta > 0 else 'down' }}" title="Points since previous change, {{ ch.at | ago }}">{{ ch.score_delta | signed }}</span>
-        {%- endif %}</td>{% endif %}
+      <td class="num mono">{{ t.play_time | hms }}</td>
+      <td>{% if t.code %}<span class="warn" title="{% for c in t.code %}{{ warning_codes.get(c, c) }}{{ ', ' if not loop.last }}{% endfor %}">{{ t.code }}</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 </div>
+{% endmacro %}
+
+{% macro warning_key() %}
+<p class="key small muted"><span class="strong">Flags:</span>
+  {% for code, meaning in warning_codes.items() %}<span><span class="warn">{{ code }}</span> = {{ meaning }}</span>{% endfor %}
+</p>
 {% endmacro %}
 
 <section class="status">
@@ -67,7 +75,7 @@
 </section>
 
 {% if watched or watch_missing %}
-<h2>Watchlist</h2>
+<h2>{{ watch_label }}</h2>
 {% if watched %}{{ team_table(watched, watch_cols) }}{% endif %}
 {% if watch_missing %}<p class="muted">Not on the board yet: {{ watch_missing | join(', ') }}</p>{% endif %}
 {% endif %}
@@ -75,6 +83,7 @@
 <h2>Scoreboard <span class="muted">· showing {{ rows | length }} of {{ matched }}</span></h2>
 {% if rows %}
   {{ team_table(rows, cols) }}
+  {{ warning_key() }}
 {% elif shown_on_board == 0 %}
   <p class="empty">Waiting for scoreboard data…</p>
 {% else %}

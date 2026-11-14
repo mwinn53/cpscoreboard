@@ -37,7 +37,8 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         store = SnapshotStore(settings.effective_database_url)
         app.state.devices = DeviceStore(store, timedelta(days=settings.device_lifetime_days))
         board = BoardConfig(store)
-        board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions)
+        board.seed(settings.watch_team_list, settings.collect_locations, settings.collect_divisions,
+                   settings.default_division, settings.default_state, settings.watch_label)
         app.state.board = board
         app.state.branding = branding.Branding(store)
         poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store)

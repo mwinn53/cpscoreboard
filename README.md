@@ -80,8 +80,10 @@ All settings are environment variables; see [.env.example](.env.example).
 | `COLLECT_LOCATIONS` | — (all) | First start only: locations to keep, e.g. `VA,MD,DC` |
 | `COLLECT_DIVISIONS` | — (all) | First start only: divisions to keep, e.g. `Open,Middle School` |
 | `WATCH_TEAMS` | — | First start only: team numbers to pin; always collected |
+| `DEFAULT_DIVISION`, `DEFAULT_STATE` | — | First start only: where the dashboard opens (`all`, or blank to follow the collection filter) |
+| `WATCH_LABEL` | `Watchlist` | First start only: heading for the watched teams |
 
-The last three only **seed** the database the first time the app starts. After that,
+The `COLLECT_*`, `WATCH_*` and `DEFAULT_*` settings only **seed** the database the first time the app starts. After that,
 change them on the admin page (`/admin/board`); the env vars are ignored, and the
 startup log says so.
 

@@ -3,7 +3,7 @@
 <form id="filters" class="filters" method="get" action="/"
       hx-get="/partials/board" hx-target="#board"
       hx-trigger="change, input changed delay:300ms from:input[name=q]">
-  <input type="search" name="q" value="{{ filters.q }}" placeholder="Team number or alias…" aria-label="Search team number or alias">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Team number or school…" aria-label="Search team number or school">
   <select name="division" aria-label="Division">
     <option value="all">All divisions</option>
     {% for d in divisions %}<option {% if d == filters.division %}selected{% endif %}>{{ d }}</option>{% endfor %}
@@ -13,7 +13,7 @@
     {% for s in states %}<option {% if s == filters.state %}selected{% endif %}>{{ s }}</option>{% endfor %}
   </select>
   <select name="limit" aria-label="Rows">
-    {% for n in [50, 100, 500, 0] %}
+    {% for n in [0, 50, 100, 500] %}
     <option value="{{ n }}" {% if n == filters.limit %}selected{% endif %}>{{ 'All rows' if n == 0 else n ~ ' rows' }}</option>
     {% endfor %}
   </select>

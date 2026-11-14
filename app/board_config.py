@@ -50,6 +50,8 @@ team_aliases = Table(
 )
 
 LOCATIONS, DIVISIONS, WATCH_SEEDED = "collect_locations", "collect_divisions", "watch_seeded"
+DEFAULT_DIVISION, DEFAULT_STATE, WATCH_LABEL = "default_division", "default_state", "watch_label"
+VIEW_TEXT_MAX = 60
 
 
 def _now() -> datetime:
@@ -86,9 +88,14 @@ class BoardConfig:
 
     # --- seeding ---
 
-    def seed(self, watch: Iterable[str], locations: str, divisions: str) -> None:
+    def seed(self, watch: Iterable[str], locations: str, divisions: str, default_division: str = "",
+             default_state: str = "", watch_label: str = "Watchlist") -> None:
         """Copy env-var values into the database the first time only."""
         watch = list(watch)
+        for key, value in ((DEFAULT_DIVISION, default_division), (DEFAULT_STATE, default_state),
+                           (WATCH_LABEL, watch_label)):
+            if key not in self._settings:
+                self._set(key, value.strip()[:VIEW_TEXT_MAX])
         for key, env_name, value in ((LOCATIONS, "COLLECT_LOCATIONS", locations),
                                      (DIVISIONS, "COLLECT_DIVISIONS", divisions)):
             if key not in self._settings:
@@ -128,6 +135,23 @@ class BoardConfig:
     @property
     def divisions(self) -> tuple[str, ...]:
         return split_list(self._settings.get(DIVISIONS, ""))
+
+    @property
+    def default_division(self) -> str:
+        return self._settings.get(DEFAULT_DIVISION, "")
+
+    @property
+    def default_state(self) -> str:
+        return self._settings.get(DEFAULT_STATE, "")
+
+    @property
+    def watch_label(self) -> str:
+        return self._settings.get(WATCH_LABEL, "") or "Watchlist"
+
+    def set_view(self, default_division: str, default_state: str, watch_label: str) -> None:
+        self._set(DEFAULT_DIVISION, default_division.strip()[:VIEW_TEXT_MAX])
+        self._set(DEFAULT_STATE, default_state.strip()[:VIEW_TEXT_MAX])
+        self._set(WATCH_LABEL, " ".join(watch_label.split())[:VIEW_TEXT_MAX])
 
     def collection_filter(self) -> CollectionFilter:
         return CollectionFilter.from_strings(",".join(self.locations), ",".join(self.divisions), self._watch)

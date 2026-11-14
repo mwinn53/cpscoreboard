@@ -56,7 +56,8 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
                  known_locations=locations, known_divisions=divisions,
                  chosen_locations={v.casefold() for v in board.locations},
                  chosen_divisions={v.casefold() for v in board.divisions},
-                 collecting=poller.collect.describe(),
+                 collecting=poller.collect.describe(), default_division=board.default_division,
+                 default_state=board.default_state, watch_label=board.watch_label,
                  board_size=poller.state.board_size, collected=len(poller.state.teams))
 
 
@@ -146,3 +147,12 @@ async def logo_reset(request: Request, slot: str, admin: Device = Depends(requir
         await asyncio.to_thread(request.app.state.branding.clear, slot)
         log.info("Admin device %d: removed the %s logo", admin.id, slot)
     return _done(f"Removed the {SLOTS.get(slot, 'logo')}.")
+
+
+@router.post("/view", dependencies=[Depends(same_origin)])
+async def view_set(request: Request, default_division: str = Form(""), default_state: str = Form(""),
+                   watch_label: str = Form(""), admin: Device = Depends(require_admin)):
+    await asyncio.to_thread(_board(request).set_view, default_division, default_state, watch_label)
+    log.info("Admin device %d: default view %r / %r, watch label %r", admin.id, default_division, default_state,
+             watch_label)
+    return _done("Saved the scoreboard view.")

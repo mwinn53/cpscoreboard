@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # Comma-separated team numbers to pin on the dashboard (always collected).
     # Temporary until milestone 3 moves the watchlist into the database.
     watch_teams: str = ""
+    # Dashboard view, first start only (then edited on /admin/board): which division and
+    # state the scoreboard opens on (blank = follow the collection filter, else all), and
+    # the heading for the watched teams.
+    default_division: str = ""
+    default_state: str = ""
+    watch_label: str = "Watchlist"
 
     # --- Access control (milestone 4) ---
     # Viewers register a browser with an emailed code; the admin approves it.
