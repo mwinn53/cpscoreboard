@@ -25,6 +25,7 @@ from .sources import build_source
 from .store import SnapshotStore
 from .posting import Poster
 from .secret_box import SecretBox
+from .geo import Geo
 from .team_detail import DetailPoller, DetailStore, OfficialDetailClient, build_detail_source
 
 log = logging.getLogger(__name__)
@@ -79,6 +80,11 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
             detail.restore()
             detail_task = asyncio.create_task(detail.run(), name="detail")
         app.state.detail = detail
+        geo = geo_task = None
+        if settings.geoip_enabled and settings.scrape_mode.value != "replay":
+            geo = Geo(settings.data_dir / "geoip")
+            geo_task = asyncio.create_task(geo.run(client), name="geoip")
+        app.state.geo = geo
         # Team pages read any team's per-image detail from the public scoreboard (not in replay).
         app.state.official = OfficialDetailClient(client, settings.scoreboard_url) \
             if settings.scrape_mode.value != "replay" else None
@@ -91,7 +97,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         try:
             yield
         finally:
-            for t in (task, detail_task):
+            for t in (task, detail_task, geo_task):
                 if t is not None:
                     t.cancel()
                     with suppress(asyncio.CancelledError):

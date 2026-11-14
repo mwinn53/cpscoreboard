@@ -19,7 +19,7 @@ shutdown). Next up is M5 (X notifier) and the rest of M7 (analysis).
 | [M1 – Restructure & dev loop](https://github.com/mwinn53/cpscoreboard/milestone/6) | ✅ Done ([#1](https://github.com/mwinn53/cpscoreboard/pull/1)) | Legacy code moved, scraper ported with tests, dev container, capture/replay |
 | [M2 – Infra & pipeline](https://github.com/mwinn53/cpscoreboard/milestone/7) | ✅ Done ([#1](https://github.com/mwinn53/cpscoreboard/pull/1), [#3](https://github.com/mwinn53/cpscoreboard/pull/3)) | Terraform on EC2, GitHub Actions → ECR → SSM deploy, Caddy TLS |
 | [M3a – Persistence & live updates](https://github.com/mwinn53/cpscoreboard/milestone/8) | ✅ Done ([#2](https://github.com/mwinn53/cpscoreboard/pull/2)) | SQLite change-only snapshots, restore on restart, SSE, change indicators |
-| [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | ✅ Live ([#27](https://github.com/mwinn53/cpscoreboard/pull/27), [#31](https://github.com/mwinn53/cpscoreboard/pull/31)); open: geolocation [#8](https://github.com/mwinn53/cpscoreboard/issues/8), prod checks [#9](https://github.com/mwinn53/cpscoreboard/issues/9), DNS [#10](https://github.com/mwinn53/cpscoreboard/issues/10) | Email code → pending device → admin approval; the whole site is gated |
+| [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | ✅ Live ([#27](https://github.com/mwinn53/cpscoreboard/pull/27), [#31](https://github.com/mwinn53/cpscoreboard/pull/31), device locations [#8](https://github.com/mwinn53/cpscoreboard/issues/8)); open: DNS [#10](https://github.com/mwinn53/cpscoreboard/issues/10) | Email code → pending device → admin approval; the whole site is gated |
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
@@ -46,6 +46,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
 | `app/team_detail.py` | Per-image detail: stored for watched teams while they play; fetched on demand (images and the 5-minute image chart) for any team's page |
 | `app/schema.py`, `app/migrations/` | Alembic migrations, run at startup |
+| `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
 | `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
@@ -125,6 +126,7 @@ All settings are environment variables; see [.env.example](.env.example).
 | `DATABASE_URL` | — | Override the database. The default is `sqlite:///<DATA_DIR>/cpscoreboard.db`; in replay mode it's an in-memory database, so replays never mix into real history |
 | `DETAIL_INTERVAL` | `300` | Seconds between per-image fetches for watched teams that are playing |
 | `DETAIL_ENABLED` | `true` | Fetch per-image detail for watched teams (replay serves it from `<capture set>/images/` if present) |
+| `GEOIP_ENABLED` | `true` | Approximate device locations on `/admin` (DB-IP city database, monthly download); off in replay |
 | `ARCHIVE_ENABLED` | `true` | Save the full scoreboard once per day (see [Season archive](#season-archive)); always off in replay |
 | `CAPTURE_DIR` | `captures` | Where capture mode saves, and where `CAPTURE_SET` names are looked up |
 | `CAPTURE_SET` | — | Replay: folder under `CAPTURE_DIR`, or any folder path |
@@ -158,7 +160,10 @@ The scoreboard is private. There are no passwords. A visitor registers a browser
    (365) from the approval date.
 4. **`/admin`**: approve, deny or revoke, label, delete, or make another device an
    admin. Each device shows its browser and IP when registered and when last seen,
-   and is flagged if the browser has changed. Revoking takes effect on the next
+   with an approximate location (city, region, country), and is flagged if the browser
+   has changed. The approval email includes the location too. Locations come from
+   DB-IP's free city database, downloaded monthly to `<DATA_DIR>/geoip/` (about
+   120 MB) and read locally, so no viewer's IP goes to a third party. Revoking takes effect on the next
    request; an open live-update stream closes within about 20 seconds.
 
 **Becoming admin:** register normally, then open **`/admin/claim`** and enter
