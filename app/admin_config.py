@@ -1,4 +1,4 @@
-"""Admin page for configuration: the season (competition start) and posting to X.
+"""Admin page for configuration: the scoreboard address, the season (competition start) and posting to X.
 
 Board settings (/admin/board) is about what the scoreboard shows and collects; this
 page is about how the app runs around it.
@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from . import scoreboard_url
 from .auth import _page, require_admin, same_origin
 from .devices import Device
 from .posting import CREDENTIAL_LABELS, CREDENTIALS, KINDS, MODES, Post, PostSettings
@@ -28,7 +29,11 @@ router = APIRouter(prefix="/admin/config")
 def _render(request: Request, admin: Device, status_code: int = 200, error: str | None = None) -> HTMLResponse:
     state, settings = request.app.state, request.app.state.settings
     monitor, poster = state.monitor, state.poster
+    url = scoreboard_url.effective(state.board, settings.scoreboard_url)
     return _page(request, "admin_config.html", status_code, me=admin, error=error,
+                 scoreboard_url=url, default_scoreboard_url=settings.scoreboard_url,
+                 url_is_default=url == settings.scoreboard_url,
+                 replay=settings.scrape_mode.value == "replay",
                  notice=request.query_params.get("notice"),
                  outage=monitor.status() if monitor else None,
                  grace_hours=settings.outage_grace_hours, alert_hours=settings.outage_alert_hours,
@@ -49,6 +54,29 @@ def _done(notice: str, anchor: str = "") -> RedirectResponse:
 @router.get("", response_class=HTMLResponse)
 async def config_page(request: Request, admin: Device = Depends(require_admin)):
     return _render(request, admin)
+
+
+@router.post("/scoreboard-url", dependencies=[Depends(same_origin)])
+async def set_scoreboard_url(request: Request, admin: Device = Depends(require_admin),
+                             url: Annotated[str, Form()] = "", reset: Annotated[str, Form()] = ""):
+    """Save a new scoreboard address after a test fetch, or go back to SCOREBOARD_URL."""
+    state, default = request.app.state, request.app.state.settings.scoreboard_url
+    if reset:
+        await asyncio.to_thread(state.board.set_value, scoreboard_url.KEY, "")
+        scoreboard_url.apply(state, default)
+        log.warning("Admin device %d reset the scoreboard address to the default", admin.id)
+        return _done("Back to the default scoreboard address.", "#scoreboard")
+    url = url.strip()
+    if problem := scoreboard_url.check_format(url):
+        return _render(request, admin, 400, error=problem)
+    result = await scoreboard_url.test(state.http, url)
+    if not result.ok:
+        return _render(request, admin, 400, error=f"Not saved: {url} was tested and {result.error}.")
+    await asyncio.to_thread(state.board.set_value, scoreboard_url.KEY, "" if url == default else url)
+    scoreboard_url.apply(state, url)
+    log.warning("Admin device %d set the scoreboard address to %s", admin.id, url)
+    teams = f"{result.teams} teams on the board" if result.teams else "a readable but empty board (between rounds?)"
+    return _done(f"Saved. The test fetch found {teams}.", "#scoreboard")
 
 
 @router.post("/competition-start", dependencies=[Depends(same_origin)])

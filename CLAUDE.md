@@ -12,7 +12,9 @@
    items related to the PR's area (or one or two small ones), tick them off in the
    issue (move them under Done with the PR number), and name them in the PR body.
    Add new one-off ideas there instead of opening issues or asking about each.
-5. If `infra/` changed, run `terraform plan` and note it in the PR; apply it before
+5. **TODO.md** is the user's brainstorm list: file each new idea as a GitHub issue
+   (label `feature-request`, right milestone, short spec), then clear it from the list.
+6. If `infra/` changed, run `terraform plan` and note it in the PR; apply it before
    or with the deploy.
 
 ## Notes

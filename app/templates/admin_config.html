@@ -1,20 +1,44 @@
 {% extends "base.html" %}
+{% from "_info.html" import info %}
 {% block title %}Configuration · {{ site_title }}{% endblock %}
 {% block content %}
 {% with active="/admin/config" %}{% include "_admin_nav.html" %}{% endwith %}
 <h1>Configuration</h1>
-<p class="muted">How the app runs around the scoreboard: the season, and posting to X. What the scoreboard shows
-  and collects is under <a href="/admin/board">Board settings</a>.</p>
+<p class="muted">How the app runs around the scoreboard. What it shows and collects is under
+  <a href="/admin/board">Board settings</a>.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 
-<h2 id="competition-start">Competition start</h2>
-<p class="muted">The end-of-season outage alert counts from this. Starting {{ grace_hours | int }} hours after the
-  competition starts, if the public scoreboard is unavailable for {{ alert_hours | int }} hours in a row, the admin is
-  emailed a recommendation to shut the server down, and the <strong>Server</strong> page (snapshot and shut down)
-  appears. It's recorded automatically the first time teams show play time; set it here only if that was missed or
-  is wrong. Leave it blank and save to clear it (it will be recorded again from the next board with play time).
-  Times are US Eastern.</p>
+<h2 id="scoreboard">Scoreboard address
+  {% call info("scoreboard-help", "About the scoreboard address") %}
+  The public scoreboard's scores feed, polled every minute. The per-image detail and image charts come from the same
+  site (<code>…/api/image/…</code> next to <code>…/api/team/scores.php</code>), so they follow this address.
+  A new address is <strong>tested before it's saved</strong>: it has to return a readable scoreboard. It takes effect
+  at once, without a restart. <strong>Reset to default</strong> goes back to
+  <code>{{ default_scoreboard_url }}</code> (the <code>SCOREBOARD_URL</code> setting).
+  {% endcall %}
+</h2>
+<p class="muted">Where scores come from{% if not url_is_default %} <strong>(changed from the default)</strong>{% endif %}.
+  {% if replay %}This is a replay, so nothing is fetched from it here.{% endif %}</p>
+<form method="post" action="/admin/config/scoreboard-url" class="inline url-form">
+  <input name="url" type="url" value="{{ scoreboard_url }}" maxlength="500" aria-label="Scoreboard address" required>
+  <button type="submit">Test and save</button>
+</form>
+{% if not url_is_default %}
+<form method="post" action="/admin/config/scoreboard-url" class="inline">
+  <input type="hidden" name="reset" value="1"><button type="submit" class="link">Reset to default</button>
+</form>
+{% endif %}
+
+<h2 id="competition-start">Competition start
+  {% call info("competition-help", "About the competition start") %}
+  The end-of-season outage alert counts from this. Starting {{ grace_hours | int }} hours after the competition starts,
+  if the public scoreboard is unavailable for {{ alert_hours | int }} hours in a row, the admin is emailed a
+  recommendation to shut the server down, and the <strong>Server</strong> page (snapshot and shut down) appears.
+  It's recorded automatically the first time teams show play time; set it only if that was missed or is wrong.
+  Saving it blank clears it, and it's recorded again from the next board with play time. Times are US Eastern.
+  {% endcall %}
+</h2>
 {% if not outage %}
 <p class="empty">Outage monitoring is off here (replay mode).</p>
 {% else %}
@@ -27,10 +51,13 @@
 </form>
 {% endif %}
 
-
-<h2 id="image-detail">Per-image detail</h2>
-<p class="muted">Watched teams' per-image scores are fetched every few minutes while they play (shown on each team's
-  history page).</p>
+<h2 id="image-detail">Per-image detail
+  {% call info("detail-help", "About per-image detail") %}
+  For watched teams, the app fetches the scoreboard's per-image scores (found, remaining, penalties, time and flags)
+  every few minutes while the team's play time is moving, and stores each change. Team pages show it, together with
+  the public scoreboard's own 5-minute image history for the current round (that part works for any team).
+  {% endcall %}
+</h2>
 {% if not detail %}
 <p class="empty">Off here (<code>DETAIL_ENABLED=false</code>, or a replay without an <code>images/</code> folder).</p>
 {% else %}
@@ -39,12 +66,15 @@
 </ul>
 {% endif %}
 
-<h2 id="posting">Posting to X</h2>
-<p class="muted">Posts about the watched teams during a round, like the legacy bot: when a team appears on the board,
-  live score and place changes while it's actively playing, an hour left and time up, then periodic place changes
-  once it's done (time up, or no play for 20 minutes) as other teams finish. <strong>Dry run</strong> writes
-  the posts to the log below without sending them, so you can see what would go out. Limits apply to real posts only;
-  anything over a limit is skipped and logged.</p>
+<h2 id="posting">Posting to X
+  {% call info("posting-help", "About posting") %}
+  Posts about the watched teams during a round, like the legacy bot: when a team appears on the board; live score and
+  place changes while it's actively playing (from the slider's hour on); an hour left and time up; then, once it's done
+  (time up, or no play for 20 minutes), periodic place changes as other teams finish. <strong>Dry run</strong> writes
+  the posts to Recent posts below without sending them, so you can see what would go out.
+  {% endcall %}
+</h2>
+<p class="muted">Posts about the watched teams during a round.</p>
 <form method="post" action="/admin/config/posting" class="stack compact">
   <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if post.enabled }}> Posting enabled</label>
   <fieldset class="choices">
@@ -64,31 +94,31 @@
          oninput="document.getElementById('change_after_out').value = this.value">
   <label for="place_every_minutes">Once a team is done, post its place changes at most every (minutes)</label>
   <input id="place_every_minutes" name="place_every_minutes" type="number" min="5" max="240" step="5" value="{{ post.place_every_minutes }}">
-  <label for="per_hour">At most this many posts per hour</label>
+  <label for="per_hour">At most this many posts per hour
+    {% call info("limits-help", "About the limits") %}
+    Limits apply to real posts only; anything over a limit is skipped and shown in Recent posts. X's API is
+    pay-per-use: each post draws on prepaid credits (bought in the X Developer Console), and with none left X refuses
+    posts ("credits depleted"). The daily limit is what caps the cost of a round.
+    {% endcall %}
+  </label>
   <input id="per_hour" name="per_hour" type="number" min="0" value="{{ post.per_hour }}">
   <label for="per_day">At most this many posts per day</label>
   <input id="per_day" name="per_day" type="number" min="0" value="{{ post.per_day }}">
-  <span class="muted small">X's free API tier allows about 500 posts a month (roughly 17 a day), so keep the daily
-    limit near that unless the account is on a paid tier.</span>
   <label for="footer">Added to the end of every post (optional, e.g. hashtags)</label>
   <input id="footer" name="footer" maxlength="100" value="{{ post.footer }}" placeholder="#CyberPatriot">
   <button type="submit">Save posting settings</button>
 </form>
 
 <h3 id="x-keys">X keys
-  <span class="info">
-    <button type="button" class="info-btn" aria-label="How to get or regenerate the X keys"
-            aria-expanded="false" aria-controls="x-keys-help">i</button>
-    <span class="info-bubble" id="x-keys-help" role="note" hidden>
-      <strong>Getting or regenerating the keys.</strong> Sign in at
-      <a href="https://developer.x.com" rel="noopener" target="_blank">developer.x.com</a> as the account that posts,
-      open the app, then <strong>Keys &amp; Tokens</strong>. Under <strong>OAuth 1.0 Keys</strong>, <em>Regenerate</em>
-      next to <strong>Consumer Key</strong> shows the key and its secret; <em>Regenerate</em> next to
-      <strong>Access Token</strong> shows the token and its secret, and its line must say <strong>Read and write</strong>
-      (if it says Read, set the app's permissions to Read and write, then regenerate the token). X shows each secret only
-      once, and regenerating replaces the old values, so anything else using them needs the new ones.
-    </span>
-  </span>
+  {% call info("x-keys-help", "How to get or regenerate the X keys") %}
+  <strong>Getting or regenerating the keys.</strong> Sign in at
+  <a href="https://developer.x.com" rel="noopener" target="_blank">developer.x.com</a> as the account that posts,
+  open the app, then <strong>Keys &amp; Tokens</strong>. Under <strong>OAuth 1.0 Keys</strong>, <em>Regenerate</em>
+  next to <strong>Consumer Key</strong> shows the key and its secret; <em>Regenerate</em> next to
+  <strong>Access Token</strong> shows the token and its secret, and its line must say <strong>Read and write</strong>
+  (if it says Read, set the app's permissions to Read and write, then regenerate the token). X shows each secret only
+  once, and regenerating replaces the old values, so anything else using them needs the new ones.
+  {% endcall %}
 </h3>
 <p class="muted">The four <strong>OAuth 1.0 Keys</strong> from the X Developer Console: the Consumer Key and secret,
   and an Access Token and secret for the account that posts, with <strong>Read and write</strong> permission. The
@@ -113,12 +143,17 @@
 {% endif %}
 {% endif %}
 
-<h3 id="recent-posts">Recent posts</h3>
+<h3 id="recent-posts">Recent posts
+  {% call info("recent-help", "About recent posts and test posts") %}
+  The last 25 posts and what happened to each: <em>sent</em>, <em>failed</em> (with X's reason), or <em>skipped</em>
+  (over a limit, or keys incomplete). A test post goes out in the current mode (to this log in dry run) and ignores
+  the limits.
+  {% endcall %}
+</h3>
 <form method="post" action="/admin/config/test-post" class="inline">
   <label>Test post <input name="text" maxlength="280" placeholder="Test post from {{ site_title }}."></label>
   <button type="submit">Send</button>
 </form>
-<p class="muted small">A test post goes out in the current mode (to the log in dry run) and ignores the limits.</p>
 {% if not recent %}
 <p class="empty">Nothing posted yet.</p>
 {% else %}
@@ -134,24 +169,5 @@
 </table>
 </div>
 {% endif %}
-<script>
-  // (i) buttons: click to open or close the bubble; Escape or a click elsewhere closes it.
-  (function () {
-    function close(btn) { btn.setAttribute("aria-expanded", "false"); document.getElementById(btn.getAttribute("aria-controls")).hidden = true; }
-    document.addEventListener("click", function (e) {
-      var btn = e.target.closest(".info-btn");
-      document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (b) {
-        if (b !== btn && !e.target.closest("#" + b.getAttribute("aria-controls"))) close(b);
-      });
-      if (!btn) return;
-      var open = btn.getAttribute("aria-expanded") === "true";
-      if (open) { close(btn); return; }
-      btn.setAttribute("aria-expanded", "true");
-      document.getElementById(btn.getAttribute("aria-controls")).hidden = false;
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(close);
-    });
-  })();
-</script>
+<script src="{{ url_for('static', path='info.js') }}" defer></script>
 {% endblock %}
