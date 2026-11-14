@@ -191,6 +191,7 @@ def test_configuration_page(site):  # noqa: F811
     admin = make_admin(site)
     page = admin.get("/admin/config")
     assert page.status_code == 200 and "Posting to X" in page.text and "SECRETS_KEY" in page.text
+    assert 'class="info-btn"' in page.text and 'id="x-keys-help" role="note" hidden' in page.text
     assert 'href="/admin/config"' in admin.get("/admin").text
     r = admin.post("/admin/config/posting", data={"enabled": "1", "mode": "dry_run",
                                                   "kinds": ["on_board", "time_up"], "change_after_hours": "3",

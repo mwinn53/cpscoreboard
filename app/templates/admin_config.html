@@ -75,23 +75,26 @@
   <button type="submit">Save posting settings</button>
 </form>
 
-<h3 id="x-keys">X keys</h3>
+<h3 id="x-keys">X keys
+  <span class="info">
+    <button type="button" class="info-btn" aria-label="How to get or regenerate the X keys"
+            aria-expanded="false" aria-controls="x-keys-help">i</button>
+    <span class="info-bubble" id="x-keys-help" role="note" hidden>
+      <strong>Getting or regenerating the keys.</strong> Sign in at
+      <a href="https://developer.x.com" rel="noopener" target="_blank">developer.x.com</a> as the account that posts,
+      open the app, then <strong>Keys &amp; Tokens</strong>. Under <strong>OAuth 1.0 Keys</strong>, <em>Regenerate</em>
+      next to <strong>Consumer Key</strong> shows the key and its secret; <em>Regenerate</em> next to
+      <strong>Access Token</strong> shows the token and its secret, and its line must say <strong>Read and write</strong>
+      (if it says Read, set the app's permissions to Read and write, then regenerate the token). X shows each secret only
+      once, and regenerating replaces the old values, so anything else using them needs the new ones.
+    </span>
+  </span>
+</h3>
 <p class="muted">The four <strong>OAuth 1.0 Keys</strong> from the X Developer Console: the Consumer Key and secret,
   and an Access Token and secret for the account that posts, with <strong>Read and write</strong> permission. The
   Bearer Token and the OAuth 2.0 keys aren't used. Saved keys are encrypted and never shown again; leave a field blank
   to keep what's saved.
   {% if credentials_ok %}<strong>All four are saved.</strong>{% elif saved_credentials %}<strong>Some keys are missing.</strong>{% else %}No keys saved yet.{% endif %}</p>
-<aside class="callout" aria-label="Getting or regenerating the X keys">
-  <span class="callout-icon" aria-hidden="true">i</span>
-  <p><strong>Getting or regenerating the keys.</strong> Sign in at
-    <a href="https://developer.x.com" rel="noopener" target="_blank">developer.x.com</a> as the account that posts, open
-    the app, then <strong>Keys &amp; Tokens</strong>. Under <strong>OAuth 1.0 Keys</strong>, <em>Regenerate</em> next to
-    <strong>Consumer Key</strong> shows the key and its secret; <em>Regenerate</em> next to <strong>Access Token</strong>
-    shows the token and its secret, and its line must say <strong>Read and write</strong> (if it says Read, set the app's
-    permissions to Read and write under its user authentication settings, then regenerate the token). X shows each
-    secret only once, and regenerating replaces the old values, so anything else using them, such as the legacy bot,
-    needs the new ones. Paste all four here and save.</p>
-</aside>
 {% if not secrets_available %}
 <p class="empty">Keys can't be saved here: <code>SECRETS_KEY</code> isn't set on the server.</p>
 {% else %}
@@ -131,4 +134,24 @@
 </table>
 </div>
 {% endif %}
+<script>
+  // (i) buttons: click to open or close the bubble; Escape or a click elsewhere closes it.
+  (function () {
+    function close(btn) { btn.setAttribute("aria-expanded", "false"); document.getElementById(btn.getAttribute("aria-controls")).hidden = true; }
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest(".info-btn");
+      document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(function (b) {
+        if (b !== btn && !e.target.closest("#" + b.getAttribute("aria-controls"))) close(b);
+      });
+      if (!btn) return;
+      var open = btn.getAttribute("aria-expanded") === "true";
+      if (open) { close(btn); return; }
+      btn.setAttribute("aria-expanded", "true");
+      document.getElementById(btn.getAttribute("aria-controls")).hidden = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") document.querySelectorAll('.info-btn[aria-expanded="true"]').forEach(close);
+    });
+  })();
+</script>
 {% endblock %}

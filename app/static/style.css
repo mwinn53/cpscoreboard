@@ -211,9 +211,13 @@ svg.spark .end { fill: var(--series-1); }
 .charts.placement { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .charts.scoring { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 .charts.scoring + .table-wrap { margin-top: 16px; }
-.callout { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 14px; padding: 10px 12px;
-  border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--surface);
-  font-size: 13px; max-width: 72ch; }
-.callout p { margin: 0; }
-.callout-icon { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--accent);
-  color: var(--accent); font: italic 700 12px/15px Georgia, serif; text-align: center; margin-top: 1px; }
+.info { position: relative; display: inline-block; vertical-align: middle; }
+.info-btn { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1.5px solid var(--accent);
+  background: none; color: var(--accent); font: italic 700 12px/15px Georgia, serif; cursor: pointer; margin-left: 4px; }
+.info-btn:hover, .info-btn[aria-expanded="true"] { background: var(--accent); color: var(--bg); }
+.info-bubble { position: absolute; left: -8px; top: calc(100% + 8px); z-index: 10; width: min(360px, 80vw);
+  padding: 10px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); font-size: 13px; font-weight: normal; line-height: 1.45; }
+.info-bubble::before { content: ""; position: absolute; top: -6px; left: 12px; width: 10px; height: 10px;
+  background: var(--surface); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+.info-bubble[hidden] { display: none; }
