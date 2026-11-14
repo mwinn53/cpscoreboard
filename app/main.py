@@ -12,9 +12,11 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_archive, admin_board, auth, branding, templating, web
+from . import admin_archive, admin_board, admin_server, auth, branding, templating, web
 from .archive import Archive
 from .board_config import BoardConfig
+from .outage import OutageMonitor
+from .server_control import ServerControl
 from .config import Settings
 from .devices import DeviceStore
 from .mail import Mailer, build_mailer
@@ -48,7 +50,16 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         if settings.archive_enabled and settings.scrape_mode.value != "replay":
             archive = Archive(settings.data_dir / "archive", settings.display_timezone)
         app.state.archive = archive
-        poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store, archive=archive)
+        monitor = None
+        if settings.scrape_mode.value != "replay":
+            monitor = OutageMonitor(board, app.state.mailer, settings.admin_notify_email, settings.site_title,
+                                    settings.public_url, grace=timedelta(hours=settings.outage_grace_hours),
+                                    threshold=timedelta(hours=settings.outage_alert_hours))
+        app.state.monitor = monitor
+        app.state.server_control = ServerControl(settings.aws_region, settings.aws_instance_id,
+                                                 settings.data_volume_id)
+        poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store, archive=archive,
+                        monitor=monitor)
         poller.restore()
         app.state.poller = poller
         app.state.store = store
@@ -82,5 +93,6 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.include_router(auth.router)
     app.include_router(admin_board.router)
     app.include_router(admin_archive.router)
+    app.include_router(admin_server.router)
     app.include_router(web.router)
     return app

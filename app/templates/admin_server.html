@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Server · {{ site_title }}{% endblock %}
+{% block content %}
+{% with active="/admin/server" %}{% include "_admin_nav.html" %}{% endwith %}
+<h1>Server</h1>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+<h2>Public scoreboard</h2>
+{% if not status %}
+<p class="empty">Outage monitoring is off here (replay mode).</p>
+{% else %}
+<p>{% if status.down_since %}<span class="error">⚠ Unavailable since {{ status.down_since | local }}</span>
+  {% else %}<strong>Available.</strong>{% endif %}</p>
+<p class="muted">When the public scoreboard has been unavailable for {{ alert_hours | int }} hours, an alert goes to
+  <strong>{{ notify or '(ADMIN_NOTIFY_EMAIL is not set)' }}</strong> recommending a shutdown. Monitoring starts
+  {{ grace_hours | int }} hours after the competition starts, so early hiccups don't count.</p>
+<ul class="muted">
+  <li>Competition start: <strong>{{ status.competition_start | local if status.competition_start else 'not yet seen' }}</strong>
+    (recorded automatically the first time teams show play time)</li>
+  <li>Monitoring from: <strong>{{ status.monitoring_from | local if status.monitoring_from else '—' }}</strong></li>
+  {% if status.alert_at %}<li>Alert {{ 'sent' if status.alerted else 'due' }}: <strong>{{ status.alert_at | local }}</strong></li>{% endif %}
+</ul>
+<form method="post" action="/admin/server/competition-start" class="inline">
+  <label>Competition start <input type="datetime-local" name="start"></label>
+  <button type="submit">Set</button>
+</form>
+{% endif %}
+
+<h2>Shut down</h2>
+<p>Once the season is over and the public scoreboard is gone, there's nothing left to collect. Shutting down:</p>
+<ol>
+  <li>takes a final snapshot of the data volume (database and <a href="/admin/archive">season archive</a>), then</li>
+  <li>stops the server. The site goes offline, and you stop paying for the server itself; the disk, its
+    snapshots and the IP address cost a few dollars a month. It can be started again later.</li>
+</ol>
+<p class="muted"><strong>Download the <a href="/admin/archive">archive</a> first</strong> if you want a copy of your own.</p>
+{% if control.available %}
+<form method="post" action="/admin/server/shutdown" class="inline"
+      onsubmit="return confirm('Snapshot the data and stop the server now? The site will go offline.')">
+  <label>Type <code>SHUT DOWN</code> to confirm <input name="confirm" autocomplete="off" required></label>
+  <button type="submit" class="danger">Snapshot and shut down</button>
+</form>
+{% else %}
+<p class="empty">Not available here (not running on AWS).</p>
+{% endif %}
+{% endblock %}
