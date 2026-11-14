@@ -69,8 +69,9 @@ KINDS = {
 }
 DONE_AFTER = timedelta(minutes=20)  # play time not moving this long = the team is done
 CREDENTIALS = ("x_api_key", "x_api_secret", "x_access_token", "x_access_secret")
-CREDENTIAL_LABELS = {"x_api_key": "API key (consumer key)", "x_api_secret": "API key secret",
-                     "x_access_token": "Access token", "x_access_secret": "Access token secret"}
+# Named as on the X Developer Console's Keys & Tokens tab (OAuth 1.0 Keys section).
+CREDENTIAL_LABELS = {"x_api_key": "Consumer Key", "x_api_secret": "Consumer Secret",
+                     "x_access_token": "Access Token", "x_access_secret": "Access Token Secret"}
 
 
 @dataclass
