@@ -1,0 +1,11 @@
+{% if not sparks %}
+<p class="muted small">No history stored for {{ team_number }} yet.</p>
+{% else %}
+<div class="sparks">
+  {% for title, value, svg in sparks %}
+  <div class="spark-item"><span class="spark-label">{{ title }}</span>{{ svg | safe }}<strong class="spark-value">{{ value }}</strong></div>
+  {% endfor %}
+  <a class="small" href="/teams/{{ team_number }}">Full history →</a>
+</div>
+<p class="muted small spark-note">This round, since {{ since | local }}. Places: higher on the line is better.</p>
+{% endif %}

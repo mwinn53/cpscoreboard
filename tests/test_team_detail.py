@@ -1,13 +1,14 @@
 """Per-image detail for watched teams (#19)."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.store import SnapshotStore
-from app.team_detail import DetailPoller, DetailStore, ReplayDetail, detail_url, parse_images
+from app.team_detail import (DetailPoller, DetailStore, ReplayDetail, chart_url, detail_url, parse_image_chart,
+                              parse_images)
 
-FIXTURE = Path(__file__).parent / "fixtures" / "images_s19_2026-11-14.json"
+FIXTURE = Path(__file__).parent / "fixtures" / "detail" / "images_s19_2026-11-14.json"
 
 
 def test_parse_real_response():
@@ -20,6 +21,44 @@ def test_parse_real_response():
 
 def test_detail_url():
     assert detail_url("https://x.org/api/team/scores.php") == "https://x.org/api/image/scores.php"
+    assert chart_url("https://x.org/api/team/scores.php") == "https://x.org/api/image/chart.php"
+
+
+CHART = Path(__file__).parent / "fixtures" / "detail" / "image_chart_s19_2026-11-14.json"
+
+
+def test_parse_official_image_chart():
+    now = datetime(2026, 11, 14, 14, 40, tzinfo=UTC)
+    series = parse_image_chart(CHART.read_bytes(), now)
+    assert 1 <= len(series) <= 3 and all(n for n, _ in series)
+    for _, pts in series:
+        assert pts == sorted(pts) and all(now - timedelta(hours=7) < t <= now for t, _ in pts)  # UTC, this year
+
+
+def test_official_chart_year_rolls_back_in_january():
+    body = b'{"cols":[{"label":"Time"},{"label":"Img_x"}],"rows":[{"c":[{"v":"12/31 23:55"},{"v":5}]},' \
+           b'{"c":[{"v":"12/31 23:59"},{"v":"null"}]}]}'
+    (name, pts), = parse_image_chart(body, datetime(2027, 1, 1, 0, 10, tzinfo=UTC))
+    assert name == "Img_x" and pts == [(datetime(2026, 12, 31, 23, 55, tzinfo=UTC), 5.0)]
+
+
+def test_district_history_ranks_among_district_teams_in_the_division():
+    from app.team_view import district_history
+    store = SnapshotStore("sqlite://")
+    t0 = datetime(2026, 11, 14, 15, tzinfo=UTC)
+
+    def snap(n, place, div="Middle School"):
+        from app.scraper import TeamScore
+        return TeamScore(team_number=n, team_id=1, location="GA", division=div, tier="", images=3, play_time=1,
+                         score_time=1, ccs_score=1, adjustment=None, total=None, code="", place_overall=place,
+                         place_division=place, place_state=place, place_state_division=place)
+
+    store.save(t0, 3, 3, [snap("19-0001", 5), snap("19-0002", 9), snap("19-0003", 1, div="Open")])
+    store.save(t0 + timedelta(minutes=5), 3, 3, [snap("19-0002", 3)])   # passes 19-0001
+    store.save(t0 + timedelta(minutes=9), 3, 3, [snap("19-0003", 2, div="Open")])  # other division: no effect
+    hist = district_history(store, "19-0001", {"19-0001", "19-0002", "19-0003"})
+    assert hist == [(t0, 1), (t0 + timedelta(minutes=5), 2)]
+    store.close()
 
 
 class FakeSource:
@@ -64,6 +103,20 @@ def test_replay_serves_the_newest_saved_response(tmp_path):
     src = ReplayDetail(tmp_path / "images")
     assert len(parse_images(asyncio.run(src.fetch("19-1")))) == 3
     assert asyncio.run(src.fetch("19-9")) is None
+
+
+def test_multi_chart_and_sparkline():
+    from zoneinfo import ZoneInfo
+
+    from app.charts import multi_step_chart, short_image_name, sparkline
+    t = datetime(2026, 11, 14, 15, tzinfo=UTC)
+    chart = multi_step_chart([("Win_a", [(t, 5), (t + timedelta(minutes=5), 10)]), ("Srv_b", [(t, 10)])],
+                             t + timedelta(minutes=10), tz=ZoneInfo("America/New_York"), label="Images")
+    assert 'class="series s1"' in chart.svg and 'class="series s2"' in chart.svg
+    assert "Win 5 · Srv 10" in chart.svg.replace("&quot;", '"') or "Win 5" in chart.svg
+    assert short_image_name("Windows11_cp19_intro") == "Windows11"
+    assert sparkline([(t, 3), (t + timedelta(minutes=5), 1)], t + timedelta(minutes=9), invert=True).startswith("<svg")
+    assert sparkline([], t) == ""
 
 
 def test_team_page_shows_images(site):  # noqa: F811

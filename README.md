@@ -44,7 +44,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/admin_config.py` | Configuration page: competition start, per-image detail status, posting to X |
 | `app/board_config.py`, `app/admin_board.py` | Watchlist, district schools, collection filter and view defaults (database + admin page), legacy import |
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
-| `app/team_detail.py` | Per-image detail for watched teams (`/api/image/scores.php`), polled while they play |
+| `app/team_detail.py` | Per-image detail: stored for watched teams while they play; fetched on demand (images and the 5-minute image chart) for any team's page |
+| `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
 | `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
 | `app/main.py`, `app/config.py` | App factory; settings from environment variables |
@@ -56,7 +57,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | Path | Returns |
 |---|---|
 | `/` | Dashboard: the live board with National (division), State (within division) and District places; opens on the collected division and state |
-| `/teams/{team}` | A team's history: total score, national and state place over time (step charts, one round at a time) plus a table; for watched teams, per-image scores |
+| `/teams/{team}` | A team's history, one round at a time: **Placement** (District, State, National) and **Scoring** (total score, per-image table and image-score chart), plus a table |
+| `/partials/spark/{team}` | The scoreboard's expanded row for a team: this round's sparklines |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
 | `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
@@ -93,7 +95,13 @@ approved device (see [Access control](#access-control)).
   numbers line up.
 - **Watched teams** are pinned under their own heading (default "Watchlist"), without the
   School column; the main table still shows their school.
-- **Team history:** each team number links to `/teams/{team}`.
+- **Trends:** the ▸ next to a team opens a row with this round's sparklines (total score,
+  District, State, National); open rows stay open through auto-refreshes.
+- **Team history:** each team number links to `/teams/{team}`. Placement charts follow the
+  scoreboard's order (District, State, National); the District chart appears for district
+  schools' and watched teams. Scoring shows the total score and, like the official team page,
+  the per-image table and one chart of every image's score: live from the public scoreboard
+  for the current round (any team), or from stored detail for watched teams.
 - **Live updates:** the board refreshes on every change (via `/events`) and every polling
   interval. Times are shown in `DISPLAY_TIMEZONE`.
 - **Logos:** a square logo sits at each end of the header. Each can link somewhere:

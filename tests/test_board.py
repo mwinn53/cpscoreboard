@@ -388,11 +388,35 @@ def test_team_history_page_has_charts_and_a_table(site):  # noqa: F811
     assert f'href="/teams/{number}"' in admin.get("/").text
     page = admin.get(f"/teams/{number}")
     assert page.status_code == 200
-    for title in ("Total score", "National place (division)", "State place (division)"):
-        assert f"<h3>{title}</h3>" in page.text
-    assert page.text.count('<svg class="chart"') == 3 and "data-points=" in page.text
-    assert "Table view" in page.text and "charts.js" in page.text
+    text = page.text
+    assert text.index("<h2>Placement</h2>") < text.index("<h3>State</h3>") < text.index("<h3>National</h3>") \
+        < text.index("<h2>Scoring</h2>") < text.index("<h3>Total score</h3>")
+    assert text.count('<svg class="chart"') == 3 and "data-points=" in text
+    assert "Table view" in text and "charts.js" in text
     assert admin.get("/teams/99-0000").status_code == 404
+
+
+def test_district_chart_comes_first_for_district_teams(site):  # noqa: F811
+    admin = make_admin(site)
+    wait_for_replay(admin)
+    number = admin.get("/api/scores").json()["teams"][0]["team_number"]
+    assert admin.post("/admin/board/watch", data={"team": number}).status_code == 303
+    text = admin.get(f"/teams/{number}").text
+    assert text.index("<h3>District</h3>") < text.index("<h3>State</h3>") < text.index("<h3>National</h3>")
+
+
+def test_scoreboard_rows_expand_to_sparklines(site):  # noqa: F811
+    admin = make_admin(site)
+    wait_for_replay(admin)
+    number = admin.get("/api/scores").json()["teams"][0]["team_number"]
+    assert admin.post("/admin/board/watch", data={"team": number}).status_code == 303
+    page = admin.get("/").text
+    assert f'class="expand" data-team="{number}"' in page and "board.js" in page
+    spark = admin.get(f"/partials/spark/{number}").text
+    assert spark.count('<svg class="spark"') == 4  # score, district, state, national
+    assert spark.index("Total score") < spark.index("District") < spark.index("State") < spark.index("National")
+    assert f'href="/teams/{number}"' in spark
+    assert "No history" in admin.get("/partials/spark/99-0000").text
 
 
 def test_history_pages_need_an_approved_device(site):  # noqa: F811

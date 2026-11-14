@@ -1,4 +1,5 @@
-// Crosshair + tooltip for the step charts on /teams/<n> (app/charts.py).
+// Crosshair + tooltip for the step charts on /teams/<n> (app/charts.py). A point's y is
+// null on multi-series charts (image scores): no dot, and the label lists every series.
 // Each .chart-wrap has data-points = [[x, y, label], ...] in SVG units and
 // data-plot = "left,right,top,bottom,width,height". A step chart holds each value
 // until the next change, so the hovered value is the last point at or before x.
@@ -25,11 +26,12 @@
       var p = pts[0];
       for (var i = 0; i < pts.length && pts[i][0] <= x; i++) p = pts[i];
       line.setAttribute("x1", x); line.setAttribute("x2", x);
-      dot.setAttribute("cx", x); dot.setAttribute("cy", p[1]);
-      line.style.display = dot.style.display = "";
+      line.style.display = "";
+      if (p[1] === null) { dot.style.display = "none"; }  // several series: the tooltip lists them all
+      else { dot.setAttribute("cx", x); dot.setAttribute("cy", p[1]); dot.style.display = ""; }
       tip.textContent = p[2];
       tip.hidden = false;
-      var left = x * r.width / plot[4], top = p[1] * r.height / plot[5];
+      var left = x * r.width / plot[4], top = (p[1] === null ? plot[2] + 20 : p[1]) * r.height / plot[5];
       tip.style.left = Math.min(Math.max(left, 60), r.width - 60) + "px";
       tip.style.top = Math.max(top - 34, 0) + "px";
     }

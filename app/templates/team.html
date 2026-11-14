@@ -6,13 +6,13 @@
   <h1>{{ team_number }}{% if school %} <span class="muted">{{ school }}</span>{% endif %}</h1>
   {% if current %}
   <span>{{ current.location }} · {{ current.division }}{% if current.tier %} · {{ current.tier }}{% endif %}</span>
-  <span>Total score <strong>{{ current.ccs_score | num }}</strong></span>
-  <span>National <strong>{{ current.place_division }}</strong></span>
+  <span>Total score <strong>{{ current.score | num }}</strong></span>
   <span>State <strong>{{ current.place_state_division }}</strong></span>
+  <span>National <strong>{{ current.place_division }}</strong></span>
   {% endif %}
 </div>
 
-{% if not charts %}
+{% if not placement and not scoring %}
 <p class="empty">No history stored for this team yet. History is kept for collected teams
   (see the collection filter on the admin page) from the first time they score.</p>
 {% else %}
@@ -26,16 +26,30 @@
 {% else %}
 <p class="muted">Since {{ rounds[0] | local }}. Each line holds its value until the next change.</p>
 {% endif %}
-<div class="charts">
-  {% for title, chart in charts %}
+
+<h2>Placement</h2>
+<div class="charts placement">
+  {% for title, chart in placement %}
   <section class="chart-card"><h3>{{ title }}</h3>{{ chart.svg | safe }}</section>
   {% endfor %}
 </div>
 
-{% if images or image_charts %}
-<h2>Images</h2>
-<p class="muted">Per-image detail is fetched for watched teams every few minutes while they play{% if images_as_of %};
-  last fetched {{ images_as_of | local }}{% endif %}.</p>
+<h2>Scoring</h2>
+<div class="charts scoring">
+  {% for title, chart in scoring %}
+  <section class="chart-card"><h3>{{ title }}</h3>{{ chart.svg | safe }}</section>
+  {% endfor %}
+  {% if image_chart %}
+  <section class="chart-card">
+    <h3>Image scores</h3>
+    <ul class="legend" aria-label="Images">
+      {% for name in image_legend %}<li><span class="swatch s{{ loop.index }}"></span>{{ name }}</li>{% endfor %}
+    </ul>
+    {{ image_chart.svg | safe }}
+  </section>
+  {% endif %}
+</div>
+
 {% if images %}
 <div class="table-wrap">
 <table class="board">
@@ -43,7 +57,7 @@
     <th class="num">Penalties</th><th class="num">Time</th><th>Flags</th></tr></thead>
   <tbody>
   {% for i in images %}
-  <tr><td class="mono">{{ i.image }}</td><td class="num strong">{{ i.ccs_score | num }}</td>
+  <tr><td title="{{ i.image }}">{{ image_names[loop.index0] }}</td><td class="num strong">{{ i.ccs_score | num }}</td>
     <td class="num">{{ i.found if i.found is not none }}</td><td class="num">{{ i.remaining if i.remaining is not none }}</td>
     <td class="num">{{ i.penalties if i.penalties is not none }}</td><td class="num mono">{{ i.duration | hms }}</td>
     <td>{{ i.code }}</td></tr>
@@ -52,25 +66,24 @@
 </table>
 </div>
 {% endif %}
-{% if image_charts %}
-<div class="charts">
-  {% for title, chart in image_charts %}
-  <section class="chart-card"><h3 class="mono">{{ title }}</h3>{{ chart.svg | safe }}</section>
-  {% endfor %}
-</div>
-{% endif %}
+{% if image_source %}
+<p class="muted small">Per-image detail {{ 'from the public scoreboard (5-minute steps)' if image_source == 'official'
+  else 'stored by this app for watched teams' }}.</p>
+{% elif scoring %}
+<p class="muted small">No per-image detail for this round (it's kept for watched teams, and shown live from the
+  public scoreboard during a round).</p>
 {% endif %}
 
 <details>
   <summary>Table view ({{ rows | length }} changes)</summary>
   <div class="table-wrap">
   <table class="board">
-    <thead><tr><th>Time</th><th class="num">Total score</th><th class="num">National</th><th class="num">State</th>
+    <thead><tr><th>Time</th><th class="num">Total score</th><th class="num">State</th><th class="num">National</th>
       <th class="num">Images</th><th class="num">Play time</th><th>Flags</th></tr></thead>
     <tbody>
     {% for s in rows %}
-    <tr><td>{{ s.observed_at | local(seconds=True) }}</td><td class="num">{{ s.team.ccs_score | num }}</td>
-      <td class="num">{{ s.team.place_division }}</td><td class="num">{{ s.team.place_state_division }}</td>
+    <tr><td>{{ s.observed_at | local(seconds=True) }}</td><td class="num">{{ s.team.score | num }}</td>
+      <td class="num">{{ s.team.place_state_division }}</td><td class="num">{{ s.team.place_division }}</td>
       <td class="num">{{ s.team.images if s.team.images is not none }}</td><td class="num mono">{{ s.team.play_time | hms }}</td>
       <td>{{ s.team.code }}</td></tr>
     {% endfor %}
