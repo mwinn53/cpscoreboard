@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # Keep the full raw scoreboard, one file per day, in <DATA_DIR>/archive (live and capture
     # modes; never in replay). See app/archive.py.
     archive_enabled: bool = True
+    # Per-image detail for watched teams while they play (app/team_detail.py), in seconds.
+    detail_interval: float = 300
+    detail_enabled: bool = True
     # Outage alert (app/outage.py): email ADMIN_NOTIFY_EMAIL when the public scoreboard has
     # been down this long, counting from this long after the competition starts.
     outage_alert_hours: float = 24

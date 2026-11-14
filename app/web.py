@@ -233,10 +233,49 @@ def team_page(request: Request, team_number: str, round: int = 0):
             if pts:
                 charts.append((title, step_chart(pts, until, tz=tz, label=f"{title} for {team_number}", **opts)))
         rows = list(reversed(snaps))
+    images, image_charts, images_as_of = _images(request, team_number, runs, round, snapshots, tz)
     return templates.TemplateResponse(request, "team.html", {
+        "images": images, "image_charts": image_charts, "images_as_of": images_as_of,
         "team_number": team_number, "school": board.schools.get(team_number, ""), "current": current,
         "rounds": [snapshots[s].observed_at for s, _ in runs], "round": round, "charts": charts, "rows": rows,
     })
+
+
+def _images(request: Request, team_number: str, runs, round: int, snapshots, tz):
+    """Latest per-image rows and one score chart per image for the shown round (watched teams only)."""
+    from .charts import step_chart
+    from .templating import _num
+
+    detail = getattr(request.app.state, "detail", None)
+    if detail is None:
+        return [], [], None
+    as_of, images = detail.latest.get(team_number, (None, []))
+    history = detail.store.history(team_number) if detail.store else []
+    if runs:  # keep the chosen round's window
+        start = snapshots[runs[round][0]].observed_at - timedelta(hours=1)
+        stop = snapshots[runs[round][1] - 1].observed_at + timedelta(hours=12)
+        history = [h for h in history if start <= h.observed_at <= stop]
+    by_image: dict[str, list] = {}
+    for h in history:
+        if h.image.ccs_score is not None:
+            by_image.setdefault(h.image.image, []).append((h.observed_at, h.image.ccs_score))
+    until = max([p[-1][0] for p in by_image.values()] + ([as_of] if as_of else []), default=None)
+    charts = [(name, step_chart(pts, until, tz=tz, label=f"{name} score for {team_number}", fmt=_num))
+              for name, pts in sorted(by_image.items())]
+    return images, charts, as_of
+
+
+@router.get("/api/teams/{team_number}/images")
+def api_team_images(request: Request, team_number: str) -> dict[str, Any]:
+    detail = getattr(request.app.state, "detail", None)
+    if detail is None:
+        raise HTTPException(404, "Image detail is off here")
+    as_of, latest = detail.latest.get(team_number, (None, []))
+    history = detail.store.history(team_number) if detail.store else []
+    if not latest and not history:
+        raise HTTPException(404, f"No image detail for team {team_number} (watched teams only)")
+    return {"team_number": team_number, "as_of": as_of, "images": [vars(i) for i in latest],
+            "history": [{"observed_at": h.observed_at, **vars(h.image)} for h in history]}
 
 
 @router.get("/api/status")

@@ -23,6 +23,7 @@ from .mail import Mailer, build_mailer
 from .poller import Poller
 from .sources import build_source
 from .store import SnapshotStore
+from .team_detail import DetailPoller, DetailStore, build_detail_source
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +65,15 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         app.state.poller = poller
         app.state.store = store
         task = asyncio.create_task(poller.run(), name="poller")
+        detail = detail_task = None
+        detail_source = build_detail_source(settings, client, getattr(source, "directory", None))             if settings.detail_enabled else None
+        if detail_source is not None:
+            detail = DetailPoller(detail_source, DetailStore(store), settings.detail_interval,
+                                  watched=lambda: board.watchlist,
+                                  play_time=lambda n: t.play_time if (t := poller.state.by_number.get(n)) else None)
+            detail.restore()
+            detail_task = asyncio.create_task(detail.run(), name="detail")
+        app.state.detail = detail
         log.info("Started in %s mode (%s); collecting %s; database %s; email via %s; access control %s",
                  settings.app_env, source.description, poller.collect.describe(),
                  store.engine.url.render_as_string(), app.state.mailer.description,
@@ -73,9 +83,11 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         try:
             yield
         finally:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+            for t in (task, detail_task):
+                if t is not None:
+                    t.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await t
             await poller.drain()
             await source.aclose()
             await client.aclose()

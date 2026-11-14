@@ -22,7 +22,7 @@ shutdown). Next up is M5 (X notifier) and the rest of M7 (analysis).
 | [M4 – Registration & approval](https://github.com/mwinn53/cpscoreboard/milestone/1) | ✅ Live ([#27](https://github.com/mwinn53/cpscoreboard/pull/27), [#31](https://github.com/mwinn53/cpscoreboard/pull/31)); open: geolocation [#8](https://github.com/mwinn53/cpscoreboard/issues/8), prod checks [#9](https://github.com/mwinn53/cpscoreboard/issues/9), DNS [#10](https://github.com/mwinn53/cpscoreboard/issues/10) | Email code → pending device → admin approval; the whole site is gated |
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | Planned | Legacy `tweet()` behind a notifier interface |
-| [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40)); open: per-team detail data [#19](https://github.com/mwinn53/cpscoreboard/issues/19) | `/teams/{team}`: score, national and state place over time, one round at a time |
+| [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); analysis planned ([#21](https://github.com/mwinn53/cpscoreboard/issues/21)) | Analysis features; season-end data retention |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
@@ -42,6 +42,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/auth.py`, `app/devices.py` | Registration (email code), device approval, admin page, access checks |
 | `app/board_config.py`, `app/admin_board.py` | Watchlist, district schools, collection filter and view defaults (database + admin page), legacy import |
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
+| `app/team_detail.py` | Per-image detail for watched teams (`/api/image/scores.php`), polled while they play |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
 | `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
 | `app/main.py`, `app/config.py` | App factory; settings from environment variables |
@@ -53,11 +54,12 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | Path | Returns |
 |---|---|
 | `/` | Dashboard: the live board with National (division), State (within division) and District places; opens on the collected division and state |
-| `/teams/{team}` | A team's history: total score, national and state place over time (step charts, one round at a time) plus a table |
+| `/teams/{team}` | A team's history: total score, national and state place over time (step charts, one round at a time) plus a table; for watched teams, per-image scores |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
 | `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
 | `/api/teams/{team}/history` | A team's stored snapshots, oldest first (`?limit=`, default 1000) |
+| `/api/teams/{team}/images` | A watched team's latest per-image rows and their stored history |
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
@@ -109,6 +111,8 @@ All settings are environment variables; see [.env.example](.env.example).
 | `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
 | `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |
 | `DATABASE_URL` | — | Override the database. The default is `sqlite:///<DATA_DIR>/cpscoreboard.db`; in replay mode it's an in-memory database, so replays never mix into real history |
+| `DETAIL_INTERVAL` | `300` | Seconds between per-image fetches for watched teams that are playing |
+| `DETAIL_ENABLED` | `true` | Fetch per-image detail for watched teams (replay serves it from `<capture set>/images/` if present) |
 | `ARCHIVE_ENABLED` | `true` | Save the full scoreboard once per day (see [Season archive](#season-archive)); always off in replay |
 | `CAPTURE_DIR` | `captures` | Where capture mode saves, and where `CAPTURE_SET` names are looked up |
 | `CAPTURE_SET` | — | Replay: folder under `CAPTURE_DIR`, or any folder path |
@@ -177,6 +181,12 @@ whose score, images, warnings, score time or any place changed. Play time alone
 doesn't trigger a row. With the filter limited to one state and division, that
 means tens of rows per round, not thousands. On restart, the dashboard reloads the
 last known board from the database instead of starting empty.
+
+For **watched** teams, the app also fetches the scoreboard's per-image detail
+(`/api/image/scores.php?team=…`) every `DETAIL_INTERVAL` seconds while the team's
+play time is moving, and writes an `image_snapshots` row per image whose score,
+found/remaining counts, penalties or warnings changed. Time on the image alone
+doesn't trigger a row.
 
 The schema comes from SQLAlchemy `create_all`, plus a small startup step that adds new
 columns with defaults to existing tables. Anything more (renames, type changes) waits
@@ -267,7 +277,9 @@ SCRAPE_MODE=capture uvicorn --factory app.main:create_app --port 8080
 
 Each poll whose data changed is saved as
 `captures/<session>/<YYYYmmddTHHMMSSZ>.json.gz` (about 25–70 KB each). Unchanged
-polls aren't saved. `captures/` is gitignored; copy any sets you want to keep
+polls aren't saved. Per-image detail for watched teams goes to
+`captures/<session>/images/<team>/`, and replay serves the newest file per team.
+`captures/` is gitignored; copy any sets you want to keep
 into `tests/fixtures/`.
 
 Play a capture back at any time, with the original gaps between snapshots:
