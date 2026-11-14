@@ -48,7 +48,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 
 | Path | Returns |
 |---|---|
-| `/` | Dashboard: overall, division, state, and state-within-division rankings |
+| `/` | Dashboard: the live board with National (division), State (within division) and District places; opens on the collected division and state |
 | `/events` | Server-sent events; a `board` event whenever the scoreboard changes |
 | `/api/status` | Poller, source, filter and database status |
 | `/api/scores` | The current collected board as JSON |
@@ -56,6 +56,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): watchlist, aliases, collection filter, legacy import |
+| `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
 

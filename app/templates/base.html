@@ -9,6 +9,7 @@
 </head>
 <body>
   <header class="topbar">
+    <img class="logo" src="{{ logos.left }}" alt="CyberPatriot logo" width="48" height="48">
     <a class="brand" href="/">CP Scoreboard</a>
     {% if app_env == 'dev' %}<span class="badge badge-dev">dev · {{ scrape_mode }}{% if not auth_enabled %} · no auth{% endif %}</span>{% endif %}
     {% if viewer %}
@@ -17,6 +18,7 @@
       <span class="muted" title="Signed in on this browser">{{ viewer.name }}</span>
     </nav>
     {% endif %}
+    <img class="logo logo-right" src="{{ logos.right }}" alt="School logo" width="48" height="48">
   </header>
   <main>{% block content %}{% endblock %}</main>
   <footer class="foot">Unofficial. Scores come from the public CyberPatriot scoreboard and may lag or change.</footer>

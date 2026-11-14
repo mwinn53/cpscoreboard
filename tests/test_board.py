@@ -1,5 +1,6 @@
 """Board settings (M3b): watchlist, aliases, collection filter, legacy import."""
 
+import re
 import time
 from pathlib import Path
 
@@ -143,3 +144,75 @@ def test_board_posts_need_same_origin(site):  # noqa: F811
     admin = make_admin(site)
     r = admin.post("/admin/board/watch", data={"team": "19-0001"}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
+
+
+# --- Design: logos, dashboard filters and columns ---
+
+def _png(size=4):
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + b"\xff\x00\x00\xff" * size for _ in range(size))
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+def test_logos_placeholder_upload_and_reset(site):  # noqa: F811
+    import base64
+    admin = make_admin(site)
+    r = admin.get("/brand/left")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg")
+    assert admin.get("/brand/elsewhere").status_code == 404
+
+    assert admin.post("/admin/board/logo/left", data={"image": "data:image/png;base64,AAAA"}).status_code == 400
+    assert admin.post("/admin/board/logo/left", data={"image": "not an image"}).status_code == 400
+
+    png = _png()
+    r = admin.post("/admin/board/logo/left", data={"image": "data:image/png;base64," + base64.b64encode(png).decode()})
+    assert r.status_code == 303
+    page = admin.get("/").text
+    url = re.search(r'src="(/brand/left\?v=\d+)"', page).group(1)  # versioned, so it can be cached forever
+    r = admin.get(url)
+    assert r.content == png and "immutable" in r.headers["cache-control"]
+
+    admin.post("/admin/board/logo/left/reset")
+    assert admin.get("/brand/left").headers["content-type"].startswith("image/svg")
+
+
+def test_logos_are_public_but_uploads_are_admin_only(site):  # noqa: F811
+    anon = site()
+    assert anon.get("/brand/right").status_code == 200
+    assert anon.post("/admin/board/logo/right", data={"image": ""}).status_code in (303, 401, 403)
+
+
+def test_district_places_rank_named_teams_within_their_division():
+    from app.scraper import parse_scores
+    from app.web import district_places
+    teams = parse_scores(board(team("19-0001", 300), team("19-0002", 200), team("19-0003", 100),
+                               team("19-0004", 250, division="Open")))
+    assert district_places(teams, {"19-0003", "19-0001", "19-0004"}) == {"19-0001": 1, "19-0003": 2, "19-0004": 1}
+
+
+def test_dashboard_defaults_to_the_collected_division_and_state(site):  # noqa: F811
+    admin = make_admin(site)
+    deadline = time.monotonic() + 10
+    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
+        time.sleep(0.05)
+    admin.post("/admin/board/filter", data={"locations": ["ga"], "divisions": ["Middle School"]})
+
+    page = admin.get("/").text
+    assert re.search(r'<option\s+selected>Middle School</option>', page)
+    assert re.search(r'<option\s+selected>GA</option>', page)
+    assert '<option value="all">All states</option>' in page
+    assert page.count("<option") > 10  # every state on the board, not just the collected ones
+    head = page[page.index("<thead>"):page.index("</thead>")]
+    assert "Placement" in head and "National" in head and "District" in head and "Total Score" in head
+    assert ">State</th>" in head  # the State *place* column
+    assert "Division</th>" not in head and 'rowspan="2">State</th>' not in head and ">#<" not in head
+
+    everything = admin.get("/partials/board", params={"state": "all", "division": "all", "limit": 0}).text
+    head = everything[everything.index("<thead>"):everything.index("</thead>")]
+    assert 'rowspan="2">State</th>' in head and 'rowspan="2">Division</th>' in head
+    assert everything.count('<td class="team">') > 1000  # the full board, not just what's stored

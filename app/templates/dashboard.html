@@ -5,11 +5,11 @@
       hx-trigger="change, input changed delay:300ms from:input[name=q]">
   <input type="search" name="q" value="{{ filters.q }}" placeholder="Team number or alias…" aria-label="Search team number or alias">
   <select name="division" aria-label="Division">
-    <option value="">All divisions</option>
+    <option value="all">All divisions</option>
     {% for d in divisions %}<option {% if d == filters.division %}selected{% endif %}>{{ d }}</option>{% endfor %}
   </select>
   <select name="state" aria-label="State">
-    <option value="">All states</option>
+    <option value="all">All states</option>
     {% for s in states %}<option {% if s == filters.state %}selected{% endif %}>{{ s }}</option>{% endfor %}
   </select>
   <select name="limit" aria-label="Rows">
@@ -20,13 +20,25 @@
   <noscript><button type="submit">Apply</button></noscript>
 </form>
 
-<div id="board" hx-get="/partials/board" hx-trigger="refresh, every 60s" hx-include="#filters">
+<div id="board" hx-get="/partials/board" hx-trigger="refresh, every {{ refresh }}s" hx-include="#filters">
   {% include "_board.html" %}
 </div>
 
 <script>
   // Refresh the board as soon as the server says it changed. The browser reconnects
-  // on its own; the 60 s htmx poll above is a fallback and keeps the "ago" times current.
+  // on its own; the htmx poll above (every polling interval) is a fallback and keeps the
+  // "ago" times current. Both refreshes send the current filters, so the view stays put.
+  // Keep the address bar in step with the filters, so a reload shows the same view.
+  (function () {
+    var form = document.getElementById("filters");
+    function sync() {
+      var params = new URLSearchParams(new FormData(form));
+      if (!params.get("q")) params.delete("q");
+      history.replaceState(null, "", "/?" + params.toString());
+    }
+    form.addEventListener("change", sync);
+    form.addEventListener("input", sync);
+  })();
   if (window.EventSource) {
     new EventSource("/events").addEventListener("board", function () {
       if (window.htmx) htmx.trigger("#board", "refresh");

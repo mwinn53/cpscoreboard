@@ -6,12 +6,35 @@
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 
+<h2>Logos</h2>
+<p class="muted">Shown at the top left and top right of every page. Choose an image, drag it to position it,
+  and zoom with the slider or the mouse wheel; the square is what gets saved.</p>
+<div class="logo-grid">
+{% for slot, label in slots.items() %}
+  <form method="post" action="/admin/board/logo/{{ slot }}" enctype="multipart/form-data" class="logo-card" data-cropper>
+    <h3>{{ label }} <span class="muted small">({{ 'top left' if slot == 'left' else 'top right' }})</span></h3>
+    <div class="logo-current">Current: <img class="logo" src="{{ logos[slot] }}" alt="Current {{ label }}"></div>
+    <input type="file" accept="image/*" aria-label="Choose an image for the {{ label }}">
+    <canvas width="320" height="320" class="crop" aria-label="Crop area"></canvas>
+    <label class="small">Zoom <input type="range" min="1" max="8" step="0.01" value="1" disabled></label>
+    <input type="hidden" name="image">
+    <div class="row">
+      <button type="submit" class="primary" disabled>Save logo</button>
+      {% if slot in custom_logos %}
+      <button type="submit" formaction="/admin/board/logo/{{ slot }}/reset" formnovalidate class="danger">Use placeholder</button>
+      {% endif %}
+    </div>
+  </form>
+{% endfor %}
+</div>
+<script src="{{ url_for('static', path='cropper.js') }}" defer></script>
+
 <h2>Watchlist <span class="muted">· {{ watch | length }}</span></h2>
 <p class="muted">Watched teams are pinned on the scoreboard and always collected, even outside the filter below.</p>
 {% if watch %}
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Team</th><th>Alias</th><th>State</th><th>Division</th><th class="num">Overall #</th><th></th></tr></thead>
+  <thead><tr><th>Team</th><th>Name</th><th>State</th><th>Division</th><th class="num">Overall #</th><th></th></tr></thead>
   <tbody>
   {% for number, t in watch %}
   <tr>
@@ -35,13 +58,14 @@
   <button type="submit" class="primary">Watch team</button>
 </form>
 
-<h2>Aliases <span class="muted">· {{ aliases | length }}</span></h2>
-<p class="muted">Friendly names shown next to team numbers. Search on the scoreboard matches them too.
-  Clear an alias and save to remove it.</p>
+<h2>District teams <span class="muted">· {{ aliases | length }}</span></h2>
+<p class="muted">Give each team in your district a name. Named teams are ranked against each other in the
+  scoreboard's <strong>District</strong> column (within their division), the name is shown next to the team
+  number, and search matches it. Clear a name and save to remove the team.</p>
 {% if aliases %}
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Team</th><th>Alias</th></tr></thead>
+  <thead><tr><th>Team</th><th>Name</th></tr></thead>
   <tbody>
   {% for number, alias in aliases %}
   <tr>
@@ -61,8 +85,8 @@
 {% endif %}
 <form method="post" action="/admin/board/alias" class="inline">
   <input name="team" placeholder="19-1515" aria-label="Team number" pattern="\d{2}-\d{4}" required>
-  <input name="alias" placeholder="Alias" aria-label="Alias" maxlength="60" required>
-  <button type="submit" class="primary">Add alias</button>
+  <input name="alias" placeholder="Name, e.g. Evans MS" aria-label="Name" maxlength="60" required>
+  <button type="submit" class="primary">Add district team</button>
 </form>
 
 <h2>Collection filter</h2>

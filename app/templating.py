@@ -52,6 +52,14 @@ def _recent(when: datetime | None) -> bool:
     return when is not None and (utcnow() - when).total_seconds() <= RECENT_SECONDS
 
 
+def _logos(request: Request) -> dict[str, str]:
+    """Image URL per header slot; versioned so a new upload isn't served from cache."""
+    from .branding import SLOTS
+    brand = getattr(request.app.state, "branding", None)
+    versions = brand.versions() if brand else {}
+    return {slot: f"/brand/{slot}" + (f"?v={v}" if (v := versions.get(slot)) else "") for slot in SLOTS}
+
+
 def _context(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
@@ -59,6 +67,7 @@ def _context(request: Request) -> dict[str, Any]:
         "scrape_mode": settings.scrape_mode.value,
         "auth_enabled": settings.auth_enabled,
         "viewer": getattr(request.state, "device", None),
+        "logos": _logos(request),
     }
 
 

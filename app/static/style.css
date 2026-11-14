@@ -41,6 +41,9 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
+.logo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; }
+.logo-right { margin-left: auto; }
+.topbar .nav + .logo-right { margin-left: 12px; }
 .brand { font-weight: 700; font-size: 16px; color: var(--text); text-decoration: none; }
 .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
 .badge-dev { color: var(--dev); }
@@ -56,6 +59,12 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
 .status strong { color: var(--text); }
 .muted { color: var(--muted); font-weight: normal; }
 .error { color: var(--error); }
+.logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.logo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.logo-card h3 { margin: 0; font-size: 14px; }
+.logo-current { display: flex; align-items: center; gap: 8px; }
+canvas.crop { width: 100%; max-width: 320px; aspect-ratio: 1; border: 1px dashed var(--border); border-radius: 8px; cursor: grab; touch-action: none; background: repeating-conic-gradient(var(--border) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.row { display: flex; gap: 8px; }
 .notice { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .empty { color: var(--muted); padding: 24px 0; }
 
@@ -63,6 +72,10 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
 table.board { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .board th, .board td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
 .board th { position: sticky; top: 0; background: var(--surface); font-size: 12px; color: var(--muted); font-weight: 600; }
+.board thead tr:nth-child(2) th { top: 29px; }
+.board th.placement[colspan] { text-align: center; color: var(--text); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.board .placement { border-left: 1px solid var(--border); }
+.board .district { border-right: 1px solid var(--border); }
 .board tbody tr:last-child td { border-bottom: none; }
 .board .num { text-align: right; font-variant-numeric: tabular-nums; }
 .board .mono { font-family: ui-monospace, Consolas, monospace; }
