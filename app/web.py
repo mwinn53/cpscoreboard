@@ -85,6 +85,25 @@ def district_places(teams: list[TeamScore], district: set[str]) -> dict[str, int
     return places
 
 
+def placement_counts(board: list[TeamScore], shown: list[TeamScore], district: set[str]) -> dict[str, int]:
+    """How many teams each Placement column ranks among, for the column headers.
+
+    Places are within a division (and State within a state), so a count only makes sense
+    when every shown team shares one division (and, for State, one state). Counts come
+    from the full board, not the search results."""
+    divisions = {t.division.casefold() for t in shown}
+    if len(divisions) != 1:
+        return {}
+    (div,) = divisions
+    pool = [t for t in board if t.division.casefold() == div]
+    counts = {"national": len(pool), "district": sum(t.team_number in district for t in pool)}
+    states = {t.location.casefold() for t in shown}
+    if len(states) == 1:
+        (loc,) = states
+        counts["state"] = sum(t.location.casefold() == loc for t in pool)
+    return counts
+
+
 def _board(request: Request, q: str, division: str | None, state: str | None, limit: int) -> dict[str, Any]:
     poller, board = _poller(request), request.app.state.board
     st = poller.state
@@ -119,6 +138,8 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         }
 
     shown = rows[:limit] if limit > 0 else rows
+    # District = the named district schools' teams plus the watched (e.g. EMS) teams.
+    district = set(board.aliases) | set(watch)
     return {
         "status": _status(request),
         "watched": watched,
@@ -127,8 +148,10 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "watch_label": board.watch_label,
         "warning_codes": WARNING_CODES,
         "aliases": aliases,
-        # District = the named district schools' teams plus the watched (e.g. EMS) teams.
-        "district": district_places(teams, set(board.aliases) | set(watch)),
+        "district": district_places(teams, district),
+        # Teams each Placement column ranks among, shown in the headers.
+        "counts": placement_counts(teams, rows, district),
+        "watch_counts": placement_counts(teams, watched, district),
         "changes": st.changes,
         "rows": shown,
         "matched": len(rows),

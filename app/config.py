@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     collect_divisions: str = ""   # e.g. "Open,Middle School"
 
     # Comma-separated team numbers to pin on the dashboard (always collected).
-    # Temporary until milestone 3 moves the watchlist into the database.
+    # First start only; after that the watchlist lives in the database (/admin/board).
     watch_teams: str = ""
     # Dashboard view, first start only (then edited on /admin/board): which division and
     # state the scoreboard opens on (blank = follow the collection filter, else all), and
