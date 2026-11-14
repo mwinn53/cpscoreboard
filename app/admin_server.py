@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -48,23 +46,6 @@ def _render(request: Request, admin: Device, status_code: int = 200, **ctx) -> H
 @router.get("", response_class=HTMLResponse)
 async def server_page(request: Request, admin: Device = Depends(require_admin)):
     return _render(request, admin)
-
-
-@router.post("/competition-start", dependencies=[Depends(same_origin)])
-async def competition_start(request: Request, start: str = Form(""), admin: Device = Depends(require_admin)):
-    monitor = request.app.state.monitor
-    if monitor is None:
-        return _render(request, admin, 400, error="Outage monitoring is off here (replay mode).")
-    when = None
-    if start.strip():
-        try:  # <input type="datetime-local"> in the display time zone
-            tz = ZoneInfo(request.app.state.settings.display_timezone)
-            when = datetime.fromisoformat(start.strip()).replace(tzinfo=tz)
-        except ValueError:
-            return _render(request, admin, 400, error="That date and time couldn't be read.")
-    await asyncio.to_thread(monitor.set_competition_start, when)
-    log.info("Admin device %d: competition start set to %s", admin.id, when)
-    return RedirectResponse("/admin/server?notice=Saved+the+competition+start.", status_code=303)
 
 
 @router.post("/shutdown", response_class=HTMLResponse, dependencies=[Depends(same_origin)])

@@ -21,10 +21,7 @@
   <li>Monitoring from: <strong>{{ status.monitoring_from | local if status.monitoring_from else '—' }}</strong></li>
   {% if status.alert_at %}<li>Alert {{ 'sent' if status.alerted else 'due' }}: <strong>{{ status.alert_at | local }}</strong></li>{% endif %}
 </ul>
-<form method="post" action="/admin/server/competition-start" class="inline">
-  <label>Competition start <input type="datetime-local" name="start"></label>
-  <button type="submit">Set</button>
-</form>
+<p class="muted">The competition start can be corrected in <a href="/admin/board#competition-start">Board settings</a>.</p>
 {% endif %}
 
 <h2>Shut down</h2>

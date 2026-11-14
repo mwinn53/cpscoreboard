@@ -162,7 +162,8 @@ The app watches the public scoreboard. When it has been unavailable for **24 hou
 (`OUTAGE_ALERT_HOURS`), the admin (`ADMIN_NOTIFY_EMAIL`) gets one email per outage
 recommending a shutdown, with links to download the archive and to `/admin/server`.
 Monitoring starts **72 hours** (`OUTAGE_GRACE_HOURS`) after the competition starts,
-which is recorded automatically the first time a board shows play time. "Unavailable" means no usable board: a fetch error, an unexpected
+which is recorded automatically the first time a board shows play time (correct it
+under **Competition start** on `/admin/board`). "Unavailable" means no usable board: a fetch error, an unexpected
 response or an empty board.
 
 `/admin/server` exists only while those criteria are met (otherwise it's a 404 and
