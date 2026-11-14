@@ -192,6 +192,14 @@ class BoardConfig:
 
     # --- writes ---
 
+    def get_value(self, key: str) -> str:
+        """A raw app setting (for other modules' state, e.g. app/outage.py)."""
+        return self._settings.get(key, "")
+
+    def set_value(self, key: str, value: str) -> None:
+        if self._settings.get(key) != value:
+            self._set(key, value)
+
     def _set(self, key: str, value: str) -> None:
         with self._mutex, self.store.lock, self.store.engine.begin() as conn:
             if conn.execute(update(app_settings).where(app_settings.c.key == key)
