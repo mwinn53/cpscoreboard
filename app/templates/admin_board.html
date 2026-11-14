@@ -106,10 +106,10 @@
   <button type="submit" class="primary">Save filter</button>
 </form>
 
-<h2>Import from the legacy bot</h2>
-<p class="muted">Paste the contents of the old bot's <code>runs/team</code> file (one team number per line; added to the
-  watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line). Lines starting with
-  <code>#</code> are ignored. Importing twice is safe.</p>
+<h2>Bulk import</h2>
+<p class="muted">Acknowledging the legacy bot config. Paste the <code>runs/team</code> (one team number per line;
+  added to the watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line for the District
+  Schools). Just as before, lines starting with <code>#</code> are ignored. Importing twice is safe.</p>
 <form method="post" action="/admin/board/import" class="stack">
   <label for="team_file"><code>runs/team</code></label>
   <textarea id="team_file" name="team_file" placeholder="19-1515"></textarea>
