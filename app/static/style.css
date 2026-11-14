@@ -172,3 +172,5 @@ fieldset.choices { border: 1px solid var(--border); border-radius: 6px; padding:
   display: flex; flex-wrap: wrap; gap: 6px 16px; }
 fieldset.choices legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
 fieldset.choices label { font-weight: normal; font-size: 14px; }
+.stack label.check { font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.stack input[type="range"] { width: 100%; max-width: 360px; accent-color: var(--accent); }

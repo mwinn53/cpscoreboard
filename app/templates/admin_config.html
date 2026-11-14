@@ -41,13 +41,15 @@
 
 <h2 id="posting">Posting to X</h2>
 <p class="muted">Posts about the watched teams during a round, like the legacy bot: when a team appears on the board,
-  play-by-play score and place changes late in the round, an hour left, and time up. <strong>Dry run</strong> writes
+  live score and place changes while it's actively playing, an hour left and time up, then periodic place changes
+  once it's done (time up, or no play for 20 minutes) as other teams finish. <strong>Dry run</strong> writes
   the posts to the log below without sending them, so you can see what would go out. Limits apply to real posts only;
   anything over a limit is skipped and logged.</p>
 <form method="post" action="/admin/config/posting" class="stack">
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if post.enabled }}> Posting enabled</label>
   <fieldset class="choices">
-    <legend>Mode</legend>
-    {% for m, label in [('off', 'Off'), ('dry_run', 'Dry run (log only)'), ('x', 'Post to X')] %}
+    <legend>Send to</legend>
+    {% for m, label in [('dry_run', 'Dry run (log only)'), ('x', 'X')] %}
     <label><input type="radio" name="mode" value="{{ m }}" {{ 'checked' if post.mode == m }}> {{ label }}</label>
     {% endfor %}
   </fieldset>
@@ -57,8 +59,11 @@
     <label><input type="checkbox" name="kinds" value="{{ k }}" {{ 'checked' if k in post.kinds }}> {{ label }}</label>
     {% endfor %}
   </fieldset>
-  <label for="change_after_hours">Play-by-play starts after this many hours of a team's six</label>
-  <input id="change_after_hours" name="change_after_hours" type="number" min="0" max="6" step="0.5" value="{{ post.change_after_hours }}">
+  <label for="change_after_hours">Live changes start after <output id="change_after_out" for="change_after_hours">{{ post.change_after_hours | num }}</output> hours of a team's six</label>
+  <input id="change_after_hours" name="change_after_hours" type="range" min="0" max="6" step="0.5" value="{{ post.change_after_hours }}"
+         oninput="document.getElementById('change_after_out').value = this.value">
+  <label for="place_every_minutes">Once a team is done, post its place changes at most every (minutes)</label>
+  <input id="place_every_minutes" name="place_every_minutes" type="number" min="5" max="240" step="5" value="{{ post.place_every_minutes }}">
   <label for="per_hour">At most this many posts per hour</label>
   <input id="per_hour" name="per_hour" type="number" min="0" value="{{ post.per_hour }}">
   <label for="per_day">At most this many posts per day</label>

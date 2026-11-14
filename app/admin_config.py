@@ -74,14 +74,17 @@ async def competition_start(request: Request, start: Annotated[str, Form()] = ""
 
 @router.post("/posting", dependencies=[Depends(same_origin)])
 async def posting(request: Request, admin: Device = Depends(require_admin),
-                  mode: Annotated[str, Form()] = "dry_run", kinds: Annotated[list[str] | None, Form()] = None,
-                  change_after_hours: Annotated[str, Form()] = "4", per_hour: Annotated[str, Form()] = "10",
+                  enabled: Annotated[str, Form()] = "", mode: Annotated[str, Form()] = "dry_run",
+                  kinds: Annotated[list[str] | None, Form()] = None,
+                  change_after_hours: Annotated[str, Form()] = "4", place_every_minutes: Annotated[str, Form()] = "30",
+                  per_hour: Annotated[str, Form()] = "10",
                   per_day: Annotated[str, Form()] = "40", footer: Annotated[str, Form()] = ""):
     if mode not in MODES:
-        return _render(request, admin, 400, error="Choose off, dry run or post to X.")
+        return _render(request, admin, 400, error="Choose dry run or X.")
     try:
-        s = PostSettings(mode=mode, kinds={k for k in (kinds or []) if k in KINDS},
+        s = PostSettings(enabled=bool(enabled), mode=mode, kinds={k for k in (kinds or []) if k in KINDS},
                          change_after_hours=max(0.0, min(float(change_after_hours), 6.0)),
+                         place_every_minutes=max(5, min(int(place_every_minutes), 240)),
                          per_hour=max(0, int(per_hour)), per_day=max(0, int(per_day)), footer=footer.strip()[:100])
     except ValueError:
         return _render(request, admin, 400, error="Hours and limits must be numbers.")
@@ -117,8 +120,8 @@ async def x_credentials(request: Request, admin: Device = Depends(require_admin)
 async def test_post(request: Request, admin: Device = Depends(require_admin), text: Annotated[str, Form()] = ""):
     poster = request.app.state.poster
     settings = poster.settings()
-    if settings.mode == "off":
-        return _render(request, admin, 400, error="Posting is off; choose dry run or post to X first.")
+    if not settings.enabled:
+        return _render(request, admin, 400, error="Posting is turned off; turn it on first.")
     text = text.strip() or f"Test post from {request.app.state.settings.site_title}."
     status = await poster.send(Post("test", "", text), settings, limits=False)
     return _done(f"Test post: {status}.", "#recent-posts")

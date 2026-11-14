@@ -1,7 +1,7 @@
 """Posting about watched teams (M5): planner, limits, X signing, credentials, admin page."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -47,9 +47,42 @@ def test_planner_follows_a_round():
     assert ch[0].text == "EMS (19-1001): +30 points to 80. Up 3 places nationally (now 5th). Up 1 place in GA (now 2nd)."
     assert kinds(p.observe([team(5 * H + 60, 80, nat=5, st=2)], schools, s, AT)) == ["hour_left"]
     up = p.observe([team(6 * H, 90, nat=4, st=2)], schools, s, AT)
-    assert kinds(up) == ["time_up", "change"]
+    assert kinds(up) == ["time_up"]  # done now: no more live changes
     assert p.observe([team(6 * H, 90, nat=4, st=2)], schools, s, AT) == []  # nothing new
     assert kinds(p.observe([team(30, 0)], schools, s, AT)) == ["on_board"]  # next round
+
+
+def test_after_a_team_is_done_place_changes_are_periodic():
+    p, s, schools = PostPlanner(ET), PostSettings(place_every_minutes=30), {"19-1001": "EMS"}
+    m = timedelta(minutes=1)
+    p.observe([team(3 * H, 50)], schools, s, AT)                       # primes
+    assert p.observe([team(3 * H, 50)], schools, s, AT + 10 * m) == []  # paused, not done yet
+    assert p.observe([team(3 * H, 50)], schools, s, AT + 21 * m) == []  # done (stopped 20+ min): baseline
+    assert p.observe([team(3 * H, 50, nat=12)], schools, s, AT + 30 * m) == []  # moved, but within 30 min
+    placed = p.observe([team(3 * H, 50, nat=12, st=4)], schools, s, AT + 52 * m)
+    assert kinds(placed) == ["place"]
+    assert placed[0].text == ("Standings update for EMS (19-1001) (finished, 50 points): "
+                              "4th in GA (down 1), 12th nationally (down 2).")
+    assert p.observe([team(3 * H, 50, nat=12, st=4)], schools, s, AT + 60 * m) == []   # no change, no post
+    assert p.observe([team(3 * H, 50, nat=11, st=4)], schools, s, AT + 70 * m) == []   # too soon after the last
+    assert kinds(p.observe([team(3 * H, 50, nat=11, st=4)], schools, s, AT + 125 * m)) == ["place"]
+
+
+def test_live_changes_while_playing_stop_when_done():
+    p, s = PostPlanner(ET), PostSettings(change_after_hours=0)
+    m = timedelta(minutes=1)
+    p.observe([team(H, 10)], {}, s, AT)
+    assert kinds(p.observe([team(H + 60, 20)], {}, s, AT + m)) == ["change"]
+    p.observe([team(H + 60, 20)], {}, s, AT + 25 * m)  # stopped playing: done
+    assert p.observe([team(H + 60, 30)], {}, s, AT + 26 * m) == []  # e.g. an adjustment: not a live change
+
+
+def test_disabled_posts_nothing():
+    poster, sent, store = _poster()
+    PostSettings(enabled=False, mode="x").save(poster.board)
+    assert asyncio.run(poster.board_changed([team(0, 0)], AT)) == []
+    assert asyncio.run(poster.board_changed([team(60, 5)], AT)) == [] and sent == []
+    store.close()
 
 
 def test_restart_mid_round_does_not_repeat_posts():
@@ -159,13 +192,15 @@ def test_configuration_page(site):  # noqa: F811
     page = admin.get("/admin/config")
     assert page.status_code == 200 and "Posting to X" in page.text and "SECRETS_KEY" in page.text
     assert 'href="/admin/config"' in admin.get("/admin").text
-    r = admin.post("/admin/config/posting", data={"mode": "dry_run", "kinds": ["on_board", "time_up"],
-                                                  "change_after_hours": "3", "per_hour": "5", "per_day": "15",
+    r = admin.post("/admin/config/posting", data={"enabled": "1", "mode": "dry_run",
+                                                  "kinds": ["on_board", "time_up"], "change_after_hours": "3",
+                                                  "place_every_minutes": "45", "per_hour": "5", "per_day": "15",
                                                   "footer": "#CP"})
     assert r.status_code == 303
     s = admin.app.state.poster.settings()
-    assert (s.mode, s.kinds, s.change_after_hours, s.per_hour, s.per_day, s.footer) == \
-        ("dry_run", {"on_board", "time_up"}, 3.0, 5, 15, "#CP")
+    assert (s.enabled, s.mode, s.kinds, s.change_after_hours, s.place_every_minutes, s.per_hour, s.per_day,
+            s.footer) == (True, "dry_run", {"on_board", "time_up"}, 3.0, 45, 5, 15, "#CP")
+    assert 'type="range"' in admin.get("/admin/config").text
     assert admin.post("/admin/config/x-credentials", data={"x_api_key": "k"}).status_code == 400  # no SECRETS_KEY
     admin.app.state.poster.box = SecretBox(Fernet.generate_key().decode())
     admin.app.state.poster.credentials.box = admin.app.state.poster.box
@@ -175,3 +210,6 @@ def test_configuration_page(site):  # noqa: F811
     assert admin.post("/admin/config/test-post", data={"text": "hello"}).status_code == 303
     assert "hello" in admin.get("/admin/config").text  # dry run shows in the log
     assert admin.post("/admin/config/posting", data={"mode": "bogus"}).status_code == 400
+    admin.post("/admin/config/posting", data={"mode": "dry_run"})  # checkbox unticked
+    assert not admin.app.state.poster.settings().enabled
+    assert admin.post("/admin/config/test-post", data={"text": "x"}).status_code == 400

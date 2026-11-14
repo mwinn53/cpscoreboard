@@ -7,10 +7,12 @@ Pieces:
 * ``PostSettings``: what the admin set on /admin/config, kept in ``app_settings``.
   The four X credentials are encrypted with ``SECRETS_KEY`` (app/secret_box.py).
 * ``PostPlanner``: turns successive boards into messages, as the legacy bot did:
-  a watched team appears on the board; it changes score or place (play-by-play,
-  by default only in the last two hours of the team's six); it has an hour left;
-  its time is up. The first board after a start only primes the state, so a
-  restart doesn't repeat posts.
+  a watched team appears on the board; **live changes** to its score or places
+  while it's actively playing (from a set number of hours in, 4 by default); an
+  hour left; time up; then, once it's **done** (time up, or play time stopped for
+  20 minutes), **periodic place updates**: at most every N minutes, and only when
+  a place moved. The first board after a start only primes the state, so a restart
+  doesn't repeat posts.
 * ``Poster``: applies the hourly and daily limits, sends, and keeps a log in the
   ``posts`` table for the admin page.
 """
@@ -57,13 +59,15 @@ posts = Table(
 
 # --- Settings ---
 
-MODES = ("off", "dry_run", "x")
+MODES = ("dry_run", "x")
 KINDS = {
     "on_board": "A watched team appears on the board",
-    "change": "Play-by-play: score or place changes",
+    "change": "Live changes while the team is playing (score and places)",
     "hour_left": "A team has about an hour left",
     "time_up": "A team's time is up",
+    "place": "Periodic place changes once the team is done",
 }
+DONE_AFTER = timedelta(minutes=20)  # play time not moving this long = the team is done
 CREDENTIALS = ("x_api_key", "x_api_secret", "x_access_token", "x_access_secret")
 CREDENTIAL_LABELS = {"x_api_key": "API key (consumer key)", "x_api_secret": "API key secret",
                      "x_access_token": "Access token", "x_access_secret": "Access token secret"}
@@ -71,9 +75,11 @@ CREDENTIAL_LABELS = {"x_api_key": "API key (consumer key)", "x_api_secret": "API
 
 @dataclass
 class PostSettings:
+    enabled: bool = True
     mode: str = "dry_run"
     kinds: set[str] = field(default_factory=lambda: set(KINDS))
-    change_after_hours: float = 4.0  # play-by-play only once a team has played this long
+    change_after_hours: float = 4.0  # live changes only once a team has played this long
+    place_every_minutes: int = 30    # after a team is done: at most one place update this often
     per_hour: int = 10
     per_day: int = 40
     footer: str = ""
@@ -81,10 +87,12 @@ class PostSettings:
     @classmethod
     def load(cls, board: BoardConfig) -> PostSettings:
         s = cls()
-        s.mode = board.get_value("post_mode") or s.mode
+        s.mode = m if (m := board.get_value("post_mode")) in MODES else s.mode
+        s.enabled = board.get_value("post_enabled") != "0"
         if (kinds := board.get_value("post_kinds")) or board.get_value("post_kinds_set"):
             s.kinds = {k for k in kinds.split(",") if k in KINDS}
-        for name, conv in (("change_after_hours", float), ("per_hour", int), ("per_day", int)):
+        for name, conv in (("change_after_hours", float), ("place_every_minutes", int), ("per_hour", int),
+                           ("per_day", int)):
             raw = board.get_value(f"post_{name}")
             if raw:
                 try:
@@ -95,7 +103,9 @@ class PostSettings:
         return s
 
     def save(self, board: BoardConfig) -> None:
+        board.set_value("post_enabled", "1" if self.enabled else "0")
         board.set_value("post_mode", self.mode)
+        board.set_value("post_place_every_minutes", str(self.place_every_minutes))
         board.set_value("post_kinds", ",".join(sorted(self.kinds)))
         board.set_value("post_kinds_set", "1")
         board.set_value("post_change_after_hours", f"{self.change_after_hours:g}")
@@ -216,9 +226,12 @@ class Post:
 @dataclass
 class _Seen:
     team: TeamScore
+    moved_at: datetime | None = None    # when play time last moved
     announced: bool = False
     hour_left: bool = False
     time_up: bool = False
+    done_places: tuple[int, int] | None = None  # (national, state) last reported once done
+    place_posted_at: datetime | None = None
 
 
 class PostPlanner:
@@ -245,13 +258,15 @@ class PostPlanner:
             prev = self._seen.get(t.team_number)
             fresh = prev is None or pt < (prev.team.play_time or 0)  # first sighting or a new round
             if fresh:
-                seen = self._seen[t.team_number] = _Seen(t)
+                seen = self._seen[t.team_number] = _Seen(t, moved_at=at)
                 if not primed:
                     seen.announced = pt > 0
                     seen.hour_left = pt >= ROUND_SECONDS - 3600
                     seen.time_up = pt >= ROUND_SECONDS - 60
             else:
                 seen = prev
+                if pt > (prev.team.play_time or 0):
+                    seen.moved_at = at
             if pt > 0 and not seen.announced:
                 seen.announced = True
                 out.append(self._on_board(t, schools, at))
@@ -267,10 +282,19 @@ class PostPlanner:
                                 f"{ordinal(t.place_state_division)} in {t.location}, "
                                 f"{ordinal(t.place_division)} nationally. Places can still change "
                                 f"as other teams finish."))
-            if not fresh:
+            done = seen.time_up or (pt > 0 and seen.moved_at is not None and at - seen.moved_at >= DONE_AFTER)
+            if not fresh and not done:
                 change = self._change(prev.team, t, schools, settings)
                 if change is not None:
                     out.append(change)
+            if done:
+                places = (t.place_division, t.place_state_division)
+                if seen.done_places is None:  # just finished: report later moves from here
+                    seen.done_places, seen.place_posted_at = places, at
+                elif places != seen.done_places and \
+                        at - seen.place_posted_at >= timedelta(minutes=settings.place_every_minutes):
+                    out.append(self._place(seen.done_places, t, schools))
+                    seen.done_places, seen.place_posted_at = places, at
             seen.team = t
         return [p for p in out if p.kind in settings.kinds]
 
@@ -280,6 +304,14 @@ class PostPlanner:
         return Post("on_board", t.team_number,
                     f"{self._name(t, schools)} is on the board at {clock} with {_num(t.score)} points, "
                     f"{ordinal(t.place_state_division)} in {t.location} ({t.division}).")
+
+    def _place(self, before: tuple[int, int], t: TeamScore, schools: dict[str, str]) -> Post:
+        def moved(old: int, new: int) -> str:
+            return f"up {old - new}" if new < old else f"down {new - old}" if new > old else "unchanged"
+        return Post("place", t.team_number,
+                    f"Standings update for {self._name(t, schools)} (finished, {_num(t.score)} points): "
+                    f"{ordinal(t.place_state_division)} in {t.location} ({moved(before[1], t.place_state_division)}), "
+                    f"{ordinal(t.place_division)} nationally ({moved(before[0], t.place_division)}).")
 
     def _change(self, before: TeamScore, after: TeamScore, schools: dict[str, str],
                 settings: PostSettings) -> Post | None:
@@ -338,6 +370,8 @@ class Poster:
     def notifier(self, settings: PostSettings) -> Notifier | None:
         if self._factory is not None:
             return self._factory(settings)
+        if not settings.enabled:
+            return None
         if settings.mode == "dry_run":
             return LogNotifier()
         if settings.mode == "x":
@@ -374,7 +408,7 @@ class Poster:
         notifier = self.notifier(settings)
         text = self.compose(post.text, settings)
         if notifier is None:
-            if settings.mode == "x":
+            if settings.enabled and settings.mode == "x":
                 await asyncio.to_thread(self._record, post, text, "x", "skipped", "X credentials are incomplete")
                 return "skipped"
             return "off"
@@ -401,6 +435,6 @@ class Poster:
         watch = set(self.board.watchlist)
         watched = [t for t in teams if t.team_number in watch]
         planned = self.planner.observe(watched, self.board.schools, settings, at)
-        if settings.mode == "off":
+        if not settings.enabled:
             return []
         return [await self.send(p, settings) for p in planned]

@@ -231,12 +231,21 @@ supplies `PUBLIC_URL`, `AWS_INSTANCE_ID` and `DATA_VOLUME_ID`.
 ### Posting to X
 
 Set up on `/admin/config`. The app posts about **watched** teams as the legacy bot
-did: when a team appears on the board, play-by-play score and place changes once it
-has played 4 hours (adjustable), "less than one hour remaining", and "time is up".
-The first board after a restart only primes the state, so nothing is repeated.
+did:
 
-- **Mode:** Off, Dry run (the default: posts are logged on the page but not sent), or
-  Post to X.
+- when a team appears on the board;
+- **live changes** to its score and places while it's actively playing, from 4 hours
+  in (a slider, 0 to 6);
+- "less than one hour remaining" and "time is up";
+- once the team is **done** (time up, or play time stopped for 20 minutes),
+  **periodic place changes** as other teams finish: at most every 30 minutes
+  (adjustable), and only when a place moved.
+
+Each kind can be turned off. The first board after a restart only primes the state,
+so nothing is repeated.
+
+- **Posting enabled:** a checkbox that turns all posting on or off.
+- **Send to:** Dry run (the default: posts are logged on the page but not sent) or X.
 - **Limits:** posts per hour and per day (X's free tier allows about 500 a month).
   Posts over a limit are skipped and logged. An optional footer (e.g. hashtags) is
   added to each post.
