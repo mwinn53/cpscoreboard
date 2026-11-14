@@ -21,6 +21,7 @@ from sqlalchemy import Column, DateTime, LargeBinary, String, Table, delete, ins
 from .store import SnapshotStore, metadata
 
 SLOTS = {"left": "CyberPatriot logo", "right": "School logo"}
+CYBERPATRIOT_LINK = "https://scoreboard.uscyberpatriot.org/"  # where the left logo goes
 MAX_BYTES = 1_000_000
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 

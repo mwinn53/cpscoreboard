@@ -45,6 +45,7 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
 .topbar .filters { margin: 0 0 0 32px; }  /* a gap after the title */
 .logo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; }
 .logo-right { margin-left: auto; }
+.logo-link { display: flex; flex: none; border-radius: 8px; }
 .topbar .nav + .logo-right { margin-left: 12px; }
 .brand { font-weight: 700; font-size: 16px; color: var(--text); text-decoration: none; }
 .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
@@ -67,6 +68,7 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
 .logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .logo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .logo-card h3 { margin: 0; font-size: 14px; }
+.logo-form { display: flex; flex-direction: column; gap: 8px; }
 .logo-current { display: flex; align-items: center; gap: 8px; }
 canvas.crop { width: 100%; max-width: 320px; aspect-ratio: 1; border: 1px dashed var(--border); border-radius: 8px; cursor: grab; touch-action: none; background: repeating-conic-gradient(var(--border) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
 .row { display: flex; gap: 8px; }

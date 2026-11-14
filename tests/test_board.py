@@ -309,3 +309,20 @@ def test_placement_order_and_trend_slots(site):  # noqa: F811
     assert sub.index(">District<") < sub.index(">State<") < sub.index(">National<")
     row = page[page.index("<tbody>"):]
     assert '<span class="trend trend-place">' in row  # reserved even without a trend, so numbers align
+
+
+def test_logo_links(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/").text
+    assert 'href="https://scoreboard.uscyberpatriot.org/" target="_blank" rel="noopener"' in page
+    assert 'alt="School logo"' in page and "logo-link logo-right" not in page  # no link yet
+
+    assert admin.post("/admin/board/logo-link", data={"url": "javascript:alert(1)"}).status_code == 400
+    r = admin.post("/admin/board/logo-link", data={"url": " https://www.example.org/ems "})
+    assert r.status_code == 303
+    page = admin.get("/").text
+    assert '<a class="logo-link logo-right" href="https://www.example.org/ems" target="_blank" rel="noopener">' in page
+    assert 'value="https://www.example.org/ems"' in admin.get("/admin/board").text
+
+    admin.post("/admin/board/logo-link", data={"url": ""})
+    assert "logo-link logo-right" not in admin.get("/").text
