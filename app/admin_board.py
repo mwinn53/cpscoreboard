@@ -1,12 +1,10 @@
-"""Admin page for board settings: watchlist, team aliases, collection filter, competition start, legacy import."""
+"""Admin page for board settings: watchlist, team aliases, collection filter, legacy import."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -62,10 +60,7 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
                  default_state=board.default_state, watch_label=board.watch_label,
                  school_logo_link=board.school_logo_link, watch_school=board.watch_school,
                  schools=board.schools,
-                 board_size=poller.state.board_size, collected=len(poller.state.teams),
-                 outage=monitor.status() if (monitor := request.app.state.monitor) else None,
-                 grace_hours=request.app.state.settings.outage_grace_hours,
-                 alert_hours=request.app.state.settings.outage_alert_hours)
+                 board_size=poller.state.board_size, collected=len(poller.state.teams))
 
 
 def _done(notice: str) -> RedirectResponse:
@@ -76,26 +71,6 @@ def _done(notice: str) -> RedirectResponse:
 @router.get("", response_class=HTMLResponse, name="admin_board")
 async def board_page(request: Request, admin: Device = Depends(require_admin)):
     return _render(request, admin)
-
-
-@router.post("/competition-start", dependencies=[Depends(same_origin)])
-async def competition_start(request: Request, start: Annotated[str, Form()] = "",
-                            admin: Device = Depends(require_admin)):
-    """Set (or, blank, clear) the competition start the outage alert counts from."""
-    monitor = request.app.state.monitor
-    if monitor is None:
-        return _render(request, admin, 400, error="Outage monitoring is off here (replay mode).")
-    when = None
-    if start.strip():
-        try:  # <input type="datetime-local"> in the display time zone
-            tz = ZoneInfo(request.app.state.settings.display_timezone)
-            when = datetime.fromisoformat(start.strip()).replace(tzinfo=tz)
-        except ValueError:
-            return _render(request, admin, 400, error="That date and time couldn't be read.")
-    await asyncio.to_thread(monitor.set_competition_start, when)
-    log.info("Admin device %d: competition start set to %s", admin.id, when)
-    return _done("Saved the competition start." if when else
-                 "Cleared the competition start; it will be recorded from the next board with play time.")
 
 
 @router.post("/watch", dependencies=[Depends(same_origin)])

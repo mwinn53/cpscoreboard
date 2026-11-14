@@ -12,7 +12,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_archive, admin_board, admin_server, auth, branding, templating, web
+from . import admin_archive, admin_board, admin_config, admin_server, auth, branding, templating, web
 from .archive import Archive
 from .board_config import BoardConfig
 from .outage import OutageMonitor
@@ -23,6 +23,8 @@ from .mail import Mailer, build_mailer
 from .poller import Poller
 from .sources import build_source
 from .store import SnapshotStore
+from .posting import Poster
+from .secret_box import SecretBox
 from .team_detail import DetailPoller, DetailStore, build_detail_source
 
 log = logging.getLogger(__name__)
@@ -59,8 +61,11 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         app.state.monitor = monitor
         app.state.server_control = ServerControl(settings.aws_region, settings.aws_instance_id,
                                                  settings.data_volume_id)
+        from zoneinfo import ZoneInfo
+        poster = Poster(store, board, SecretBox(settings.secrets_key), client, ZoneInfo(settings.display_timezone))
+        app.state.poster = poster
         poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store, archive=archive,
-                        monitor=monitor)
+                        monitor=monitor, poster=poster)
         poller.restore()
         app.state.poller = poller
         app.state.store = store
@@ -104,6 +109,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.include_router(branding.router)
     app.include_router(auth.router)
     app.include_router(admin_board.router)
+    app.include_router(admin_config.router)
     app.include_router(admin_archive.router)
     app.include_router(admin_server.router)
     app.include_router(web.router)

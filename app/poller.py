@@ -57,13 +57,15 @@ class Poller:
 
     def __init__(self, source: Source, interval: float, collect: CollectionFilter | None = None,
                  store: SnapshotStore | None = None, notifier: BoardNotifier | None = None,
-                 archive: Archive | None = None, monitor: OutageMonitor | None = None):
+                 archive: Archive | None = None, monitor: OutageMonitor | None = None, poster=None):
         self.source = source
         self.interval = interval
         self.collect = collect or CollectionFilter()
         self.store = store
         self.archive = archive
         self.monitor = monitor
+        self.poster = poster  # app/posting.py: posts about watched teams
+        self._post_task: asyncio.Task | None = None
         self.notifier = notifier or BoardNotifier()
         self.state = BoardState()
         self._digest: str | None = None
@@ -94,6 +96,9 @@ class Poller:
 
     async def drain(self) -> None:
         """Wait for an in-flight database write (call after cancelling run(), before closing the store)."""
+        if self._post_task is not None and not self._post_task.done():
+            with suppress(Exception):
+                await asyncio.wait_for(self._post_task, 10)
         if self._pending_write is not None and not self._pending_write.done():
             with suppress(Exception):
                 await self._pending_write
@@ -207,7 +212,24 @@ class Poller:
         self.state.restored = False
         log.info("Scoreboard updated: kept %d of %d teams, %d changed", len(kept), len(teams), len(changed))
         await self.notifier.publish()
+        if self.poster is not None and teams:
+            self._post(kept, fetch.fetched_at)
         return True
+
+    def _post(self, kept: list[TeamScore], at: datetime) -> None:
+        """Plan and send posts in the background, one board at a time, so slow sends don't delay polling."""
+        previous = self._post_task
+
+        async def run() -> None:
+            if previous is not None:
+                with suppress(Exception):
+                    await previous
+            try:
+                await self.poster.board_changed(kept, at)
+            except Exception:
+                log.exception("Posting failed")
+
+        self._post_task = asyncio.create_task(run(), name="post")
 
     def next_delay(self) -> float:
         if self._failures:

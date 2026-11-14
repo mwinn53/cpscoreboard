@@ -167,3 +167,8 @@ svg.chart .crosshair { stroke: var(--muted); stroke-width: 1; }
 .team-head { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .board td.team a { color: inherit; text-decoration: none; }
 .board td.team a:hover { text-decoration: underline; }
+
+fieldset.choices { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin: 0;
+  display: flex; flex-wrap: wrap; gap: 6px 16px; }
+fieldset.choices legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+fieldset.choices label { font-weight: normal; font-size: 14px; }

@@ -55,13 +55,16 @@ terraform output site_url
 ## Changing app settings
 
 Non-secret settings go in `app_settings` in `terraform.tfvars`, followed by
-`terraform apply`. **Secrets** (`ADMIN_BOOTSTRAP_TOKEN` now, X API keys in milestone 5) must never go
-in Terraform, because they would be saved in the state file. Create them directly
-instead:
+`terraform apply`. **Secrets** (`ADMIN_BOOTSTRAP_TOKEN`, `SECRETS_KEY`) must never go in Terraform,
+because they would be saved in the state file. Create them directly instead:
 
 ```sh
 aws ssm put-parameter --name /cpscoreboard/env/ADMIN_BOOTSTRAP_TOKEN --type SecureString --value '...'
+# Encrypts the X keys entered on /admin/config. Changing it makes saved keys unreadable (re-enter them).
+aws ssm put-parameter --name /cpscoreboard/env/SECRETS_KEY --type SecureString   --value "$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 ```
+
+The X keys themselves are entered on `/admin/config`, not in SSM.
 
 Either way, the change takes effect on the next deploy. To apply it without
 pushing code, re-run the latest **Deploy** workflow.
