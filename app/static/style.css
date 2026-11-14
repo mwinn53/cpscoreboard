@@ -144,3 +144,26 @@ button.link { border: none; background: none; padding: 0; color: var(--accent); 
 .label-form { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .label-form input { padding: 3px 6px; font-size: 12px; width: 12em; }
 @media (max-width: 700px) { .topbar .filters { margin-left: 0; width: 100%; } }
+
+/* Team history charts (app/charts.py). One series per chart: no legend, the title names it. */
+:root { --series-1: #2a78d6; }
+@media (prefers-color-scheme: dark) { :root { --series-1: #3987e5; } }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.chart-card h3 { margin: 0 0 4px; font-size: 14px; }
+.chart-wrap { position: relative; }
+svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+svg.chart .grid { stroke: var(--border); stroke-width: 1; }
+svg.chart .axis { stroke: var(--muted); stroke-width: 1; }
+svg.chart .tick { fill: var(--muted); font-size: 11px; }
+svg.chart .series { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+svg.chart .end, svg.chart .hover-dot { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+svg.chart .end-label { fill: var(--text); font-size: 12px; font-weight: 600; }
+svg.chart .crosshair { stroke: var(--muted); stroke-width: 1; }
+.chart-tip { position: absolute; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 8px; font-size: 12px; box-shadow: 0 2px 6px rgb(0 0 0 / 0.15); }
+.rounds { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.team-head { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.board td.team a { color: inherit; text-decoration: none; }
+.board td.team a:hover { text-decoration: underline; }

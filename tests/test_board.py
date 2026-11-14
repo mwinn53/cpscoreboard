@@ -312,7 +312,7 @@ def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noq
     page = admin.get("/partials/board", params={"division": "Middle School", "state": "all"}).text
 
     def district(number):
-        row = page[page.index(f'<td class="team">{number}</td>'):]
+        row = page[page.index(f'href="/teams/{number}"'):]
         return re.search(r'<td class="num placement-start district">(\d*)</td>', row).group(1)
     assert district(ms[1]["team_number"]) == "1" and district(ms[2]["team_number"]) == "2"
     assert district(ms[0]["team_number"]) == ""
@@ -376,3 +376,39 @@ def test_admin_sets_the_watched_school_and_it_shows_on_the_board(site):  # noqa:
     assert '<td class="school">EMS</td>' in admin.get("/").text
     assert f"<td>EMS</td>" in admin.get("/admin/board").text
     assert {t["team_number"]: t["alias"] for t in admin.get("/api/scores").json()["teams"]}[number] == "EMS"
+
+
+def test_team_history_page_has_charts_and_a_table(site):  # noqa: F811
+    admin = make_admin(site)
+    wait_for_replay(admin)
+    number = admin.get("/api/scores").json()["teams"][0]["team_number"]
+    assert f'href="/teams/{number}"' in admin.get("/").text
+    page = admin.get(f"/teams/{number}")
+    assert page.status_code == 200
+    for title in ("Total score", "National place (division)", "State place (division)"):
+        assert f"<h3>{title}</h3>" in page.text
+    assert page.text.count('<svg class="chart"') == 3 and "data-points=" in page.text
+    assert "Table view" in page.text and "charts.js" in page.text
+    assert admin.get("/teams/99-0000").status_code == 404
+
+
+def test_history_pages_need_an_approved_device(site):  # noqa: F811
+    anon = site()
+    assert anon.get("/teams/19-1515").status_code in (303, 401, 403)
+
+
+def test_step_chart_and_round_splitting():
+    from datetime import UTC, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.charts import split_rounds, step_chart
+    t = datetime(2026, 11, 14, 15, tzinfo=UTC)
+    times = [t, t + timedelta(hours=1), t + timedelta(hours=3), t + timedelta(days=7), t + timedelta(days=7, hours=2)]
+    assert split_rounds(times) == [(0, 3), (3, 5)]
+    chart = step_chart([(t, 10), (t + timedelta(hours=1), 3), (t + timedelta(hours=2), 1)], t + timedelta(hours=3),
+                       tz=ZoneInfo("America/New_York"), label="National", invert=True, integer=True)
+    assert 'class="series" d="M' in chart.svg and "H" in chart.svg and "V" in chart.svg  # a step line
+    import re
+    ys = {int(m) for m in re.findall(r'class="tick" x="\d+" y="[\d.]+" text-anchor="end">(\d+)<', chart.svg)}
+    assert min(ys) == 1  # places start at 1 (and 1 is drawn at the top)
+    assert ">10 AM<" in chart.svg  # Eastern time ticks

@@ -6,6 +6,7 @@ Everything except /healthz requires an approved device (see app/auth.py).
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -193,6 +194,48 @@ async def events(request: Request) -> StreamingResponse:
     stream = event_stream(_poller(request).notifier, request.is_disconnected, still_allowed=still_allowed)
     return StreamingResponse(stream, media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/teams/{team_number}", response_class=HTMLResponse)
+def team_page(request: Request, team_number: str, round: int = 0):
+    """A team's score and places over time, one round at a time (newest first)."""
+    from zoneinfo import ZoneInfo
+
+    from .charts import split_rounds, step_chart
+    from .templating import _num
+
+    snapshots = _store(request).history(team_number, limit=10000)
+    poller, board = _poller(request), request.app.state.board
+    current = {t.team_number: t for t in (poller.full_board or poller.state.teams)}.get(team_number)
+    if not snapshots and current is None:
+        raise HTTPException(404, f"No team {team_number}")
+    tz = ZoneInfo(_settings(request).display_timezone)
+    runs = list(reversed(split_rounds([s.observed_at for s in snapshots])))  # newest round first
+    round = max(0, min(round, len(runs) - 1)) if runs else 0
+    charts, rows = [], []
+    if runs:
+        start, end = runs[round]
+        snaps = snapshots[start:end]
+        until = snaps[-1].observed_at
+        as_of = poller.state.data_as_of
+        if round == 0 and as_of and as_of > until and as_of - until < timedelta(hours=12):
+            until = as_of  # the current round: the last value still holds now
+        series = [
+            ("Total score", [(s.observed_at, s.team.score) for s in snaps if s.team.score is not None],
+             {"fmt": _num}),
+            ("National place (division)", [(s.observed_at, s.team.place_division) for s in snaps],
+             {"invert": True, "integer": True, "fmt": lambda v: f"{v:.0f}"}),
+            ("State place (division)", [(s.observed_at, s.team.place_state_division) for s in snaps],
+             {"invert": True, "integer": True, "fmt": lambda v: f"{v:.0f}"}),
+        ]
+        for title, pts, opts in series:
+            if pts:
+                charts.append((title, step_chart(pts, until, tz=tz, label=f"{title} for {team_number}", **opts)))
+        rows = list(reversed(snaps))
+    return templates.TemplateResponse(request, "team.html", {
+        "team_number": team_number, "school": board.schools.get(team_number, ""), "current": current,
+        "rounds": [snapshots[s].observed_at for s, _ in runs], "round": round, "charts": charts, "rows": rows,
+    })
 
 
 @router.get("/api/status")
