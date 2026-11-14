@@ -55,7 +55,7 @@ def site(tmp_path):
 
 
 def register(client, mailer, email):
-    r = client.post("/register", data={"email": email})
+    r = client.post("/register", data={"email": email, "relationship": "Parent"})
     assert r.status_code == 303 and r.headers["location"] == "/verify", r.text
     r = client.post("/verify", data={"code": mailer.last_code(email)})
     assert r.status_code == 303 and r.headers["location"] == "/pending", r.text
@@ -93,7 +93,7 @@ def test_anonymous_visitors_are_sent_to_register(site):
 
 def test_register_verify_approve_revoke(site):
     viewer = site("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Safari/604.1")
-    viewer.post("/register", data={"email": "  Coach@Example.COM "})
+    viewer.post("/register", data={"email": "  Coach@Example.COM ", "relationship": "Parent"})
     assert "coach@example.com" in viewer.get("/verify").text
     code = site.mailer.last_code("coach@example.com")
 
@@ -178,17 +178,17 @@ def test_admin_cannot_lock_themselves_out(site):
 
 def test_cross_site_posts_are_refused(site):
     c = site()
-    r = c.post("/register", data={"email": "x@example.com"}, headers={"Origin": "https://evil.example"})
+    r = c.post("/register", data={"email": "x@example.com", "relationship": "Parent"}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
-    assert c.post("/register", data={"email": "x@example.com"},
+    assert c.post("/register", data={"email": "x@example.com", "relationship": "Parent"},
                   headers={"Origin": "http://testserver"}).status_code == 303
 
 
 def test_bad_email_and_resend_cooldown(site):
     c = site()
-    assert c.post("/register", data={"email": "not-an-email"}).status_code == 400
-    assert c.post("/register", data={"email": "a@example.com"}).status_code == 303
-    r = c.post("/register", data={"email": "a@example.com"})
+    assert c.post("/register", data={"email": "not-an-email", "relationship": "Parent"}).status_code == 400
+    assert c.post("/register", data={"email": "a@example.com", "relationship": "Parent"}).status_code == 303
+    r = c.post("/register", data={"email": "a@example.com", "relationship": "Parent"})
     assert r.status_code == 429 and "30 seconds" in r.text
 
 
@@ -199,7 +199,7 @@ def test_failed_email_send_is_reported(site):
         raise OSError("smtp down")
 
     site.mailer.send = boom
-    r = c.post("/register", data={"email": "a@example.com"})
+    r = c.post("/register", data={"email": "a@example.com", "relationship": "Parent"})
     assert r.status_code == 502 and "send the email" in r.text
     assert "cpsb_reg" not in c.cookies
 
@@ -364,3 +364,44 @@ def test_ses_mailer_calls_send_email():
     m.send("a@b.com", "Subject", "Body")
     assert calls[0]["Destination"] == {"ToAddresses": ["a@b.com"]}
     assert calls[0]["Content"]["Simple"]["Subject"]["Data"] == "Subject"
+
+
+def test_relationship_is_required_and_shown_to_the_admin(site):
+    c = site()
+    r = c.post("/register", data={"email": "grandma@example.com", "relationship": "   "})
+    assert r.status_code == 400 and "relationship to the team" in r.text
+    assert 'value="grandma@example.com"' in r.text  # the form keeps what was typed
+
+    register_with = c.post("/register", data={"email": "grandma@example.com",
+                                              "relationship": "  Grandmother of   Alex (team 19-1515) "})
+    assert register_with.status_code == 303
+    c.post("/verify", data={"code": site.mailer.last_code("grandma@example.com")})
+    to, subject, body = site.mailer.sent[-1]
+    assert "Relationship: Grandmother of Alex (team 19-1515)" in body
+
+    admin = make_admin(site)
+    page = admin.get("/admin").text
+    assert "<th>Relationship</th>" in page
+    assert '<td class="relationship">Grandmother of Alex (team 19-1515)</td>' in page
+
+
+def test_new_columns_are_added_to_an_existing_database(tmp_path):
+    """Prod's devices/email_codes tables predate the relationship column."""
+    import sqlite3
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE devices (id INTEGER PRIMARY KEY, token_hash VARCHAR(64) NOT NULL UNIQUE, "
+                   "email VARCHAR(254) NOT NULL, label VARCHAR(100) NOT NULL, status VARCHAR(16) NOT NULL, "
+                   "is_admin BOOLEAN NOT NULL, created_at DATETIME NOT NULL, approved_at DATETIME, "
+                   "expires_at DATETIME NOT NULL, first_ip VARCHAR(64) NOT NULL, first_ua VARCHAR(512) NOT NULL, "
+                   "last_ip VARCHAR(64) NOT NULL, last_ua VARCHAR(512) NOT NULL, last_seen DATETIME NOT NULL)")
+        db.execute("INSERT INTO devices VALUES (1, 'h', 'old@example.com', '', 'approved', 1, '2026-11-13', "
+                   "NULL, '2027-11-13', '', '', '', '', '2026-11-13')")
+    store = SnapshotStore(f"sqlite:///{path.as_posix()}")
+    try:
+        old = DeviceStore(store).get(1)
+        assert old.email == "old@example.com" and old.relationship == ""
+        from app.store import add_missing_columns
+        assert add_missing_columns(store.engine) == []  # idempotent
+    finally:
+        store.close()

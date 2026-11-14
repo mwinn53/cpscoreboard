@@ -94,7 +94,8 @@ startup log says so.
 The scoreboard is private. There are no passwords. A visitor registers a browser
 (a **device**) instead:
 
-1. **`/register`**: enter an email address. A 6-digit code is emailed; it's valid
+1. **`/register`**: enter an email address and your relationship to the team (free text,
+   shown to the admin on `/admin` and in the approval email). A 6-digit code is emailed; it's valid
    for 10 minutes, with 5 attempts. Rate limits: 3 codes per address per 15 minutes,
    one every 30 seconds, and 10 per IP per hour.
 2. **`/verify`**: entering the code creates a *pending* device and sets a long-lived,

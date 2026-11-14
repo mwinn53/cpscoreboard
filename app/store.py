@@ -103,6 +103,35 @@ class Restored:
     data_as_of: datetime | None = None
 
 
+def add_missing_columns(engine: Engine) -> list[str]:
+    """Add columns that exist in the code but not yet in the database.
+
+    ``create_all`` creates missing tables but never alters existing ones. This covers
+    the simple, safe case: a *new* column with a server default (or nullable). Anything
+    else (renames, type changes, drops) needs a real migration (Alembic, #16).
+    """
+    from sqlalchemy import inspect, text
+    added: list[str] = []
+    existing_tables = set(inspect(engine).get_table_names())
+    with engine.begin() as conn:
+        for table in metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            have = {c["name"] for c in inspect(conn).get_columns(table.name)}
+            for col in table.columns:
+                if col.name in have:
+                    continue
+                if col.server_default is None and not col.nullable:
+                    raise RuntimeError(f"{table.name}.{col.name} needs a server_default or a migration")
+                ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col.type.compile(engine.dialect)}"
+                if col.server_default is not None:
+                    ddl += f" NOT NULL DEFAULT '{col.server_default.arg}'" if not col.nullable else                         f" DEFAULT '{col.server_default.arg}'"
+                conn.execute(text(ddl))
+                added.append(f"{table.name}.{col.name}")
+                log.info("Added column %s.%s", table.name, col.name)
+    return added
+
+
 class SnapshotStore:
     def __init__(self, url: str):
         self.url = url
@@ -112,6 +141,7 @@ class SnapshotStore:
         # per thread from the pool, so they don't need this.
         self.lock = threading.Lock() if self.engine.url.database in (None, "", ":memory:") else nullcontext()
         metadata.create_all(self.engine)
+        add_missing_columns(self.engine)
 
     @staticmethod
     def _make_engine(url: str) -> Engine:

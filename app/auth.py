@@ -134,25 +134,29 @@ async def register_form(request: Request):
             return RedirectResponse("/", status_code=303)
         if device.status == PENDING:
             return RedirectResponse("/pending", status_code=303)
-    return _page(request, "register.html", email="", error=None)
+    return _page(request, "register.html", email="", relationship="", error=None)
 
 
 @router.post("/register", response_class=HTMLResponse, dependencies=[Depends(same_origin)])
-async def register_submit(request: Request, email: str = Form("")):
+async def register_submit(request: Request, email: str = Form(""), relationship: str = Form("")):
     address = normalize_email(email)
+    form = {"email": email, "relationship": relationship}
     if address is None:
-        return _page(request, "register.html", 400, email=email, error="Enter a valid email address.")
+        return _page(request, "register.html", 400, **form, error="Enter a valid email address.")
+    if not relationship.strip():
+        return _page(request, "register.html", 400, **form,
+                     error="Tell us your relationship to the team, so the admin knows who you are.")
     try:
-        issued = await asyncio.to_thread(_devices(request).issue_code, address, client_ip(request))
+        issued = await asyncio.to_thread(_devices(request).issue_code, address, client_ip(request), relationship)
     except RateLimited as e:
-        return _page(request, "register.html", 429, email=email, error=str(e))
+        return _page(request, "register.html", 429, **form, error=str(e))
 
     sent = await _send(request, address, f"Your {request.app.state.settings.site_title} code: {issued.code}",
                        f"Your verification code is {issued.code}\n\n"
                        "Enter it on the page where you requested it. It expires in 10 minutes.\n\n"
                        "If you didn't ask for this, you can ignore this email.")
     if not sent:
-        return _page(request, "register.html", 502, email=email,
+        return _page(request, "register.html", 502, **form,
                      error="We couldn't send the email. Check the address and try again in a minute.")
     response = RedirectResponse("/verify", status_code=303)
     _set_cookie(request, response, REG_COOKIE, issued.reg_token, max_age=15 * 60)
@@ -176,10 +180,12 @@ async def verify_submit(request: Request, code: str = Form("")):
     if result != CodeCheck.OK:
         reason = {CodeCheck.EXPIRED: "That code has expired.",
                   CodeCheck.LOCKED: "Too many wrong attempts."}.get(result, "That code is no longer valid.")
-        return _page(request, "register.html", 400, email=email or "", error=f"{reason} Request a new code.")
+        return _page(request, "register.html", 400, email=email or "", relationship="",
+                     error=f"{reason} Request a new code.")
 
     ip, ua = client_ip(request), user_agent(request)
-    token, device = await asyncio.to_thread(devices.create_device, email, ip, ua)
+    relationship = await asyncio.to_thread(devices.relationship_for, request.cookies.get(REG_COOKIE))
+    token, device = await asyncio.to_thread(devices.create_device, email, ip, ua, relationship)
     log.info("Device %d registered for %s (%s, %s)", device.id, email, ip, ua[:80])
 
     notify = request.app.state.settings.admin_notify_email
@@ -187,7 +193,8 @@ async def verify_submit(request: Request, code: str = Form("")):
         admin_url = str(request.url_for("admin_page"))
         await _send(request, notify, f"{request.app.state.settings.site_title}: {email} is waiting for approval",
                     f"A new device is waiting for your approval.\n\n"
-                    f"Email:   {email}\nBrowser: {templates.env.filters['browser'](ua)}\nIP:      {ip}\n\n"
+                    f"Email:        {email}\nRelationship: {relationship or '(not given)'}\n"
+                    f"Browser:      {templates.env.filters['browser'](ua)}\nIP:           {ip}\n\n"
                     f"Review it here: {admin_url}\n")
 
     response = RedirectResponse("/pending", status_code=303)
