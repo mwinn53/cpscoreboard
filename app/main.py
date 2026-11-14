@@ -12,7 +12,8 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_archive, admin_board, admin_config, admin_server, auth, branding, team_view, templating, web
+from . import (admin_archive, admin_board, admin_config, admin_server, auth, branding, scoreboard_url, team_view,
+               templating, web)
 from .archive import Archive
 from .board_config import BoardConfig
 from .outage import OutageMonitor
@@ -88,6 +89,10 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         # Team pages read any team's per-image detail from the public scoreboard (not in replay).
         app.state.official = OfficialDetailClient(client, settings.scoreboard_url) \
             if settings.scrape_mode.value != "replay" else None
+        app.state.http = client
+        # An address saved on /admin/config overrides SCOREBOARD_URL (tasks haven't run yet).
+        if (url := scoreboard_url.effective(board, settings.scoreboard_url)) != settings.scoreboard_url:
+            scoreboard_url.apply(app.state, url)
         log.info("Started in %s mode (%s); collecting %s; database %s; email via %s; access control %s",
                  settings.app_env, source.description, poller.collect.describe(),
                  store.engine.url.render_as_string(), app.state.mailer.description,

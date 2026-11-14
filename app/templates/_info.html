@@ -1,0 +1,7 @@
+{# A circled (i) button that opens a small help bubble (static/info.js). Usage:
+     {% from "_info.html" import info %}
+     {% call info("some-help", "What this is about") %}Help text, may contain links.{% endcall %} #}
+{% macro info(id, label) -%}
+<span class="info"><button type="button" class="info-btn" aria-label="{{ label }}" aria-expanded="false"
+    aria-controls="{{ id }}">i</button><span class="info-bubble" id="{{ id }}" role="note" hidden>{{ caller() }}</span></span>
+{%- endmacro %}

@@ -46,6 +46,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/branding.py` | Header logos, uploaded and cropped on the admin page, stored in the database |
 | `app/team_detail.py` | Per-image detail: stored for watched teams while they play; fetched on demand (images and the 5-minute image chart) for any team's page |
 | `app/schema.py`, `app/migrations/` | Alembic migrations, run at startup |
+| `app/scoreboard_url.py` | The scoreboard address set on `/admin/config`: test fetch, and switching every live fetcher |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
@@ -69,7 +70,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
-| `/admin/config` | Configuration (admin only): competition start, per-image detail status, posting to X and its keys |
+| `/admin/config` | Configuration (admin only): scoreboard address, competition start, per-image detail status, posting to X and its keys; an (i) help bubble on each section |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
@@ -118,7 +119,7 @@ All settings are environment variables; see [.env.example](.env.example).
 | `APP_ENV` | `dev` | `prod` refuses any `SCRAPE_MODE` other than `live` |
 | `LOG_LEVEL` | `INFO` | |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
-| `SCOREBOARD_URL` | the public `scores.php` API | |
+| `SCOREBOARD_URL` | the public `scores.php` API | Default address; an admin can change it on `/admin/config` (tested before it's saved, applied without a restart) |
 | `POLL_INTERVAL` | `60` | Seconds between polls |
 | `SITE_TITLE` | `EMS CyberPatriot Next Generation Scorebot` | Header, browser tab, and email subjects/sender name |
 | `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
