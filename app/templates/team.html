@@ -32,6 +32,35 @@
   {% endfor %}
 </div>
 
+{% if images or image_charts %}
+<h2>Images</h2>
+<p class="muted">Per-image detail is fetched for watched teams every few minutes while they play{% if images_as_of %};
+  last fetched {{ images_as_of | local }}{% endif %}.</p>
+{% if images %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Image</th><th class="num">Score</th><th class="num">Found</th><th class="num">Remaining</th>
+    <th class="num">Penalties</th><th class="num">Time</th><th>Flags</th></tr></thead>
+  <tbody>
+  {% for i in images %}
+  <tr><td class="mono">{{ i.image }}</td><td class="num strong">{{ i.ccs_score | num }}</td>
+    <td class="num">{{ i.found if i.found is not none }}</td><td class="num">{{ i.remaining if i.remaining is not none }}</td>
+    <td class="num">{{ i.penalties if i.penalties is not none }}</td><td class="num mono">{{ i.duration | hms }}</td>
+    <td>{{ i.code }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% if image_charts %}
+<div class="charts">
+  {% for title, chart in image_charts %}
+  <section class="chart-card"><h3 class="mono">{{ title }}</h3>{{ chart.svg | safe }}</section>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
 <details>
   <summary>Table view ({{ rows | length }} changes)</summary>
   <div class="table-wrap">
