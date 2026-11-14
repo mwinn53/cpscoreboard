@@ -57,7 +57,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): watchlist, aliases, collection filter, legacy import |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
-| `/admin/server` | Public-scoreboard health and the outage alert; snapshot and shut down the server (admin only) |
+| `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
@@ -162,11 +162,12 @@ The app watches the public scoreboard. When it has been unavailable for **24 hou
 (`OUTAGE_ALERT_HOURS`), the admin (`ADMIN_NOTIFY_EMAIL`) gets one email per outage
 recommending a shutdown, with links to download the archive and to `/admin/server`.
 Monitoring starts **72 hours** (`OUTAGE_GRACE_HOURS`) after the competition starts,
-which is recorded automatically the first time a board shows play time (or set it on
-`/admin/server`). "Unavailable" means no usable board: a fetch error, an unexpected
+which is recorded automatically the first time a board shows play time. "Unavailable" means no usable board: a fetch error, an unexpected
 response or an empty board.
 
-**Snapshot and shut down** on `/admin/server` (type `SHUT DOWN` to confirm) takes a
+`/admin/server` exists only while those criteria are met (otherwise it's a 404 and
+isn't in the admin nav); if the scoreboard comes back, it disappears again.
+**Snapshot and shut down** there (type `SHUT DOWN` to confirm) takes a
 final EBS snapshot of `/data` and then stops the EC2 instance. Stopping is
 reversible: `aws ec2 start-instances --instance-ids <id>`. The instance role may only
 snapshot its own data volume and stop its own instance (`infra/iam.tf`). Terraform

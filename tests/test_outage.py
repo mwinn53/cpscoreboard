@@ -134,8 +134,34 @@ class FakeControl:
         self.calls.append("stop")
 
 
+def _outage(app, met=True):
+    """Put the app's monitor into (or out of) an outage that meets the alert criteria."""
+    now = datetime.now(UTC)
+    board = app.state.board
+    if app.state.monitor is None:  # tests run in replay mode, which has no monitor
+        app.state.monitor = OutageMonitor(board, FakeMailer(), None, "Scorebot")
+    board.set_value("competition_start", (now - timedelta(days=5)).isoformat())
+    board.set_value("scoreboard_down_since", (now - timedelta(hours=30 if met else 2)).isoformat())
+
+
+def test_server_page_only_exists_while_the_alert_criteria_are_met(site):  # noqa: F811
+    admin = make_admin(site)
+    assert admin.get("/admin/server").status_code == 404  # replay mode: no monitor at all
+    _outage(admin.app, met=False)  # down, but not for 24 hours yet
+    assert 'href="/admin/server"' not in admin.get("/admin").text
+    admin.app.state.server_control = control = FakeControl()
+    assert admin.post("/admin/server/shutdown", data={"confirm": "SHUT DOWN"}).status_code == 404
+    assert admin.get("/admin/server").status_code == 404
+    _outage(admin.app)
+    assert 'href="/admin/server"' in admin.get("/admin").text
+    assert admin.get("/admin/server").status_code == 200
+    admin.app.state.board.set_value("scoreboard_down_since", "")  # it came back
+    assert admin.get("/admin/server").status_code == 404 and not control.calls
+
+
 def test_admin_server_page_and_shutdown(site):  # noqa: F811
     admin = make_admin(site)
+    _outage(admin.app)
     page = admin.get("/admin/server")
     assert page.status_code == 200 and "Not available here" in page.text  # no AWS ids in tests
     assert admin.post("/admin/server/shutdown", data={"confirm": "SHUT DOWN"}).status_code == 400
@@ -152,9 +178,11 @@ def test_admin_server_page_and_shutdown(site):  # noqa: F811
 def test_shutdown_is_admin_only_and_same_origin(site):  # noqa: F811
     viewer = site()
     register(viewer, site.mailer, "coach@example.com")
+    _outage(viewer.app)
     viewer.app.state.server_control = control = FakeControl()
     assert viewer.post("/admin/server/shutdown", data={"confirm": "SHUT DOWN"}).status_code in (303, 403)
     admin = make_admin(site)
+    _outage(admin.app)  # each browser here is its own app instance
     admin.app.state.server_control = control
     r = admin.post("/admin/server/shutdown", data={"confirm": "SHUT DOWN"}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403 and not control.calls

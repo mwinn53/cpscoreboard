@@ -50,6 +50,7 @@ class OutageStatus:
     down_since: datetime | None
     alert_at: datetime | None          # when an alert goes out if the outage continues
     alerted: bool
+    alert_due: bool                    # the alert criteria are met right now (shutdown is offered)
 
 
 class OutageMonitor:
@@ -71,7 +72,12 @@ class OutageMonitor:
         if down and monitoring_from:
             alert_at = max(down, monitoring_from) + self.threshold
         alerted = bool(down) and self.board.get_value(ALERTED_FOR) == _iso(down)
-        return OutageStatus(start, monitoring_from, down, alert_at, alerted)
+        return OutageStatus(start, monitoring_from, down, alert_at, alerted,
+                            alert_at is not None and self.clock() >= alert_at)
+
+    def shutdown_offered(self) -> bool:
+        """Whether /admin/server is available: only while the alert criteria are met."""
+        return self.status().alert_due
 
     def set_competition_start(self, when: datetime | None) -> None:
         self.board.set_value(COMPETITION_START, _iso(when))

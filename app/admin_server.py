@@ -1,5 +1,10 @@
 """Admin page for the server itself: public-scoreboard health, and shutting down.
 
+The page (and everything under it) exists only while the outage-alert criteria
+are met: the public scoreboard has been down for the alert threshold, counted from
+the end of the post-start grace period. Otherwise it's a 404 and the admin nav
+doesn't show it.
+
 Shutting down takes a final snapshot of the data volume, then stops the instance
 (app/server_control.py). The stop runs after the confirmation page has been sent.
 """
@@ -15,12 +20,19 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.background import BackgroundTask
 
-from .auth import _page, require_admin, same_origin
+from .auth import NotAllowed, _page, require_admin, same_origin
 from .devices import Device
 
 log = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/server")
+
+async def require_outage(request: Request) -> None:
+    monitor = request.app.state.monitor
+    if monitor is None or not await asyncio.to_thread(monitor.shutdown_offered):
+        raise NotAllowed(404, "Not found.")
+
+
+router = APIRouter(prefix="/admin/server", dependencies=[Depends(require_outage)])
 
 
 def _render(request: Request, admin: Device, status_code: int = 200, **ctx) -> HTMLResponse:

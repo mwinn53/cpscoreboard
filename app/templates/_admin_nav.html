@@ -1,5 +1,7 @@
 <nav class="subnav">
-  {% for href, text in [('/admin', 'Devices'), ('/admin/board', 'Board settings'), ('/admin/archive', 'Archive'), ('/admin/server', 'Server')] %}
+  {% set links = [('/admin', 'Devices'), ('/admin/board', 'Board settings'), ('/admin/archive', 'Archive')] %}
+  {% if active == '/admin/server' or server_offered() %}{% set links = links + [('/admin/server', 'Server')] %}{% endif %}
+  {% for href, text in links %}
   {% if href == active %}<strong>{{ text }}</strong>{% else %}<a href="{{ href }}">{{ text }}</a>{% endif %}
   {% endfor %}
 </nav>
