@@ -296,6 +296,16 @@ def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noq
 
     def district(number):
         row = page[page.index(f'<td class="team">{number}</td>'):]
-        return re.search(r'<td class="num district">(\d*)</td>', row).group(1)
+        return re.search(r'<td class="num placement-start district">(\d*)</td>', row).group(1)
     assert district(ms[1]["team_number"]) == "1" and district(ms[2]["team_number"]) == "2"
     assert district(ms[0]["team_number"]) == ""
+
+
+def test_placement_order_and_trend_slots(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/").text
+    head = page[page.index("<thead>"):page.index("</thead>")]
+    sub = head[head.rindex("<tr>"):]  # the row under "Placement"
+    assert sub.index(">District<") < sub.index(">State<") < sub.index(">National<")
+    row = page[page.index("<tbody>"):]
+    assert '<span class="trend trend-place">' in row  # reserved even without a trend, so numbers align
