@@ -4,7 +4,7 @@ A containerized web dashboard for following teams on the public CyberPatriot
 scoreboard. It polls the scoreboard API once a minute and ranks every team
 overall, by division, by state, and by state within division.
 
-It's live (IP-allowlisted for now) and deployed automatically from `master` to
+It's live at <https://cpscores.savannahrivertech.com> (approved devices only) and deployed automatically from `master` to
 AWS. The original command-line bot that posts to X lives in [legacy/](legacy/).
 
 ## Roadmap
@@ -39,6 +39,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/collection.py` | Collection filter: which teams are kept (locations, divisions, watched teams) |
 | `app/web.py`, `app/templates/` | Dashboard (htmx) and the HTTP endpoints below |
 | `app/auth.py`, `app/devices.py` | Registration (email code), device approval, admin page, access checks |
+| `app/board_config.py`, `app/admin_board.py` | Watchlist, aliases and collection filter (database + admin page), legacy import |
 | `app/mail.py` | Email via SES (prod), SMTP/Mailpit (dev container), or the console log |
 | `tests/fixtures/` | Real scoreboard responses from season 17 (2024) and season 19 (2026) |
 | `legacy/` | The original X-posting bot, kept for reference and the M3b/M5 ports |
@@ -54,6 +55,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/api/teams/{team}/history` | A team's stored snapshots, oldest first (`?limit=`, default 1000) |
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
+| `/admin/board` | Board settings (admin only): watchlist, aliases, collection filter, legacy import |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
 | `/api/docs` | Interactive API docs (dev only) |
 
@@ -74,9 +76,13 @@ All settings are environment variables; see [.env.example](.env.example).
 | `CAPTURE_SET` | — | Replay: folder under `captures/`, or any folder path |
 | `REPLAY_SPEED` | `1` | e.g. `20` plays an hour of captures in 3 minutes |
 | `REPLAY_LOOP` | `false` | Restart the replay when it ends |
-| `COLLECT_LOCATIONS` | — (all) | Comma-separated locations to keep, e.g. `VA,MD,DC` |
-| `COLLECT_DIVISIONS` | — (all) | Comma-separated divisions to keep, e.g. `Open,Middle School` |
-| `WATCH_TEAMS` | — | Comma-separated team numbers to pin; always collected (temporary; moves to the database in M3b) |
+| `COLLECT_LOCATIONS` | — (all) | First start only: locations to keep, e.g. `VA,MD,DC` |
+| `COLLECT_DIVISIONS` | — (all) | First start only: divisions to keep, e.g. `Open,Middle School` |
+| `WATCH_TEAMS` | — | First start only: team numbers to pin; always collected |
+
+The last three only **seed** the database the first time the app starts. After that,
+change them on the admin page (`/admin/board`); the env vars are ignored, and the
+startup log says so.
 
 ### Access control
 
@@ -129,13 +135,20 @@ last known board from the database instead of starting empty.
 
 ### Collection filter
 
-`COLLECT_LOCATIONS` and `COLLECT_DIVISIONS` limit which teams the app keeps in
-memory and in the database (M3b moves them into the admin UI). They're case-insensitive. When
+The collection filter (states/locations and divisions, set on `/admin/board`) limits
+which teams the app keeps in memory and in the database. It's case-insensitive. When
 both are set, a team must match both. When neither is set, every team is kept.
 
 Places are computed on the **full** board before filtering, so a kept team still
 shows its real national, division and state places. Watched teams are always
-kept. Dev captures still save the full raw response, so a replay ranks teams the
+kept. Changes take effect at once, without a restart; newly collected teams are
+stored from the next poll. Narrowing the filter keeps existing history but stops
+recording the dropped teams.
+
+The **legacy import** on `/admin/board` takes the old bot's `runs/team` file (one team
+number per line, added to the watchlist) and `runs/lookups` file (`team,alias` per
+line; the first alias wins if a team is listed twice). `#` lines are comments, and
+importing twice changes nothing. Dev captures still save the full raw response, so a replay ranks teams the
 same way the live board does; at about 25–70 KB per changed poll, the full
 response is small.
 
@@ -206,8 +219,8 @@ Terraform and GitHub setup and for operations.
 
 App settings reach the container from SSM Parameter Store (`/cpscoreboard/env/<KEY>`).
 Terraform manages the non-secret settings. Add secrets by hand as SecureString
-parameters under the same path, so they never land in Terraform state. Until M4 gates
-the site, the security group only admits `allowed_cidrs` (see [#11](https://github.com/mwinn53/cpscoreboard/issues/11)).
+parameters under the same path, so they never land in Terraform state. The site is
+public at the network level (`allowed_cidrs`); access is controlled by device approval.
 Outbound email uses SES on the `savannahrivertech.com` domain (`infra/ses.tf`).
 
 | Path | Purpose |

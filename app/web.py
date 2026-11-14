@@ -59,7 +59,8 @@ def _status(request: Request) -> dict[str, Any]:
 
 
 def _board(request: Request, q: str, division: str, state: str, limit: int) -> dict[str, Any]:
-    settings, st = _settings(request), _poller(request).state
+    st, board = _poller(request).state, request.app.state.board
+    aliases = board.aliases
     rows = st.teams
     if division:
         rows = [t for t in rows if t.division == division]
@@ -67,13 +68,15 @@ def _board(request: Request, q: str, division: str, state: str, limit: int) -> d
         rows = [t for t in rows if t.location == state]
     if q:
         needle = q.strip().lower()
-        rows = [t for t in rows if needle in t.team_number.lower()]
-    watch = settings.watch_team_list
+        rows = [t for t in rows
+                if needle in t.team_number.lower() or needle in aliases.get(t.team_number, "").lower()]
+    watch = board.watchlist
     return {
         "status": _status(request),
         "watched": [st.by_number[n] for n in watch if n in st.by_number],
         "watch_missing": [n for n in watch if n not in st.by_number],
         "watch_set": set(watch),
+        "aliases": aliases,
         "changes": st.changes,
         "rows": rows[:limit] if limit > 0 else rows,
         "matched": len(rows),
@@ -119,8 +122,9 @@ def api_status(request: Request) -> dict[str, Any]:
 
 @router.get("/api/scores")
 def api_scores(request: Request) -> dict[str, Any]:
-    st = _poller(request).state
-    return {"data_as_of": st.data_as_of, "teams": [t.to_dict() for t in st.teams]}
+    st, aliases = _poller(request).state, request.app.state.board.aliases
+    return {"data_as_of": st.data_as_of,
+            "teams": [{**t.to_dict(), "alias": aliases.get(t.team_number, "")} for t in st.teams]}
 
 
 @router.get("/api/teams/{team_number}/history")

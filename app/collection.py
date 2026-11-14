@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from .scraper import TeamScore
 
 
-def _items(value: str) -> tuple[str, ...]:
+def split_list(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(v.strip() for v in value.split(",") if v.strip()))
 
 
@@ -28,7 +28,7 @@ class CollectionFilter:
     @classmethod
     def from_strings(cls, locations: str = "", divisions: str = "",
                      always_keep: Iterable[str] = ()) -> CollectionFilter:
-        locs, divs = _items(locations), _items(divisions)
+        locs, divs = split_list(locations), split_list(divisions)
         return cls(frozenset(v.casefold() for v in locs), frozenset(v.casefold() for v in divs),
                    frozenset(always_keep), (locs, divs))
 

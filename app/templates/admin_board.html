@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Board settings · CP Scoreboard{% endblock %}
+{% block content %}
+<nav class="subnav"><a href="/admin">Devices</a><strong>Board settings</strong></nav>
+<h1>Board settings</h1>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+<h2>Watchlist <span class="muted">· {{ watch | length }}</span></h2>
+<p class="muted">Watched teams are pinned on the scoreboard and always collected, even outside the filter below.</p>
+{% if watch %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th>Alias</th><th>State</th><th>Division</th><th class="num">Overall #</th><th></th></tr></thead>
+  <tbody>
+  {% for number, t in watch %}
+  <tr>
+    <td class="team">{{ number }}</td>
+    <td>{{ dict(aliases).get(number, '') }}</td>
+    {% if t %}<td>{{ t.location }}</td><td>{{ t.division }}</td><td class="num">{{ t.place_overall }}</td>
+    {% else %}<td colspan="3" class="muted">Not on the board yet</td>{% endif %}
+    <td class="actions">
+      <form method="post" action="/admin/board/watch/{{ number }}/remove" class="inline">
+        <button type="submit" class="danger">Remove</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}<p class="empty">No watched teams.</p>{% endif %}
+<form method="post" action="/admin/board/watch" class="inline">
+  <input name="team" placeholder="19-1515" aria-label="Team number to watch" pattern="\d{2}-\d{4}" required>
+  <button type="submit" class="primary">Watch team</button>
+</form>
+
+<h2>Aliases <span class="muted">· {{ aliases | length }}</span></h2>
+<p class="muted">Friendly names shown next to team numbers. Search on the scoreboard matches them too.
+  Clear an alias and save to remove it.</p>
+{% if aliases %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th>Alias</th></tr></thead>
+  <tbody>
+  {% for number, alias in aliases %}
+  <tr>
+    <td class="team">{{ number }}</td>
+    <td>
+      <form method="post" action="/admin/board/alias" class="inline label-form">
+        <input type="hidden" name="team" value="{{ number }}">
+        <input name="alias" value="{{ alias }}" aria-label="Alias for {{ number }}" maxlength="60">
+        <button type="submit" class="link">Save</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<form method="post" action="/admin/board/alias" class="inline">
+  <input name="team" placeholder="19-1515" aria-label="Team number" pattern="\d{2}-\d{4}" required>
+  <input name="alias" placeholder="Alias" aria-label="Alias" maxlength="60" required>
+  <button type="submit" class="primary">Add alias</button>
+</form>
+
+<h2>Collection filter</h2>
+<p>Collecting <strong>{{ collecting }}</strong>: {{ collected }} of {{ board_size }} teams on the board.</p>
+<p class="muted">Only collected teams are shown and stored. Places are always ranked on the full board first.
+  Nothing ticked in a group means all of that group. <strong>Narrowing the filter stops collecting the teams it
+  drops</strong>; their history so far is kept, but there will be a gap if you add them back later.</p>
+<form method="post" action="/admin/board/filter">
+  <h3>Divisions</h3>
+  <div class="check-grid">
+  {% for d in known_divisions %}
+    <label><input type="checkbox" name="divisions" value="{{ d }}" {{ 'checked' if d.casefold() in chosen_divisions }}> {{ d }}</label>
+  {% endfor %}
+  </div>
+  <h3>States and locations</h3>
+  {% if known_locations %}
+  <div class="check-grid">
+  {% for l in known_locations %}
+    <label><input type="checkbox" name="locations" value="{{ l }}" {{ 'checked' if l.casefold() in chosen_locations }}> {{ l }}</label>
+  {% endfor %}
+  </div>
+  {% else %}<p class="empty">Waiting for the first scoreboard data…</p>{% endif %}
+  <button type="submit" class="primary">Save filter</button>
+</form>
+
+<h2>Import from the legacy bot</h2>
+<p class="muted">Paste the contents of the old bot's <code>runs/team</code> file (one team number per line; added to the
+  watchlist) and <code>runs/lookups</code> file (<code>team,alias</code> per line). Lines starting with
+  <code>#</code> are ignored. Importing twice is safe.</p>
+<form method="post" action="/admin/board/import" class="stack">
+  <label for="team_file"><code>runs/team</code></label>
+  <textarea id="team_file" name="team_file" placeholder="19-1515"></textarea>
+  <label for="lookups_file"><code>runs/lookups</code></label>
+  <textarea id="lookups_file" name="lookups_file" placeholder="19-1515,Knights"></textarea>
+  <button type="submit">Import</button>
+</form>
+{% endblock %}
