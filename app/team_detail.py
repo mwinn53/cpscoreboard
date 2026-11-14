@@ -113,11 +113,10 @@ def parse_images(body: bytes) -> list[ImageScore]:
 
 
 class DetailStore:
-    """``image_snapshots`` on the shared database (the table is created with the others)."""
+    """``image_snapshots`` on the shared database (created by the migrations, app/schema.py)."""
 
     def __init__(self, store: SnapshotStore):
         self.store = store
-        metadata.create_all(store.engine, tables=[image_snapshots])
 
     def save(self, team: str, at: datetime, images: Iterable[ImageScore]) -> int:
         rows = [{"team_number": team, "observed_at": _to_db(at), "image": i.image, "duration": i.duration,

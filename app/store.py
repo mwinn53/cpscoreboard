@@ -9,8 +9,8 @@ Two tables:
   changed** (score, images, warnings, score time, or any place). Play time ticks
   every minute for active teams, so it's stored but doesn't trigger a row.
 
-SQLAlchemy Core keeps this portable to Postgres. Schema changes later should
-move to Alembic; ``create_all`` only creates missing tables.
+SQLAlchemy Core keeps this portable to Postgres. The schema (these tables and the
+other modules') is managed by Alembic: see app/schema.py.
 """
 
 from __future__ import annotations
@@ -106,7 +106,8 @@ class Restored:
 def add_missing_columns(engine: Engine) -> list[str]:
     """Add columns that exist in the code but not yet in the database.
 
-    ``create_all`` creates missing tables but never alters existing ones. This covers
+    Only used to bring a database from before Alembic up to the baseline (app/schema.py);
+    new schema changes are Alembic revisions. ``create_all`` never alters tables. This covers
     the simple, safe case: a *new* column with a server default (or nullable). Anything
     else (renames, type changes, drops) needs a real migration (Alembic, #16).
     """
@@ -140,8 +141,8 @@ class SnapshotStore:
         # threads at once (poller writes vs. request reads). File databases get a connection
         # per thread from the pool, so they don't need this.
         self.lock = threading.Lock() if self.engine.url.database in (None, "", ":memory:") else nullcontext()
-        metadata.create_all(self.engine)
-        add_missing_columns(self.engine)
+        from .schema import migrate
+        migrate(self.engine)
 
     @staticmethod
     def _make_engine(url: str) -> Engine:
