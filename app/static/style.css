@@ -54,6 +54,9 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
   border-radius: 6px; background: var(--surface); color: var(--text);
 }
 .filters input { min-width: 12em; }
+.filters { align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field > span { font-size: 12px; font-weight: 600; color: var(--muted); }
 
 .status { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); padding: 8px 0; }
 .status strong { color: var(--text); }

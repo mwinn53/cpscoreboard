@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}CP Scoreboard{% endblock %}</title>
+  <title>{% block title %}{{ site_title }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <img class="logo" src="{{ logos.left }}" alt="CyberPatriot logo" width="48" height="48">
-    <a class="brand" href="/">CP Scoreboard</a>
+    <a class="brand" href="/">{{ site_title }}</a>
     {% if app_env == 'dev' %}<span class="badge badge-dev">dev · {{ scrape_mode }}{% if not auth_enabled %} · no auth{% endif %}</span>{% endif %}
     {% if viewer %}
     <nav class="nav">

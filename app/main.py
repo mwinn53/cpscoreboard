@@ -12,7 +12,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_board, auth, branding, web
+from . import admin_board, auth, branding, templating, web
 from .board_config import BoardConfig
 from .config import Settings
 from .devices import DeviceStore
@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -> FastAPI:
     settings = settings or Settings()
+    templating.set_timezone(settings.display_timezone)
     logging.basicConfig(level=settings.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 

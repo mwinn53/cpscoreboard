@@ -255,3 +255,29 @@ def test_dashboard_columns_school_key_and_label(site):  # noqa: F811
     assert "Flags:" in page and "Clock Skew" in page
     assert re.search(r'<option value="0"\s+selected>All rows</option>', page)
     assert page.index('value="0"') < page.index('value="50"')
+
+
+def test_times_are_shown_in_eastern_and_the_title_is_configurable():
+    from datetime import UTC, datetime
+
+    from app.templating import _local, set_timezone
+    set_timezone("America/New_York")
+    assert _local(datetime(2026, 11, 14, 15, 5, tzinfo=UTC)) == "Nov 14, 2026 10:05 AM EST"
+    assert _local(datetime(2026, 7, 4, 0, 30, 9), seconds=True) == "Jul 3, 2026 8:30:09 PM EDT"  # naive = UTC
+
+    from pydantic import ValidationError
+
+    from app.config import Settings
+    with pytest.raises(ValidationError, match="DISPLAY_TIMEZONE"):
+        Settings(_env_file=None, display_timezone="Mars/Olympus")
+    assert Settings(_env_file=None).site_title == "EMS CyberPatriot Next Generation Scorebot"
+
+
+def test_dropdowns_have_headings_and_the_page_has_the_title(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/").text
+    for heading in ("Search", "Division", "State", "Rows"):
+        assert f'<label class="field"><span>{heading}</span>' in page
+    assert "<title>EMS CyberPatriot Next Generation Scorebot</title>" in page
+    assert re.search(r"\((\w{3} \d+, \d{4} \d+:\d\d:\d\d [AP]M E[SD]T)\)", page)
+    assert any("EMS CyberPatriot Next Generation Scorebot" in subject for _, subject, _ in site.mailer.sent)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr
 from typing import Protocol
 
 from .config import Settings
@@ -62,7 +63,7 @@ class SesMailer:
 
 
 def build_mailer(settings: Settings) -> Mailer:
-    sender = f"{settings.mail_from_name} <{settings.mail_from}>"
+    sender = formataddr((settings.mail_from_name or settings.site_title, settings.mail_from))
     backend = settings.mail_backend
     if backend == "auto":
         backend = "smtp" if settings.smtp_host else ("ses" if settings.app_env == "prod" else "console")

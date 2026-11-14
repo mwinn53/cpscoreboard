@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -34,8 +35,27 @@ def _ago(when: datetime | None) -> str:
     return f"{secs // 86400}d ago"
 
 
+_tz = ZoneInfo("America/New_York")
+
+
+def set_timezone(name: str) -> None:
+    """Called by create_app with DISPLAY_TIMEZONE (validated in Settings)."""
+    global _tz
+    _tz = ZoneInfo(name)
+
+
+def _local(when: datetime | None, seconds: bool = False) -> str:
+    """UTC (aware, or naive as stored) -> e.g. "Nov 14, 2026 10:05 AM EST"."""
+    if when is None:
+        return ""
+    t = (when if when.tzinfo else when.replace(tzinfo=UTC)).astimezone(_tz)
+    hour = t.hour % 12 or 12
+    clock = f"{hour}:{t.minute:02d}" + (f":{t.second:02d}" if seconds else "")
+    return f"{t:%b} {t.day}, {t.year} {clock} {'AM' if t.hour < 12 else 'PM'} {t.tzname()}"
+
+
 def _date(when: datetime | None) -> str:
-    return "" if when is None else when.strftime("%Y-%m-%d %H:%M UTC")
+    return _local(when)
 
 
 def _num(value: float | None) -> str:
@@ -64,6 +84,7 @@ def _context(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
         "app_env": settings.app_env.value,
+        "site_title": settings.site_title,
         "scrape_mode": settings.scrape_mode.value,
         "auth_enabled": settings.auth_enabled,
         "viewer": getattr(request.state, "device", None),
@@ -72,5 +93,6 @@ def _context(request: Request) -> dict[str, Any]:
 
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates", context_processors=[_context])
-templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed, date=_date, browser=describe_ua)
+templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed, date=_date, local=_local,
+                             browser=describe_ua)
 templates.env.tests.update(recent=_recent)

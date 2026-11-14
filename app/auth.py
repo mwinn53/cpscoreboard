@@ -147,7 +147,7 @@ async def register_submit(request: Request, email: str = Form("")):
     except RateLimited as e:
         return _page(request, "register.html", 429, email=email, error=str(e))
 
-    sent = await _send(request, address, f"Your CP Scoreboard code: {issued.code}",
+    sent = await _send(request, address, f"Your {request.app.state.settings.site_title} code: {issued.code}",
                        f"Your verification code is {issued.code}\n\n"
                        "Enter it on the page where you requested it. It expires in 10 minutes.\n\n"
                        "If you didn't ask for this, you can ignore this email.")
@@ -185,7 +185,7 @@ async def verify_submit(request: Request, code: str = Form("")):
     notify = request.app.state.settings.admin_notify_email
     if notify:
         admin_url = str(request.url_for("admin_page"))
-        await _send(request, notify, f"CP Scoreboard: {email} is waiting for approval",
+        await _send(request, notify, f"{request.app.state.settings.site_title}: {email} is waiting for approval",
                     f"A new device is waiting for your approval.\n\n"
                     f"Email:   {email}\nBrowser: {templates.env.filters['browser'](ua)}\nIP:      {ip}\n\n"
                     f"Review it here: {admin_url}\n")
@@ -264,7 +264,7 @@ async def admin_action(request: Request, device_id: int, action: str, label: str
         raise NotAllowed(404, "No such device.")
     log.info("Admin device %d: %s device %d", admin.id, action, device_id)
     if action == "approve" and before.status != APPROVED:
-        await _send(request, before.email, "CP Scoreboard: you're approved",
+        await _send(request, before.email, f"{request.app.state.settings.site_title}: you're approved",
                     f"Your browser has been approved. Open the scoreboard here: {request.url_for('dashboard')}\n\n"
                     "Use the same browser you registered with.")
     return RedirectResponse("/admin", status_code=303)

@@ -67,7 +67,7 @@
   <span><strong>{{ shown_on_board }}</strong> teams on the board
     <span class="muted">· history kept for {{ status.collecting }}</span></span>
   <span>Data as of <strong>{{ status.data_as_of | ago }}</strong>
-    {% if status.data_as_of %}<span class="muted">({{ status.data_as_of.strftime('%Y-%m-%d %H:%M:%S UTC') }})</span>{% endif %}</span>
+    {% if status.data_as_of %}<span class="muted">({{ status.data_as_of | local(seconds=True) }})</span>{% endif %}</span>
   <span>Last change <strong>{{ status.last_changed | ago }}</strong></span>
   {% if status.replay_position %}<span>Replay {{ status.replay_position[0] }}/{{ status.replay_position[1] }}{% if status.finished %} · finished{% endif %}</span>{% endif %}
   {% if status.restored %}<span class="muted">Showing saved data; waiting for the live scoreboard…</span>{% endif %}

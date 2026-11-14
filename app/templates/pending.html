@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Waiting for approval · CP Scoreboard{% endblock %}
+{% block title %}Waiting for approval · {{ site_title }}{% endblock %}
 {% block content %}
 <section class="card narrow" hx-get="/pending/status" hx-trigger="every 10s" hx-swap="none">
   <h1>Waiting for approval</h1>

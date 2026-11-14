@@ -72,6 +72,8 @@ All settings are environment variables; see [.env.example](.env.example).
 | `APP_ENV` | `dev` | `prod` refuses any `SCRAPE_MODE` other than `live` |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
 | `POLL_INTERVAL` | `60` | Seconds between polls |
+| `SITE_TITLE` | `EMS CyberPatriot Next Generation Scorebot` | Header, browser tab, and email subjects/sender name |
+| `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
 | `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |
 | `DATABASE_URL` | — | Override the database. The default is `sqlite:///<DATA_DIR>/cpscoreboard.db`; in replay mode it's an in-memory database, so replays never mix into real history |
 | `CAPTURE_SET` | — | Replay: folder under `captures/`, or any folder path |
