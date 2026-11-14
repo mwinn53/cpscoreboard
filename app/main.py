@@ -12,7 +12,8 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_board, auth, branding, templating, web
+from . import admin_archive, admin_board, auth, branding, templating, web
+from .archive import Archive
 from .board_config import BoardConfig
 from .config import Settings
 from .devices import DeviceStore
@@ -42,7 +43,11 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
                    settings.default_division, settings.default_state, settings.watch_label)
         app.state.board = board
         app.state.branding = branding.Branding(store)
-        poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store)
+        archive = None
+        if settings.archive_enabled and settings.scrape_mode.value != "replay":
+            archive = Archive(settings.data_dir / "archive", settings.display_timezone)
+        app.state.archive = archive
+        poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store, archive=archive)
         poller.restore()
         app.state.poller = poller
         app.state.store = store
@@ -75,5 +80,6 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.include_router(branding.router)
     app.include_router(auth.router)
     app.include_router(admin_board.router)
+    app.include_router(admin_archive.router)
     app.include_router(web.router)
     return app

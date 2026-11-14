@@ -1,0 +1,5 @@
+<nav class="subnav">
+  {% for href, text in [('/admin', 'Devices'), ('/admin/board', 'Board settings'), ('/admin/archive', 'Archive')] %}
+  {% if href == active %}<strong>{{ text }}</strong>{% else %}<a href="{{ href }}">{{ text }}</a>{% endif %}
+  {% endfor %}
+</nav>
