@@ -21,7 +21,7 @@
   <thead>
     <tr class="group">
       <th rowspan="2">Team</th>
-      <th rowspan="2">School</th>
+      {% if cols.school %}<th rowspan="2">School</th>{% endif %}
       <th rowspan="2" class="num">Total Score</th>
       {% if has_totals %}<th rowspan="2" class="num">Adj</th><th rowspan="2" class="num">Adjusted total</th>{% endif %}
       {% if cols.state %}<th rowspan="2">State</th>{% endif %}
@@ -45,7 +45,7 @@
     {% set shown = ch and ch.visible and ch.at is recent %}
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
       <td class="team">{{ t.team_number }}</td>
-      <td class="school">{{ aliases.get(t.team_number, '') }}</td>
+      {% if cols.school %}<td class="school">{{ aliases.get(t.team_number, '') }}</td>{% endif %}
       <td class="num strong">{{ t.ccs_score | num }}{{ score_trend(ch if shown and not has_totals else none) }}</td>
       {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}{{ score_trend(ch if shown else none) }}</td>{% endif %}
       {% if cols.state %}<td>{{ t.location }}</td>{% endif %}

@@ -251,7 +251,7 @@ def test_dashboard_columns_school_key_and_label(site):  # noqa: F811
 
     page = admin.get("/").text
     assert "<h2>EMS teams</h2>" in page
-    head = page[page.index("<thead>"):page.index("</thead>")]
+    head = page[page.rindex("<thead>"):page.rindex("</thead>")]  # the main scoreboard table
     order = [head.index(h) for h in ("Team</th>", "School</th>", "Total Score</th>", "Placement",
                                      "Score time", "Play time", "Flags</th>")]
     assert order == sorted(order)
@@ -350,6 +350,9 @@ def test_admin_sets_the_watched_school_and_it_shows_on_the_board(site):  # noqa:
     admin.post("/admin/board/watch", data={"team": number})
     admin.post("/admin/board/view", data={"default_division": "all", "default_state": "all",
                                           "watch_label": "EMS teams", "watch_school": "EMS"})
-    assert '<td class="school">EMS</td>' in admin.get("/").text
+    page = admin.get("/").text
+    watch_table = page[page.index("<h2>EMS teams</h2>"):page.index("<h2>Scoreboard")]
+    assert "School</th>" not in watch_table and 'class="school"' not in watch_table  # not in the EMS table
+    assert '<td class="school">EMS</td>' in page[page.index("<h2>Scoreboard"):]  # still in the main board
     assert f"<td>EMS</td>" in admin.get("/admin/board").text
     assert {t["team_number"]: t["alias"] for t in admin.get("/api/scores").json()["teams"]}[number] == "EMS"
