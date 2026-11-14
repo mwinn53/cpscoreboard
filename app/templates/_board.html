@@ -48,7 +48,7 @@
     {% set ch = changes.get(t.team_number) %}
     {% set shown = ch and ch.visible and ch.at is recent %}
     <tr class="{{ 'watched' if t.team_number in watch_set }} {{ 'recent' if shown }}">
-      <td class="team">{{ t.team_number }}</td>
+      <td class="team"><a href="/teams/{{ t.team_number }}" title="Score and places over time">{{ t.team_number }}</a></td>
       <td class="school">{{ aliases.get(t.team_number, '') }}</td>
       <td class="num strong">{{ t.ccs_score | num }}{{ score_trend(ch if shown and not has_totals else none) }}</td>
       {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}{{ score_trend(ch if shown else none) }}</td>{% endif %}
