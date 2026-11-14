@@ -41,6 +41,8 @@ h2 { font-size: 16px; margin: 20px 0 8px; }
   display: flex; align-items: center; gap: 12px;
   padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
+.topbar { flex-wrap: wrap; }
+.topbar .filters { margin: 0 0 0 32px; }  /* a gap after the title */
 .logo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; }
 .logo-right { margin-left: auto; }
 .topbar .nav + .logo-right { margin-left: 12px; }
@@ -136,3 +138,4 @@ button.link { border: none; background: none; padding: 0; color: var(--accent); 
 .devices .actions button { padding: 4px 10px; font-size: 12px; margin-left: 4px; }
 .label-form { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .label-form input { padding: 3px 6px; font-size: 12px; width: 12em; }
+@media (max-width: 700px) { .topbar .filters { margin-left: 0; width: 100%; } }

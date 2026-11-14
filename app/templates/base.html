@@ -11,6 +11,7 @@
   <header class="topbar">
     <img class="logo" src="{{ logos.left }}" alt="CyberPatriot logo" width="48" height="48">
     <a class="brand" href="/">{{ site_title }}</a>
+    {% block header_tools %}{% endblock %}
     {% if app_env == 'dev' %}<span class="badge badge-dev">dev · {{ scrape_mode }}{% if not auth_enabled %} · no auth{% endif %}</span>{% endif %}
     {% if viewer %}
     <nav class="nav">

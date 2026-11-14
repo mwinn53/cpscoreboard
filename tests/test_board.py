@@ -281,3 +281,21 @@ def test_dropdowns_have_headings_and_the_page_has_the_title(site):  # noqa: F811
     assert "<title>EMS CyberPatriot Next Generation Scorebot</title>" in page
     assert re.search(r"\((\w{3} \d+, \d{4} \d+:\d\d:\d\d [AP]M E[SD]T)\)", page)
     assert any("EMS CyberPatriot Next Generation Scorebot" in subject for _, subject, _ in site.mailer.sent)
+
+
+def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noqa: F811
+    admin = make_admin(site)
+    deadline = time.monotonic() + 10
+    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
+        time.sleep(0.05)
+    teams = admin.get("/api/scores").json()["teams"]
+    ms = [t for t in teams if t["division"] == "Middle School"][:3]
+    admin.post("/admin/board/alias", data={"team": ms[1]["team_number"], "alias": "Other MS"})
+    admin.post("/admin/board/watch", data={"team": ms[2]["team_number"]})  # watched, no school
+    page = admin.get("/partials/board", params={"division": "Middle School", "state": "all"}).text
+
+    def district(number):
+        row = page[page.index(f'<td class="team">{number}</td>'):]
+        return re.search(r'<td class="num district">(\d*)</td>', row).group(1)
+    assert district(ms[1]["team_number"]) == "1" and district(ms[2]["team_number"]) == "2"
+    assert district(ms[0]["team_number"]) == ""
