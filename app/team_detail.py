@@ -27,7 +27,7 @@ import json
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -280,3 +280,74 @@ class DetailPoller:
         while True:
             await self.poll_once()
             await asyncio.sleep(self.interval)
+
+
+# --- On demand, for the team page (any team) ---
+
+def chart_url(scoreboard_url: str) -> str:
+    """.../api/team/scores.php -> .../api/image/chart.php"""
+    return scoreboard_url.replace("/team/scores.php", "/image/chart.php")
+
+
+def parse_image_chart(body: bytes, now: datetime) -> list[tuple[str, list[tuple[datetime, float]]]]:
+    """The scoreboard's own 5-minute per-image history (Google Charts JSON).
+
+    Times look like "11/14 13:10" and are UTC with no year: the year is the one that
+    puts the time closest to ``now`` (so a December round read in January works).
+    Values are numbers, or the string "null" before an image is started.
+    """
+    doc = json.loads(body)
+    names = [c.get("label", "") for c in doc.get("cols", [])[1:]]
+    series: list[list[tuple[datetime, float]]] = [[] for _ in names]
+    for row in doc.get("rows", []):
+        cells = row.get("c", [])
+        if not cells:
+            continue
+        try:
+            md = datetime.strptime(f"{now.year} {cells[0].get('v', '')}", "%Y %m/%d %H:%M").replace(tzinfo=now.tzinfo)
+        except ValueError:
+            continue
+        if md - now > timedelta(days=180):
+            md = md.replace(year=now.year - 1)
+        for i, cell in enumerate(cells[1:len(names) + 1]):
+            v = _float(cell.get("v") if isinstance(cell, dict) else None)
+            if v is not None:
+                series[i].append((md, v))
+    return [(n, pts) for n, pts in zip(names, series) if n and pts]
+
+
+@dataclass(frozen=True)
+class OfficialDetail:
+    images: list[ImageScore]
+    history: list[tuple[str, list[tuple[datetime, float]]]]
+    fetched_at: datetime
+
+
+class OfficialDetailClient:
+    """Fetches a team's images and image chart from the public scoreboard, cached briefly."""
+
+    TTL = timedelta(seconds=60)
+
+    def __init__(self, client: httpx.AsyncClient, scoreboard_url: str):
+        self.client = client
+        self.images_url, self.chart_url = detail_url(scoreboard_url), chart_url(scoreboard_url)
+        self._cache: dict[str, OfficialDetail] = {}
+
+    async def get(self, team: str) -> OfficialDetail | None:
+        hit = self._cache.get(team)
+        now = utcnow()
+        if hit and now - hit.fetched_at < self.TTL:
+            return hit
+        try:
+            img, chart = await asyncio.gather(self.client.get(self.images_url, params={"team": team}),
+                                              self.client.get(self.chart_url, params={"team": team}))
+            img.raise_for_status()
+            chart.raise_for_status()
+            result = OfficialDetail(parse_images(img.content), parse_image_chart(chart.content, now), now)
+        except Exception as e:
+            log.info("Official image detail for %s unavailable: %s", team, e)
+            return hit  # stale beats nothing
+        if len(self._cache) > 500:
+            self._cache.clear()
+        self._cache[team] = result
+        return result

@@ -12,7 +12,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import admin_archive, admin_board, admin_config, admin_server, auth, branding, templating, web
+from . import admin_archive, admin_board, admin_config, admin_server, auth, branding, team_view, templating, web
 from .archive import Archive
 from .board_config import BoardConfig
 from .outage import OutageMonitor
@@ -25,7 +25,7 @@ from .sources import build_source
 from .store import SnapshotStore
 from .posting import Poster
 from .secret_box import SecretBox
-from .team_detail import DetailPoller, DetailStore, build_detail_source
+from .team_detail import DetailPoller, DetailStore, OfficialDetailClient, build_detail_source
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +79,9 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
             detail.restore()
             detail_task = asyncio.create_task(detail.run(), name="detail")
         app.state.detail = detail
+        # Team pages read any team's per-image detail from the public scoreboard (not in replay).
+        app.state.official = OfficialDetailClient(client, settings.scoreboard_url) \
+            if settings.scrape_mode.value != "replay" else None
         log.info("Started in %s mode (%s); collecting %s; database %s; email via %s; access control %s",
                  settings.app_env, source.description, poller.collect.describe(),
                  store.engine.url.render_as_string(), app.state.mailer.description,
@@ -112,5 +115,6 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.include_router(admin_config.router)
     app.include_router(admin_archive.router)
     app.include_router(admin_server.router)
+    app.include_router(team_view.router)
     app.include_router(web.router)
     return app

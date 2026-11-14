@@ -93,8 +93,12 @@ def _clock(t: datetime) -> str:
 
 def step_chart(points: Sequence[tuple[datetime, float]], end: datetime, *, tz: tzinfo, label: str,
                invert: bool = False, integer: bool = False,
-               fmt: Callable[[float], str] = lambda v: f"{v:g}") -> Chart:
-    """One series as a step line from the first point to ``end``."""
+               fmt: Callable[[float], str] = lambda v: f"{v:g}", width: int = W) -> Chart:
+    """One series as a step line from the first point to ``end``.
+
+    ``width`` is in SVG units: pick it near the width the chart is shown at, so text stays ~1:1.
+    """
+    W = width  # noqa: N806 (shadows the module default)
     t0, t1 = points[0][0], max(end, points[-1][0])
     if t1 <= t0:
         t1 = t0 + timedelta(minutes=1)
@@ -145,3 +149,107 @@ def step_chart(points: Sequence[tuple[datetime, float]], end: datetime, *, tz: t
     return Chart(f'<div class="chart-wrap" data-points="{escape(json.dumps(hover))}" '
                  f'data-plot="{LEFT},{W - RIGHT},{TOP},{H - BOTTOM},{W},{H}">{svg}'
                  f'<div class="chart-tip" hidden></div></div>')
+
+
+def short_image_name(name: str) -> str:
+    """"Windows11_cp19_intro_r2_hsms" -> "Windows11"."""
+    return name.split("_", 1)[0] or name
+
+
+def multi_step_chart(series: Sequence[tuple[str, Sequence[tuple[datetime, float]]]], end: datetime, *,
+                     tz: tzinfo, label: str, fmt: Callable[[float], str] = lambda v: f"{v:g}",
+                     width: int = W) -> Chart:
+    """Several series on one shared axis (image scores), each a step line in its categorical slot.
+
+    The page shows a legend; each line also ends in a direct label (value), nudged apart
+    so they don't overlap. The tooltip lists every series' value at the hovered time.
+    """
+    W = width  # noqa: N806
+    series = [(n, list(p)) for n, p in series if p][:8]  # 8 categorical slots, never cycled
+    if not series:
+        return Chart("")
+    t0 = min(p[0][0] for _, p in series)
+    t1 = max([end] + [p[-1][0] for _, p in series])
+    if t1 <= t0:
+        t1 = t0 + timedelta(minutes=1)
+    hi = max(v for _, p in series for _, v in p)
+    ticks = _y_ticks(0, hi, False)
+    y_lo, y_hi = ticks[0], ticks[-1] if ticks[-1] > ticks[0] else ticks[0] + 1
+    pw, ph = W - LEFT - RIGHT - 40, H - TOP - BOTTOM  # room on the right for end labels
+
+    def x(t: datetime) -> float:
+        return LEFT + (t - t0).total_seconds() / (t1 - t0).total_seconds() * pw
+
+    def y(v: float) -> float:
+        return TOP + (1 - (v - y_lo) / (y_hi - y_lo)) * ph
+
+    parts = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="{escape(label)}" '
+             f'preserveAspectRatio="xMidYMid meet">']
+    for v in ticks:
+        yy = y(v)
+        parts.append(f'<line class="grid" x1="{LEFT}" x2="{LEFT + pw}" y1="{yy:.1f}" y2="{yy:.1f}"/>')
+        parts.append(f'<text class="tick" x="{LEFT - 8}" y="{yy + 4:.1f}" text-anchor="end">{escape(fmt(v))}</text>')
+    for t in _time_ticks(t0, t1, tz):
+        xx = x(t)
+        parts.append(f'<line class="axis" x1="{xx:.1f}" x2="{xx:.1f}" y1="{H - BOTTOM}" y2="{H - BOTTOM + 4}"/>')
+        parts.append(f'<text class="tick" x="{xx:.1f}" y="{H - 8}" text-anchor="middle">{_clock(t)}</text>')
+    parts.append(f'<line class="axis" x1="{LEFT}" x2="{LEFT + pw}" y1="{H - BOTTOM}" y2="{H - BOTTOM}"/>')
+
+    ends = []
+    for i, (_, pts) in enumerate(series, start=1):
+        d = [f"M{x(pts[0][0]):.1f},{y(pts[0][1]):.1f}"] + [f"H{x(t):.1f}V{y(v):.1f}" for t, v in pts[1:]]
+        d.append(f"H{x(t1):.1f}")
+        parts.append(f'<path class="series s{i}" d="{"".join(d)}"/>')
+        ends.append([y(pts[-1][1]), i, pts[-1][1]])
+    ends.sort()
+    for k in range(1, len(ends)):  # keep end labels at least 13 units apart
+        ends[k][0] = max(ends[k][0], ends[k - 1][0] + 13)
+    for ly, i, v in ends:
+        cy = y(v)
+        parts.append(f'<circle class="end s{i}" cx="{x(t1):.1f}" cy="{cy:.1f}" r="4"/>')
+        parts.append(f'<text class="end-label" x="{x(t1) + 8:.1f}" y="{ly + 4:.1f}">{escape(fmt(v))}</text>')
+    parts.append("</svg>")
+
+    times = sorted({t for _, p in series for t, _ in p})
+    hover = []
+    for t in times:  # each series' value at t (held from its last change), or "–" before it starts
+        vals = []
+        for name, pts in series:
+            cur = None
+            for pt, pv in pts:
+                if pt > t:
+                    break
+                cur = pv
+            vals.append(f"{short_image_name(name)} {fmt(cur) if cur is not None else '–'}")
+        hover.append([round(x(t), 1), None, f"{_clock(t.astimezone(tz))} · " + " · ".join(vals)])
+    return Chart(f'<div class="chart-wrap" data-points="{escape(json.dumps(hover))}" '
+                 f'data-plot="{LEFT},{LEFT + pw},{TOP},{H - BOTTOM},{W},{H}">{"".join(parts)}'
+                 f'<div class="chart-tip" hidden></div></div>')
+
+
+def sparkline(points: Sequence[tuple[datetime, float]], end: datetime, *, invert: bool = False,
+              label: str = "", width: int = 120, height: int = 28) -> str:
+    """A tiny step line with an end dot and no axes, for the scoreboard's expanded rows."""
+    if not points:
+        return ""
+    t0, t1 = points[0][0], max(end, points[-1][0])
+    if t1 <= t0:
+        t1 = t0 + timedelta(minutes=1)
+    values = [v for _, v in points]
+    lo, hi = min(values), max(values)
+    if hi == lo:
+        lo, hi = lo - 1, hi + 1
+    pad = 4
+
+    def x(t: datetime) -> float:
+        return pad + (t - t0).total_seconds() / (t1 - t0).total_seconds() * (width - 2 * pad)
+
+    def y(v: float) -> float:
+        frac = (v - lo) / (hi - lo)
+        return pad + (frac if invert else 1 - frac) * (height - 2 * pad)
+
+    d = [f"M{x(points[0][0]):.1f},{y(points[0][1]):.1f}"] + [f"H{x(t):.1f}V{y(v):.1f}" for t, v in points[1:]]
+    d.append(f"H{x(t1):.1f}")
+    return (f'<svg class="spark" viewBox="0 0 {width} {height}" width="{width}" height="{height}" role="img" '
+            f'aria-label="{escape(label)}"><path class="series" d="{"".join(d)}"/>'
+            f'<circle class="end" cx="{x(t1):.1f}" cy="{y(points[-1][1]):.1f}" r="3"/></svg>')
