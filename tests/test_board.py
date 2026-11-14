@@ -203,6 +203,20 @@ def test_district_places_rank_named_teams_within_their_division():
     assert district_places(teams, {"19-0003", "19-0001", "19-0004"}) == {"19-0001": 1, "19-0003": 2, "19-0004": 1}
 
 
+def test_placement_counts():
+    from app.scraper import parse_scores
+    from app.web import placement_counts
+    teams = parse_scores(board(team("19-0001", 300), team("19-0002", 200), team("19-0003", 100, state="VA"),
+                               team("19-0004", 250, division="Open")))
+    district = {"19-0001", "19-0003", "19-0004"}
+    ms = [t for t in teams if t.division == "Middle School"]
+    same_state = [t for t in ms if t.location == "GA"]
+    assert placement_counts(teams, same_state, district) == {"national": 3, "district": 2, "state": 2}
+    assert placement_counts(teams, ms, district) == {"national": 3, "district": 2}  # several states
+    assert placement_counts(teams, teams, district) == {}  # several divisions
+    assert placement_counts(teams, [], district) == {}
+
+
 def test_dashboard_defaults_to_the_collected_division_and_state(site):  # noqa: F811
     admin = make_admin(site)
     wait_for_replay(admin)
@@ -215,7 +229,7 @@ def test_dashboard_defaults_to_the_collected_division_and_state(site):  # noqa: 
     assert page.count("<option") > 10  # every state on the board, not just the collected ones
     head = page[page.index("<thead>"):page.index("</thead>")]
     assert "Placement" in head and "National" in head and "District" in head and "Total Score" in head
-    assert ">State</th>" in head  # the State *place* column
+    assert ">State<" in head  # the State *place* column
     assert "Division</th>" not in head and 'rowspan="2">State</th>' not in head and ">#<" not in head
 
     everything = admin.get("/partials/board", params={"state": "all", "division": "all", "limit": 0}).text
@@ -311,6 +325,15 @@ def test_placement_order_and_trend_slots(site):  # noqa: F811
     head = page[page.index("<thead>"):page.index("</thead>")]
     sub = head[head.rindex("<tr>"):]  # the row under "Placement"
     assert sub.index(">District<") < sub.index(">State<") < sub.index(">National<")
+    ms = [t for t in admin.get("/api/scores").json()["teams"] if t["division"] == "Middle School"]
+    one = admin.get("/partials/board", params={"division": "Middle School", "state": "all"}).text
+    sub = one[one.index("<thead>"):one.index("</thead>")]
+    sub = sub[sub.rindex("<tr>"):]
+    assert re.search(r'National<span class="muted count" title="Teams ranked"> \((\d+)\)</span>', sub)
+    assert int(re.search(r'National<span[^>]*> \((\d+)\)', sub).group(1)) >= len(ms)
+    assert "State<span" not in sub  # several states: no single count
+    every = admin.get("/partials/board", params={"division": "all", "state": "all"}).text
+    assert 'class="muted count"' not in every[every.rindex("<thead>"):]
     row = page[page.index("<tbody>"):]
     assert '<span class="trend trend-place">' in row  # reserved even without a trend, so numbers align
 

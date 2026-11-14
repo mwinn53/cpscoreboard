@@ -15,7 +15,11 @@
 </span>
 {%- endmacro %}
 
-{% macro team_table(teams, cols) %}
+{% macro count(n) -%}
+{%- if n is not none %}<span class="muted count" title="Teams ranked"> ({{ n }})</span>{% endif -%}
+{%- endmacro %}
+
+{% macro team_table(teams, cols, counts) %}
 <div class="table-wrap">
 <table class="board">
   <thead>
@@ -34,9 +38,9 @@
       <th rowspan="2" title="Warning flags (see the key below)">Flags</th>
     </tr>
     <tr>
-      <th class="num placement-start" title="Place among the district schools' teams and {{ watch_label }}, within the division">District</th>
-      <th class="num" title="Place in the state, within the division">State</th>
-      <th class="num placement-end" title="Place in the division, nationally">National</th>
+      <th class="num placement-start" title="Place among the district schools' teams and {{ watch_label }}, within the division">District{{ count(counts.get('district')) }}</th>
+      <th class="num" title="Place in the state, within the division">State{{ count(counts.get('state')) }}</th>
+      <th class="num placement-end" title="Place in the division, nationally">National{{ count(counts.get('national')) }}</th>
     </tr>
   </thead>
   <tbody>
@@ -84,13 +88,13 @@
 
 {% if watched or watch_missing %}
 <h2>{{ watch_label }}</h2>
-{% if watched %}{{ team_table(watched, watch_cols) }}{% endif %}
+{% if watched %}{{ team_table(watched, watch_cols, watch_counts) }}{% endif %}
 {% if watch_missing %}<p class="muted">Not on the board yet: {{ watch_missing | join(', ') }}</p>{% endif %}
 {% endif %}
 
 <h2>Scoreboard <span class="muted">· showing {{ rows | length }} of {{ matched }}</span></h2>
 {% if rows %}
-  {{ team_table(rows, cols) }}
+  {{ team_table(rows, cols, counts) }}
   {{ warning_key() }}
 {% elif shown_on_board == 0 %}
   <p class="empty">Waiting for scoreboard data…</p>

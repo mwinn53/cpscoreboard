@@ -6,14 +6,14 @@ Compose (the app plus Caddy for HTTPS), deployed from GitHub Actions.
 ```
 GitHub push to master ─► Actions: tests ─► build arm64 image ─► ECR
                                            └─► SSM Run Command ─► EC2: docker compose pull && up -d
-Browser ─► https://<elastic-ip>.sslip.io ─► Caddy (TLS) ─► app:8080
+Browser ─► https://<site_hostname> (or <elastic-ip>.sslip.io) ─► Caddy (TLS) ─► app:8080
 ```
 
 | Resource | Notes |
 |---|---|
 | EC2 `t4g.small`, Amazon Linux 2023 | No SSH; shell access via SSM Session Manager. IMDSv2 only. |
 | Elastic IP | Stable address. The hostname is `<a-b-c-d>.sslip.io`, which resolves to that IP, so no domain is needed. |
-| EBS `/data` volume (gp3, encrypted) | App database and Caddy certificates. Separate from the instance and protected by `prevent_destroy`. |
+| EBS `/data` volume (gp3, encrypted) | App database, season archive (`/data/archive`) and Caddy certificates. Separate from the instance and protected by `prevent_destroy`. |
 | Daily snapshots (DLM) | Of the `/data` volume; keeps 7. |
 | ECR repository | Keeps the 10 most recent images; scan on push. |
 | CloudWatch Logs `/cpscoreboard` | Logs from the app and Caddy containers; kept 30 days. |
@@ -55,12 +55,12 @@ terraform output site_url
 ## Changing app settings
 
 Non-secret settings go in `app_settings` in `terraform.tfvars`, followed by
-`terraform apply`. **Secrets** (X API keys in milestone 5, for example) must never go
+`terraform apply`. **Secrets** (`ADMIN_BOOTSTRAP_TOKEN` now, X API keys in milestone 5) must never go
 in Terraform, because they would be saved in the state file. Create them directly
 instead:
 
 ```sh
-aws ssm put-parameter --name /cpscoreboard/env/X_API_KEY --type SecureString --value '...'
+aws ssm put-parameter --name /cpscoreboard/env/ADMIN_BOOTSTRAP_TOKEN --type SecureString --value '...'
 ```
 
 Either way, the change takes effect on the next deploy. To apply it without
@@ -89,12 +89,10 @@ pushing code, re-run the latest **Deploy** workflow.
 - **Logs:** `aws logs tail /cpscoreboard --follow`
 - **Replace the instance** (e.g. for a newer AMI): `terraform apply -replace=aws_instance.web`,
   then re-run Deploy. `/data` is reattached, and existing data is never reformatted.
-- **Terraform state** is in S3: `s3://cpscoreboard-tfstate-224066956748/cpscoreboard/terraform.tfstate`.
-  The bucket is versioned (any earlier state can be restored), encrypted and private,
-  and locks with S3-native locking, so two runs can't collide. It was created by hand,
-  outside Terraform, so `terraform destroy` can't delete it. On a new machine,
-  `terraform init` is all you need. An old local `terraform.tfstate` from before the
-  move is only a backup; don't apply against it.
+- **Terraform state** is local (`infra/terraform.tfstate`, gitignored). Keep a
+  backup until it moves to an S3 backend ([#23](https://github.com/mwinn53/cpscoreboard/issues/23)).
+- **Season archive:** one gzipped full scoreboard per day in `/data/archive`, also
+  downloadable from `/admin/archive`. It's covered by the daily `/data` snapshots.
 - **Tearing down:** `terraform destroy` refuses to delete the data volume
   because of `prevent_destroy`. Remove that line first if you really mean it.
 
@@ -102,8 +100,8 @@ pushing code, re-run the latest **Deploy** workflow.
 
 - **TLS without a domain:** sslip.io hostnames are shared by everyone, so Let's
   Encrypt rate limits are possible. Caddy automatically falls back to ZeroSSL.
-  With a real domain, set `SITE_ADDRESS` (add it to `app_settings`) and point an
-  A record at the Elastic IP.
+  With a real domain, set `site_hostname` and point an A record at the Elastic IP;
+  production uses `cpscores.savannahrivertech.com`.
 - **ARM:** the instance is Graviton (arm64). The image is built natively on
   GitHub's `ubuntu-24.04-arm` runners, which are free for public repos.
 - **Already have GitHub's OIDC provider** in this account? Set
