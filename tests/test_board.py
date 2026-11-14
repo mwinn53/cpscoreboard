@@ -15,6 +15,16 @@ from test_store import ScriptedSource, board, team
 LEGACY = Path(__file__).parent.parent / "legacy" / "cpscoreboard"
 
 
+def wait_for_replay(client, timeout=10.0):
+    """Wait until the replay has loaded its last board, so the page has a table and teams stay put."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if client.get("/api/status").json()["finished"]:
+            return
+        time.sleep(0.05)
+    raise AssertionError("the replay never finished")
+
+
 @pytest.fixture
 def store(tmp_path):
     s = SnapshotStore(f"sqlite:///{(tmp_path / 'db.sqlite').as_posix()}")
@@ -113,9 +123,7 @@ def test_board_settings_page_requires_admin(site):  # noqa: F811
 
 def test_admin_edits_watchlist_aliases_and_filter(site):  # noqa: F811
     admin = make_admin(site)
-    deadline = time.monotonic() + 10  # let the replay reach its last board, so teams stay put
-    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
-        time.sleep(0.05)
+    wait_for_replay(admin)
     page = admin.get("/admin/board")
     assert page.status_code == 200 and "Board settings" in page.text
 
@@ -197,9 +205,7 @@ def test_district_places_rank_named_teams_within_their_division():
 
 def test_dashboard_defaults_to_the_collected_division_and_state(site):  # noqa: F811
     admin = make_admin(site)
-    deadline = time.monotonic() + 10
-    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
-        time.sleep(0.05)
+    wait_for_replay(admin)
     admin.post("/admin/board/filter", data={"locations": ["ga"], "divisions": ["Middle School"]})
 
     page = admin.get("/").text
@@ -236,9 +242,7 @@ def test_view_settings_seed_once_and_drive_the_default_view(store):
 
 def test_dashboard_columns_school_key_and_label(site):  # noqa: F811
     admin = make_admin(site)
-    deadline = time.monotonic() + 10
-    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
-        time.sleep(0.05)
+    wait_for_replay(admin)
     number = admin.get("/api/scores").json()["teams"][0]["team_number"]
     admin.post("/admin/board/alias", data={"team": number, "alias": "Evans MS"})
     admin.post("/admin/board/watch", data={"team": number})
@@ -275,6 +279,7 @@ def test_times_are_shown_in_eastern_and_the_title_is_configurable():
 
 def test_dropdowns_have_headings_and_the_page_has_the_title(site):  # noqa: F811
     admin = make_admin(site)
+    wait_for_replay(admin)
     page = admin.get("/").text
     for heading in ("Search", "Division", "State", "Rows"):
         assert f'<label class="field"><span>{heading}</span>' in page
@@ -285,9 +290,7 @@ def test_dropdowns_have_headings_and_the_page_has_the_title(site):  # noqa: F811
 
 def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noqa: F811
     admin = make_admin(site)
-    deadline = time.monotonic() + 10
-    while not admin.get("/api/status").json()["finished"] and time.monotonic() < deadline:
-        time.sleep(0.05)
+    wait_for_replay(admin)
     teams = admin.get("/api/scores").json()["teams"]
     ms = [t for t in teams if t["division"] == "Middle School"][:3]
     admin.post("/admin/board/alias", data={"team": ms[1]["team_number"], "alias": "Other MS"})
@@ -303,6 +306,7 @@ def test_watched_teams_are_ranked_in_the_district_without_a_school(site):  # noq
 
 def test_placement_order_and_trend_slots(site):  # noqa: F811
     admin = make_admin(site)
+    wait_for_replay(admin)
     page = admin.get("/").text
     head = page[page.index("<thead>"):page.index("</thead>")]
     sub = head[head.rindex("<tr>"):]  # the row under "Placement"
