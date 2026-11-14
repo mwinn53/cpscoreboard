@@ -19,7 +19,8 @@ dependencies = [
     "boto3>=1.34",              # SES in production
     "tzdata>=2024.1",           # time zones for display (Windows and slim images have none)
     "cryptography>=42",
-    "alembic>=1.13",            # schema migrations (app/schema.py, app/migrations/)         # encrypts the X credentials at rest (app/secret_box.py)
+    "alembic>=1.13",
+    "maxminddb>=2.5",           # reads the offline IP geolocation database (app/geo.py)            # schema migrations (app/schema.py, app/migrations/)         # encrypts the X credentials at rest (app/secret_box.py)
 ]
 
 [project.optional-dependencies]

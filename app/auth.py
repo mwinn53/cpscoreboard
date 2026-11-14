@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
+from .geo import ATTRIBUTION
 from .devices import APPROVED, PENDING, REVOKED, CodeCheck, Device, DeviceStore, RateLimited, normalize_email
 from .templating import templates
 
@@ -194,7 +195,8 @@ async def verify_submit(request: Request, code: str = Form("")):
         await _send(request, notify, f"{request.app.state.settings.site_title}: {email} is waiting for approval",
                     f"A new device is waiting for your approval.\n\n"
                     f"Email:        {email}\nRelationship: {relationship or '(not given)'}\n"
-                    f"Browser:      {templates.env.filters['browser'](ua)}\nIP:           {ip}\n\n"
+                    f"Browser:      {templates.env.filters['browser'](ua)}\nIP:           {ip}"
+                    f"{_where(request, ip)}\n\n"
                     f"Review it here: {admin_url}\n")
 
     response = RedirectResponse("/pending", status_code=303)
@@ -242,13 +244,23 @@ async def forget(request: Request):
     return response
 
 
+def _where(request: Request, ip: str) -> str:
+    """" (City, Region, CC)" from the offline geolocation database, or ""."""
+    geo = getattr(request.app.state, "geo", None)
+    place = geo.locate(ip) if geo else ""
+    return f" ({place})" if place else ""
+
+
 # --- Admin ---
 
 @router.get("/admin", response_class=HTMLResponse, name="admin_page")
 async def admin_page(request: Request, admin: Device = Depends(require_admin)):
     all_devices = await asyncio.to_thread(_devices(request).list)
     groups = {s: [d for d in all_devices if d.status == s] for s in (PENDING, APPROVED, REVOKED)}
-    return _page(request, "admin.html", groups=groups, me=admin)
+    geo = getattr(request.app.state, "geo", None)
+    return _page(request, "admin.html", groups=groups, me=admin,
+                 locate=geo.locate if geo and geo.available else (lambda ip: ""),
+                 geo_attribution=ATTRIBUTION if geo and geo.available else None)
 
 
 @router.post("/admin/devices/{device_id}/{action}", dependencies=[Depends(same_origin)])

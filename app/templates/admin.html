@@ -21,7 +21,8 @@
     <td class="relationship">{{ d.relationship or '—' }}</td>
     <td title="{{ d.last_ua }}">{{ d.last_ua | browser }}
       {% if ua_changed %}<div class="warn small" title="Registered with: {{ d.first_ua }}">changed since registration ({{ d.first_ua | browser }})</div>{% endif %}</td>
-    <td class="mono">{{ d.last_ip }}{% if d.first_ip != d.last_ip %}<div class="muted small">first: {{ d.first_ip }}</div>{% endif %}</td>
+    <td><span class="mono">{{ d.last_ip }}</span>{% set here = locate(d.last_ip) %}{% if here %}<div class="small">{{ here }}</div>{% endif %}
+      {% if d.first_ip != d.last_ip %}<div class="muted small">first: <span class="mono">{{ d.first_ip }}</span>{% set there = locate(d.first_ip) %}{% if there %} · {{ there }}{% endif %}</div>{% endif %}</td>
     <td title="{{ d.created_at | date }}">{{ d.created_at | ago }}</td>
     <td title="{{ d.last_seen | date }}">{{ d.last_seen | ago }}</td>
     <td>{% if d.status == 'approved' %}{{ d.expires_at | date }}{% else %}<span class="muted">—</span>{% endif %}</td>
@@ -59,4 +60,5 @@
 {% if groups.revoked %}
   {{ device_rows(groups.revoked, [('approve', 'Approve', ''), ('delete', 'Delete', 'danger')]) }}
 {% else %}<p class="empty">None.</p>{% endif %}
+{% if geo_attribution %}<p class="muted small">Locations are approximate (city level). <a href="{{ geo_attribution[1] }}">{{ geo_attribution[0] }}</a>.</p>{% endif %}
 {% endblock %}

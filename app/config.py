@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Per-image detail for watched teams while they play (app/team_detail.py), in seconds.
     detail_interval: float = 300
     detail_enabled: bool = True
+    # Approximate device locations on /admin from DB-IP's free city database, downloaded
+    # monthly to <DATA_DIR>/geoip and read locally (app/geo.py). Off in replay mode.
+    geoip_enabled: bool = True
     # Fernet key that encrypts the X credentials saved on /admin/config (app/secret_box.py).
     # Production: an SSM SecureString. Blank = credentials can't be saved.
     secrets_key: str = ""
