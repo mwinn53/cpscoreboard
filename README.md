@@ -23,7 +23,7 @@ shutdown). Next up is M5 (X notifier) and the rest of M7 (analysis).
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
-| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); analysis planned ([#21](https://github.com/mwinn53/cpscoreboard/issues/21)) | Analysis features; season-end data retention |
+| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab: round samples, legacy import and a first round report (#21, in progress) | Analysis for coaches; season-end data retention |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -47,6 +47,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/team_detail.py` | Per-image detail: stored for watched teams while they play; fetched on demand (images and the 5-minute image chart) for any team's page |
 | `app/schema.py`, `app/migrations/` | Alembic migrations, run at startup |
 | `app/scoreboard_url.py` | The scoreboard address set on `/admin/config`: test fetch, and switching every live fetcher |
+| `app/analysis_store.py`, `app/analysis_sampler.py`, `app/analysis_legacy.py` | Round samples for the Analysis tab: storage, the quiet-scoring sampler, the legacy CSV import |
+| `app/analysis.py`, `app/analysis_web.py` | Round statistics and findings; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
 | `app/archive.py`, `app/admin_archive.py` | Season archive: the full raw scoreboard, one file per day, and its admin page |
@@ -70,6 +72,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/register`, `/verify`, `/pending` | Registration: email → code → waiting for approval (public) |
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
+| `/analysis` | Analysis (coaches and admins): round samples by division, sampling status and "sample now", settings and legacy import (admin) |
+| `/analysis/rounds/{id}` | A round's report: findings, participation, our teams, images, state table, coaches' notes |
 | `/admin/config` | Configuration (admin only): scoreboard address, competition start, per-image detail status, posting to X and its keys; an (i) help bubble on each section |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
@@ -159,8 +163,9 @@ The scoreboard is private. There are no passwords. A visitor registers a browser
 3. **`/pending`**: waits, polling every 10 seconds, until the admin approves this
    browser, then goes on to the scoreboard. Approval lasts `DEVICE_LIFETIME_DAYS`
    (365) from the approval date.
-4. **`/admin`**: approve, deny or revoke, label, delete, or make another device an
-   admin. Each device shows its browser and IP when registered and when last seen,
+4. **`/admin`**: approve, deny or revoke, label, delete, make a person a **coach**
+   (by email: every device registered with it), or make another device an admin.
+   Coaches and admins see the **Analysis** tab. Each device shows its browser and IP when registered and when last seen,
    with an approximate location (city, region, country), and is flagged if the browser
    has changed. The approval email includes the location too. Locations come from
    DB-IP's free city database, downloaded monthly to `<DATA_DIR>/geoip/` (about
@@ -288,6 +293,30 @@ so nothing is repeated.
   `SECRETS_KEY` before they're stored and never shown again. Without `SECRETS_KEY`,
   keys can't be saved.
 - **Test post:** sends one post in the current mode, ignoring the limits.
+
+### Analysis tab
+
+For coaches and admins (`/analysis`), modeled on the legacy R report
+(`legacy/cpdataanalysis/shiny`), and built to compare in a round, across rounds and
+across seasons.
+
+- **Round samples.** A round is analyzed from a frozen sample of every team in a
+  division: its final row (score, challenge scores such as Cisco, places, play time),
+  per-image results, and the scoreboard's 5-minute score history. The sampler takes
+  one once no score has changed for 24 hours (adjustable; usually about 72 hours after
+  the round starts), for the divisions chosen in the settings (Middle School by default).
+  It sends three gentle requests per team. **Sample now** does it on demand. Season and round come
+  from image names (`…_cp19_…_r2_…` = CP-19 Round 2), and coaches can rename rounds.
+- **Groups:** national (the division), the state (the board's default state), the
+  district (district schools plus ours) and our teams (the watchlist).
+- **Report:** findings written from the numbers, participation, our teams per image
+  (found, completion, score), image summaries, the state table (gaps to the team above
+  and to the leader), and coaches' notes saved with the round.
+- **Legacy import** (admin): upload the old CSVs (CP-XI to CP-XIV). Score files become
+  rounds, and timeline files become their 5-minute histories. In the old files, other
+  district schools are labeled with their abbreviation (`GTMS`…) and our teams with
+  their team names. Malformed rows are skipped, and a file whose name and images
+  disagree (e.g. a "State Round" file holding Round 2's images) is refused.
 
 ### Collection filter
 

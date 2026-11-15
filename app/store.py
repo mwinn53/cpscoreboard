@@ -103,7 +103,7 @@ class Restored:
     data_as_of: datetime | None = None
 
 
-def add_missing_columns(engine: Engine) -> list[str]:
+def add_missing_columns(engine: Engine, only: tuple[str, ...] | None = None) -> list[str]:
     """Add columns that exist in the code but not yet in the database.
 
     Only used to bring a database from before Alembic up to the baseline (app/schema.py);
@@ -116,7 +116,7 @@ def add_missing_columns(engine: Engine) -> list[str]:
     existing_tables = set(inspect(engine).get_table_names())
     with engine.begin() as conn:
         for table in metadata.sorted_tables:
-            if table.name not in existing_tables:
+            if table.name not in existing_tables or (only is not None and table.name not in only):
                 continue
             have = {c["name"] for c in inspect(conn).get_columns(table.name)}
             for col in table.columns:

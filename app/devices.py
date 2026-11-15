@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import re
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -51,6 +51,14 @@ devices = Table(
     Column("last_ip", String(64), nullable=False, default=""),
     Column("last_ua", String(512), nullable=False, default=""),
     Column("last_seen", DateTime, nullable=False),
+)
+
+# Coaches (issue: Analysis tab). Granted per person: every device registered with the
+# email gets the role. Admins are always coaches.
+coaches = Table(
+    "coaches", metadata,
+    Column("email", String(254), primary_key=True),
+    Column("granted_at", DateTime, nullable=False),
 )
 
 email_codes = Table(
@@ -110,6 +118,12 @@ class Device:
     last_ip: str
     last_ua: str
     last_seen: datetime
+    is_coach: bool = False  # filled in by DeviceStore from the coaches table
+
+    @property
+    def can_analyze(self) -> bool:
+        """Coaches and admins see the Analysis tab."""
+        return self.is_admin or self.is_coach
 
     @property
     def expired(self) -> bool:
@@ -235,19 +249,19 @@ class DeviceStore:
                 created_at=now, expires_at=now + self.lifetime, first_ip=ip, first_ua=ua[:512],
                 last_ip=ip, last_ua=ua[:512], last_seen=now))
             row = conn.execute(select(devices).where(devices.c.id == result.inserted_primary_key[0])).one()
-        return token, Device.from_row(row)
+        return token, self._with_role(Device.from_row(row))
 
     def lookup(self, token: str | None) -> Device | None:
         if not token:
             return None
         with self.lock, self.engine.connect() as conn:
             row = conn.execute(select(devices).where(devices.c.token_hash == hash_token(token))).first()
-        return Device.from_row(row) if row else None
+        return self._with_role(Device.from_row(row)) if row else None
 
     def get(self, device_id: int) -> Device | None:
         with self.lock, self.engine.connect() as conn:
             row = conn.execute(select(devices).where(devices.c.id == device_id)).first()
-        return Device.from_row(row) if row else None
+        return self._with_role(Device.from_row(row)) if row else None
 
     def touch(self, device: Device, ip: str, ua: str) -> None:
         """Record activity, at most every few minutes unless the IP or browser changed."""
@@ -261,11 +275,32 @@ class DeviceStore:
     def list(self) -> list[Device]:
         with self.lock, self.engine.connect() as conn:
             rows = conn.execute(select(devices).order_by(devices.c.created_at.desc())).all()
-        return [Device.from_row(r) for r in rows]
+        emails = self.coach_emails()
+        return [self._with_role(Device.from_row(r), emails) for r in rows]
 
     def count_admins(self) -> int:
         with self.lock, self.engine.connect() as conn:
             return conn.scalar(select(func.count()).where(and_(devices.c.is_admin, devices.c.status == APPROVED)))
+
+    # --- coaches (per email) ---
+
+    def coach_emails(self) -> set[str]:
+        with self.lock, self.engine.connect() as conn:
+            return {r.email for r in conn.execute(select(coaches.c.email))}
+
+    def _with_role(self, device: Device, emails: set[str] | None = None) -> Device:
+        if emails is None:
+            with self.lock, self.engine.connect() as conn:
+                coach = conn.scalar(select(func.count()).where(coaches.c.email == device.email)) > 0
+        else:
+            coach = device.email in emails
+        return replace(device, is_coach=coach)
+
+    def set_coach(self, email: str, coach: bool) -> None:
+        with self.lock, self.engine.begin() as conn:
+            conn.execute(delete(coaches).where(coaches.c.email == email))
+            if coach:
+                conn.execute(insert(coaches).values(email=email, granted_at=_now()))
 
     def _set(self, device_id: int, **values: Any) -> bool:
         with self.lock, self.engine.begin() as conn:
