@@ -13,7 +13,7 @@
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 
 <form method="get" action="/analysis" class="inline">
-  <label>Division
+  <label>Show division
     <select name="division" onchange="this.form.submit()">
       {% for d in choices %}<option value="{{ d }}" {{ 'selected' if d == division }}>{{ d }}</option>{% endfor %}
     </select>
@@ -26,6 +26,7 @@
      hx-swap="innerHTML">
 {% include "_analysis_collection.html" %}
 </div>
+{% include "_analysis_controls.html" %}
 
 <h2>Reports</h2>
 {% if not rounds %}
@@ -66,15 +67,17 @@
 {% if me.is_admin %}
 {% if collector %}
 <details class="admin-box">
-  <summary>Divisions to collect</summary>
+  <summary>Divisions to collect (background data collection)</summary>
   <form method="post" action="/analysis/settings" class="stack compact">
     <input type="hidden" name="division" value="{{ division }}">
     <fieldset class="choices">
-      <legend>Collect these divisions as teams finish</legend>
+      <legend>Fetch data for these divisions as teams finish</legend>
       {% for d in (on_board + configured) | unique | sort %}
       <label><input type="checkbox" name="divisions" value="{{ d }}" {{ 'checked' if d in configured }}> {{ d }}</label>
       {% endfor %}
     </fieldset>
+    <p class="muted small">This decides what the collector fetches from the public scoreboard. "Show division" at the top
+      only picks which division's reports and progress this page shows.</p>
     <button type="submit">Save</button>
   </form>
 </details>

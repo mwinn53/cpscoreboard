@@ -296,10 +296,27 @@ def test_collector_waits_longer_for_teams_that_stopped_short_of_4_hours():
     short = dataclasses.replace(box["teams"][0], play_time=2 * 3600)
     box["teams"] = [short]
     c.plan()
-    clock.now = T0 + timedelta(hours=5)
+    clock.now = T0 + timedelta(hours=3, minutes=59)
     assert c.plan() == [] and c.status["Middle School"].playing == 1
-    clock.now = T0 + timedelta(hours=6, minutes=1)
+    clock.now = T0 + timedelta(hours=4, minutes=1)
     assert [t.team_number for t in c.plan()] == [short.team_number]
+    store.close()
+
+
+def test_collect_all_takes_unfinished_teams_once_at_the_same_throttle():
+    c, store, box, calls, clock = _collector()
+    assert c.plan() == []                                                  # just seen: not finished
+    c.collect_all("Middle School")
+    pending = c.plan()
+    assert len(pending) == 3 and c.status["Middle School"].forced
+
+    async def go():
+        assert c.start_fetches(pending) == 1                               # still one at a time
+        await asyncio.gather(*c.tasks)
+        while c.start_fetches(c.plan()):
+            await asyncio.gather(*c.tasks)
+    asyncio.run(go())
+    assert c.plan() == [] and c.status["Middle School"].complete and not c.forced
     store.close()
 
 
@@ -380,10 +397,16 @@ def test_collection_panel_and_throttle(site):  # noqa: F811
     clock.now = T0 + timedelta(minutes=95)
     c.plan()
     page = admin.get("/analysis/partials/collection?division=Middle+School").text
-    assert "0</strong> of 3 teams' data sets complete" in page and "3 waiting" in page and 'type="range"' in page
+    assert "0</strong> of 3 teams' data sets complete" in page and "3 waiting" in page
+    assert 'type="range"' in admin.get("/analysis?division=Middle+School").text
     r = admin.post("/analysis/throttle", data={"concurrency": "3", "division": "Middle School"},
                    headers={"HX-Request": "true"})
-    assert r.status_code == 200 and c.concurrency() == 3 and 'value="3"' in r.text
+    assert r.status_code == 200 and c.concurrency() == 3 and "teams' data sets complete" in r.text
     assert admin.post("/analysis/throttle", data={"concurrency": "0", "division": "Middle School"}).status_code == 303
     assert "Collection is paused" in admin.get("/analysis/partials/collection?division=Middle+School").text
+    home = admin.get("/analysis?division=Middle+School").text
+    assert "Collect all Middle School teams now" in home and "including teams still" in home
+    r = admin.post("/analysis/collect-all", data={"division": "Middle School"}, headers={"HX-Request": "true"})
+    assert r.status_code == 200 and "Collecting all teams now" in r.text and "Middle School" in c.forced
+    assert admin.post("/analysis/collect-all", data={"division": "Open"}).status_code == 400
     store.close()

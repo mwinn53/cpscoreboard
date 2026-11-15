@@ -3,9 +3,10 @@
 The poller keeps the full board in memory. For each division chosen in the
 settings (Middle School by default), the collector watches every team's **play
 time**. Reports are written after the round, so a team is collected only when it's
-surely finished: at least ``MIN_PLAY`` (4 hours) played and no play for
-``DONE_AFTER`` (60 minutes); a team that stopped short of 4 hours is collected once
-it has been idle for ``GIVE_UP_AFTER`` (6 hours). Its per-image results, challenge
+surely finished: at least ``MIN_PLAY`` (3¾ hours) played and no play for
+``DONE_AFTER`` (60 minutes), or idle for ``GIVE_UP_AFTER`` (4 hours) whatever it
+played. **Collect all** fetches a division's remaining teams now, finished or not, at
+the same throttle and pace. Its per-image results, challenge
 scores and 5-minute image history are then fetched from its subpages on the public
 scoreboard (three requests) and saved to the round's data set
 (app/analysis_store.py). Teams finish across the whole weekend, so collection is a
@@ -45,9 +46,9 @@ log = logging.getLogger(__name__)
 
 DIVISIONS_KEY, CONCURRENCY_KEY = "analysis_divisions", "analysis_concurrency"
 DEFAULT_DIVISIONS, DEFAULT_CONCURRENCY, MAX_CONCURRENCY = "Middle School", 1, 6
-MIN_PLAY = 4 * 3600                  # seconds played before a team counts as finished
+MIN_PLAY = int(3.75 * 3600)          # seconds played before a team counts as finished
 DONE_AFTER = timedelta(minutes=60)   # ...and no play for this long
-GIVE_UP_AFTER = timedelta(hours=6)   # a team that stopped short of MIN_PLAY: finished after this long idle
+GIVE_UP_AFTER = timedelta(hours=4)   # or idle this long, whatever it played
 TICK = 5                             # seconds between scheduling passes while there's work
 IDLE_TICK = 30
 PAUSE = 1.0                          # seconds after each team, per worker
@@ -70,6 +71,7 @@ class DivisionStatus:
     fetching: int = 0
     round_id: int | None = None   # the data set being filled
     eta_seconds: float | None = None
+    forced: bool = False          # Collect all is running
 
     @property
     def complete(self) -> bool:
@@ -92,6 +94,7 @@ class AnalysisCollector:
         self.tasks: set[asyncio.Task] = set()
         self.pace: float | None = None                       # seconds per team (moving average)
         self.status: dict[str, DivisionStatus] = {}
+        self.forced: set[str] = set()                        # divisions where Collect all is running
         self.last_error = ""
         self._refreshed: datetime | None = None
 
@@ -112,6 +115,10 @@ class AnalysisCollector:
 
     def set_concurrency(self, n: int) -> None:
         self.board.set_value(CONCURRENCY_KEY, str(max(0, min(n, MAX_CONCURRENCY))))
+
+    def collect_all(self, division: str) -> None:
+        """Fetch the division's remaining teams now, finished or not (same throttle and pace)."""
+        self.forced.add(division)
 
     # --- who's done ---
 
@@ -151,13 +158,16 @@ class AnalysisCollector:
                     st.collected += 1
                 elif t.team_number in self.inflight:
                     st.fetching += 1
-                elif not self.done(t):
+                elif not self.done(t) and division not in self.forced:
                     st.playing += 1
                 else:
                     st.waiting += 1
                     failed = self.failed.get(t.team_number)
                     if not (failed and failed[0] == key and now - failed[1] < RETRY_AFTER):
                         pending.append(t)
+            if division in self.forced and not st.waiting and not st.fetching:
+                self.forced.discard(division)   # the pass is done; back to the usual rule
+            st.forced = division in self.forced
             left = st.waiting + st.fetching
             if left and conc:
                 st.eta_seconds = left * ((self.pace or 4.0) + PAUSE) / conc

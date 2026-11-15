@@ -130,6 +130,23 @@ async def throttle(request: Request, me: Device = Depends(require_coach),
     return _done(f"/analysis?division={quote(division)}", "Saved the throttle.")
 
 
+@router.post("/collect-all", response_class=HTMLResponse, dependencies=[Depends(same_origin)])
+async def collect_all(request: Request, me: Device = Depends(require_coach), division: Annotated[str, Form()] = ""):
+    """Fetch every remaining team in the division now, at the usual throttle."""
+    _admin(me)
+    _, collector = _state(request)
+    if collector is None:
+        raise NotAllowed(400, "Collection is off here (replay).")
+    if division not in collector.divisions():
+        raise NotAllowed(400, f"{division or 'That division'} isn't collected.")
+    collector.collect_all(division)
+    await asyncio.to_thread(collector.plan)
+    log.info("Device %d asked to collect all %s teams now", me.id, division)
+    if request.headers.get("HX-Request"):
+        return _page(request, "_analysis_collection.html", me=me, **_collection(request, collector, division))
+    return _done(f"/analysis?division={quote(division)}", f"Collecting all {division} teams now.")
+
+
 @router.post("/import", response_class=HTMLResponse, dependencies=[Depends(same_origin)])
 async def import_legacy(request: Request, me: Device = Depends(require_coach),
                         files: Annotated[list[UploadFile], File()] = None):
