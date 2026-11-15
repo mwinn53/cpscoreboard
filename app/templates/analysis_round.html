@@ -1,44 +1,35 @@
 {% extends "base.html" %}
+{% from "_info.html" import info as tip %}
 {% block title %}{{ info.title }} · Analysis · {{ site_title }}{% endblock %}
+{% macro para(lines) %}{% if lines %}<p class="narrative">{{ lines | join(' ') }}</p>{% endif %}{% endmacro %}
+{% macro card(title, chart, extra='', cls='') %}{% if chart %}
+<section class="chart-card {{ cls }}"><h3>{{ title }}</h3>{{ extra | safe }}{{ chart | safe }}</section>{% endif %}{% endmacro %}
 {% block content %}
 {% set r = report %}
-<p class="small"><a href="/analysis?division={{ info.division | urlencode }}">← Analysis</a></p>
+{% set n = r.narrative %}
+<p class="small"><a href="/analysis?division={{ info.division | urlencode }}">← Analysis</a> ·
+  <a href="/analysis/seasons/{{ info.season }}?division={{ info.division | urlencode }}">CP-{{ info.season }} season</a></p>
 <h1>{{ info.title }} <span class="muted">· {{ info.division }}</span></h1>
-<p class="muted">{{ info.status | capitalize }} scores · {{ 'legacy file' if info.source == 'legacy' else 'sampled from the live board' }}
-  {{ info.sampled_at | local }}{% if info.revision > 1 %} (revision {{ info.revision }}){% endif %} ·
+<p class="muted">{{ info.status | capitalize }} scores · {{ 'legacy file' if info.source == 'legacy' else 'collected from the live board' }},
+  updated {{ info.sampled_at | local }}{% if info.revision > 1 %} (revision {{ info.revision }}){% endif %} ·
   images: {{ info.images | join(', ') }}</p>
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+{% if status %}<p class="notice">This data set is still filling: {{ status.collected }} of {{ status.played }} teams so far
+  ({{ status.playing }} still playing). The report covers the teams collected so far.</p>{% endif %}
 
-<h2>Findings</h2>
-<ul class="findings">{% for f in r.findings %}<li>{{ f }}</li>{% endfor %}</ul>
-
-<h2>Participation</h2>
-<div class="table-wrap">
-<table class="board">
-  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th>
-    <th class="num">Mean</th><th class="num">Best</th></tr></thead>
-  <tbody>
-  {% for key, label in [('national', 'Nationally'), ('state', r.state), ('district', 'District (incl. ours)'), ('ems', 'Our teams')] %}
-  {% set d = r.score[key] %}
-  <tr><td>{{ label }}</td><td class="num">{{ d.n }}</td><td class="num">{{ d.median | num }}</td>
-    <td class="num">{% if d.n > 1 %}{{ d.q1 | num }}–{{ d.q3 | num }}{% endif %}</td>
-    <td class="num">{{ d.mean | num }}</td><td class="num">{{ d.max | num }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-<p class="muted small">Play time: median {{ r.play_time.median | num }} minutes; {{ r.over_limit }} teams over the
-  6-hour limit.</p>
+<h2>In brief</h2>
+<ul class="findings">{% for f in n.summary %}<li>{{ f }}</li>{% endfor %}</ul>
+{{ para(n.overview + context) }}
 
 <h2>Our teams</h2>
 {% if not r.ems %}
-<p class="empty">None of our teams are in this sample.</p>
+<p class="empty">None of our teams are in this data set.</p>
 {% else %}
 <div class="table-wrap">
 <table class="board">
   <thead><tr><th>Team</th><th class="num">Score</th>{% if r.has_challenge %}<th class="num">Challenge</th>{% endif %}
     <th class="num">State</th><th class="num">National</th><th class="num">Outscored</th><th class="num">Play time</th>
-    {% for img in r.images %}<th class="num" title="Found / completion / score">{{ img.name }}</th>{% endfor %}</tr></thead>
+    {% for img in r.images %}<th class="num" title="Found · completion · score">{{ img.name }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for res in r.ems %}{% set t = res.team %}
   <tr><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
@@ -53,43 +44,159 @@
   </tbody>
 </table>
 </div>
+<p class="muted small">Per image: items found · completion (found ÷ the image's items) · score.</p>
+{% endif %}
+
+<h2>Scores</h2>
+{{ para(n.scores) }}
+<div class="charts">
+  {{ card('Score by state, highest median first', charts.state_boxes,
+          '<p class="chart-note">Boxes are the middle half of each state\'s teams, the line is the median and the whiskers reach 1.5× the box. ' ~ r.state ~ ' is highlighted; the dashed line is the national median.</p>', 'wide') }}
+  {{ card('Where teams landed', charts.strips, legend, 'wide') }}
+</div>
+<details class="table-view"><summary>Scores by group (table)</summary>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th>
+    <th class="num">Mean</th><th class="num">Best</th></tr></thead>
+  <tbody>
+  {% for key, label in [('national', 'Nationally'), ('state', r.state), ('district', 'District (incl. ours)'), ('ems', 'Our teams')] %}
+  {% set d = r.score[key] %}
+  <tr><td>{{ label }}</td><td class="num">{{ d.n }}</td><td class="num">{{ d.median | num }}</td>
+    <td class="num">{% if d.n > 1 %}{{ d.q1 | num }}–{{ d.q3 | num }}{% endif %}</td>
+    <td class="num">{{ d.mean | num }}</td><td class="num">{{ d.max | num }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if r.density %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>State</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th><th class="num">Best</th></tr></thead>
+  <tbody>{% for s in r.density.states %}<tr class="{{ 'watched' if s.state == r.state }}"><td>{{ s.state }}</td><td class="num">{{ s.n }}</td>
+    <td class="num">{{ s.score.median | num }}</td><td class="num">{% if s.n > 1 %}{{ s.score.q1 | num }}–{{ s.score.q3 | num }}{% endif %}</td>
+    <td class="num">{{ s.score.max | num }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+</details>
+
+<h2>Score and play time</h2>
+{{ para(n.time) }}
+<div class="charts pair">
+  {{ card('Score distribution', charts.score_hist, legend) }}
+  {{ card('Play time distribution', charts.time_hist) }}
+  {{ card('Score against play time', charts.heatmap, '<p class="chart-note">Darker cells hold more teams (15 minutes × a score band); our teams are the orange dots.</p>', 'wide') }}
+</div>
+
+{% if n.density %}
+<h2>Teams per state</h2>
+{{ para(n.density) }}
+<div class="charts">
+  {{ card("Teams per state against the state's median score", charts.density,
+          '<p class="chart-note">Each dot is a state; ' ~ r.state ~ ', the largest state and the highest median are labeled. The dashed line is the national median (of teams, not of states).</p>', 'wide') }}
+</div>
 {% endif %}
 
 <h2>Images</h2>
+{{ para(n.attempts) }}
+{{ para(n.images) }}
+<div class="charts pair">
+  {{ card('Score by number of images attempted', charts.attempts, legend) }}
+  {{ card('Completion per image', charts.completion, legend) }}
+</div>
 <div class="table-wrap">
 <table class="board">
   <thead><tr><th>Image</th><th class="num">Items</th><th class="num">Teams attempted</th><th class="num">Median completion</th>
-    <th class="num">Middle half</th><th class="num">Median score</th><th class="num">Best score</th></tr></thead>
+    <th class="num">Middle half</th><th class="num">Median score</th><th class="num">Best score</th><th class="num">Found everything</th></tr></thead>
   <tbody>
   {% for img in r.images %}
   <tr><td>{{ img.name }}</td><td class="num">{{ img.total_items or '' }}</td><td class="num">{{ img.attempted }}</td>
     <td class="num">{{ '%.0f%%' % (100 * img.completion.median) if img.completion.median is not none else '–' }}</td>
     <td class="num">{% if img.completion.n > 1 %}{{ '%.0f' % (100 * img.completion.q1) }}–{{ '%.0f%%' % (100 * img.completion.q3) }}{% endif %}</td>
-    <td class="num">{{ img.score.median | num }}</td><td class="num">{{ img.score.max | num }}</td></tr>
+    <td class="num">{{ img.score.median | num }}</td><td class="num">{{ img.score.max | num }}</td><td class="num">{{ img.perfect or '' }}</td></tr>
   {% endfor %}
   </tbody>
+</table>
+</div>
+<h3>Items found per image</h3>
+<div class="charts small-multiples">
+  {% for img in r.images %}{{ card(img.name ~ ' (' ~ (img.total_items or '?') ~ ' items)', charts['finds:' ~ img.name]) }}{% endfor %}
+</div>
+
+{% if n.challenge %}
+<h2>Challenge</h2>
+{{ para(n.challenge) }}
+{% endif %}
+
+<h2>In-round progress</h2>
+{% if r.progress %}
+{{ para(n.progress) }}
+<div class="charts">
+  {{ card('Score by time since each team started', charts.progress, progress_legend ~ '<p class="chart-note">Image scores only (the challenge isn\'t in the 5-minute history), from each team\'s first scored check.</p>', 'wide') }}
+</div>
+<details class="table-view"><summary>Progress by hour (table)</summary>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Hour</th><th class="num">Field median</th><th class="num">Middle half</th>
+    {% for team, _ in r.progress.ours %}<th class="num">{{ team }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for m in r.progress.minutes %}{% if m % 60 == 0 %}{% set k = loop.index0 %}
+  <tr><td>{{ m // 60 }} h</td><td class="num">{{ r.progress.median[k] | num }}</td>
+    <td class="num">{{ r.progress.q1[k] | num }}–{{ r.progress.q3[k] | num }}</td>
+    {% for _, s in r.progress.ours %}<td class="num">{{ s[k] | num }}</td>{% endfor %}</tr>{% endif %}{% endfor %}</tbody>
+</table>
+</div>
+</details>
+{% else %}
+<p class="empty">No 5-minute history in this data set.</p>
+{% endif %}
+
+<h2 id="top">Top teams</h2>
+<form method="get" action="#top" class="inline">
+  <label>Show
+    <select name="top" onchange="this.form.submit()">
+      {% for k in top_choices %}<option value="{{ k }}" {{ 'selected' if k == top }}>{{ k }}</option>{% endfor %}
+    </select> teams</label>
+  <noscript><button type="submit">Show</button></noscript>
+</form>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th class="num">National</th><th>Team</th><th>State</th><th class="num">State place</th><th class="num">Score</th></tr></thead>
+  <tbody>{% for t in r.teams[:top] %}
+  <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_division or loop.index }}</td>
+    <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td><td>{{ t.location }}</td>
+    <td class="num">{{ t.place_state_division or '' }}</td><td class="num strong">{{ t.score | num }}</td></tr>{% endfor %}</tbody>
 </table>
 </div>
 
 <h2>{{ r.state }} teams</h2>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th class="num">State</th><th>Team</th><th class="num">National</th><th class="num">Score</th>
+  <thead><tr><th class="num">State</th><th>Team</th><th class="num">National</th>{% if r.has_challenge %}<th class="num">Challenge</th>{% endif %}<th class="num">Score</th>
     <th class="num">Behind the team above</th><th class="num">Behind the leader</th></tr></thead>
   <tbody>
   {% for t, gap, lead in r.state_table %}
   <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_state_division or loop.index }}</td>
     <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
-    <td class="num">{{ t.place_division or '' }}</td><td class="num strong">{{ t.score | num }}</td>
+    <td class="num">{{ t.place_division or '' }}</td>{% if r.has_challenge %}<td class="num">{{ t.challenge_1 | num }}</td>{% endif %}<td class="num strong">{{ t.score | num }}</td>
     <td class="num">{{ gap | num if gap else '' }}</td><td class="num">{{ lead | num if lead else '' }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
 
+{% if others %}
+<form method="get" action="/analysis/compare" class="compare-form">
+  <input type="hidden" name="a" value="{{ info.id }}">
+  <label for="cmp-b"><strong>Compare with</strong></label>
+  <select id="cmp-b" name="b">{% for o in others %}<option value="{{ o.id }}">{{ o.title }} ({{ o.status }})</option>{% endfor %}</select>
+  <button type="submit">Compare</button>
+</form>
+{% endif %}
+
 <h2 id="notes">Coaches' notes</h2>
-<form method="post" action="/analysis/rounds/{{ info.id }}" class="stack compact">
-  <label for="label">Round name</label>
+<form method="post" action="/analysis/reports/{{ info.id }}" class="stack compact">
+  <label for="label">Report name</label>
   <input id="label" name="label" value="{{ info.label }}" maxlength="100">
   <label for="notes">Notes (interpretation, context, what to practice)</label>
   <textarea id="notes" name="notes" rows="8">{{ info.notes }}</textarea>
@@ -100,9 +207,11 @@
   <button type="submit">Save</button>
 </form>
 {% if me.is_admin %}
-<form method="post" action="/analysis/rounds/{{ info.id }}/delete" class="inline"
-      onsubmit="return confirm('Delete this round sample? It can be re-sampled while the round is on the board, or re-imported.')">
-  <button type="submit" class="danger">Delete this sample</button>
+<form method="post" action="/analysis/reports/{{ info.id }}/delete" class="inline"
+      onsubmit="return confirm('Delete this data set and its report? Live data sets fill again while the round is on the board; legacy ones can be re-imported.')">
+  <button type="submit" class="danger">Delete this data set</button>
 </form>
 {% endif %}
+<script src="{{ url_for('static', path='charts.js') }}" defer></script>
+<script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
 {% endblock %}

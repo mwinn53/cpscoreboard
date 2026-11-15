@@ -157,6 +157,30 @@ def test_limits_skip_and_log():
     store.close()
 
 
+def test_402_pauses_real_posts_until_a_test_post_goes_through():
+    from app.posting import CreditsDepleted
+    poster, sent, store = _poster()
+    broke = {"on": True}
+
+    class Broke:
+        target = "x"
+
+        async def post(self, text):
+            if broke["on"]:
+                raise CreditsDepleted("X API 402: CreditsDepleted")
+            sent.append(text)
+            return "id"
+    poster._factory = lambda s: Broke()
+    assert asyncio.run(poster.send(Post("change", "19-1001", "a"))) == "failed" and poster.paused_since()
+    assert asyncio.run(poster.send(Post("change", "19-1001", "b"))) == "skipped"
+    assert "paused" in poster.recent()[0].detail and sent == []
+    broke["on"] = False
+    assert asyncio.run(poster.send(Post("test", "", "test"), limits=False)) == "sent"
+    assert poster.paused_since() is None
+    assert asyncio.run(poster.send(Post("change", "19-1001", "c"))) == "sent"
+    store.close()
+
+
 def test_board_changed_posts_for_watched_teams_only():
     poster, sent, store = _poster()
     asyncio.run(poster.board_changed([team(0, 0), team(0, 0, number="19-9999")], AT))

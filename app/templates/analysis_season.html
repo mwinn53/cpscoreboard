@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}CP-{{ view.season }} · Analysis · {{ site_title }}{% endblock %}
+{% block content %}
+{% set sums = view.summaries %}
+<p class="small"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a> ·
+  <a href="/analysis/seasons?division={{ division | urlencode }}">All seasons</a></p>
+<h1>CP-{{ view.season }} <span class="muted">· {{ division }}</span></h1>
+<p class="narrative">{{ view.narrative | join(' ') }}</p>
+
+<div class="charts">
+  <section class="chart-card wide"><h3>Our teams' percentile by round</h3>
+    <p class="chart-note">The share of the division each team outscored, so rounds of different difficulty line up. The
+      {{ sums[0].state }} line is the state's median team.</p>
+    {{ view.chart | safe }}</section>
+</div>
+
+<h2>Rounds</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Report</th><th class="num">Teams</th><th class="num">{{ sums[0].state }}</th><th class="num">District</th>
+    <th class="num">Ours</th><th class="num">National median</th><th class="num">{{ sums[0].state }} median</th>
+    <th class="num">Our best</th><th class="num">Our median</th></tr></thead>
+  <tbody>{% for s in sums %}
+  <tr><td><a href="/analysis/reports/{{ s.info.id }}">{{ s.info.label }}</a> <span class="muted small">{{ s.info.status }}</span></td>
+    <td class="num">{{ s.counts.national }}</td><td class="num">{{ s.counts.state }}</td><td class="num">{{ s.counts.district }}</td>
+    <td class="num">{{ s.counts.ems }}</td><td class="num">{{ s.median.national | num }}</td><td class="num">{{ s.median.state | num }}</td>
+    <td class="num">{{ '%.0f%%' % s.best_pct if s.best_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % s.median_pct if s.median_pct is not none else '–' }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Our best and median: the share of the division they outscored.</p>
+
+<h2>Our teams by round</h2>
+{% if not view.teams %}
+<p class="empty">None of our teams are in this season's data sets.</p>
+{% else %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th>{% for s in sums %}<th class="num">{{ s.info.label }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for label, results in view.teams %}
+  <tr><td>{{ label }}</td>{% for s in sums %}{% set o = results.get(s.info.id) %}
+    <td class="num">{% if o %}<span class="strong">{{ '%.0f%%' % o.percentile }}</span>
+      <span class="muted small">{{ o.score | num }} pts{% if o.place_state %} · {{ o.place_state }} in {{ s.state }}{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Outscored (bold), then score and place in the state.</p>
+{% endif %}
+
+{% if view.families %}
+<h2>Completion by image family</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Family</th>{% for s in sums %}<th class="num">{{ s.info.label }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for f in view.families %}
+  <tr><td>{{ f }}</td>{% for s in sums %}{% set a = s.family_ours.get(f) %}{% set b = s.family_field.get(f) %}
+    <td class="num">{% if b is not none %}{{ '%.0f%%' % (100 * a) if a is not none else '–' }} <span class="muted small">/ {{ '%.0f%%' % (100 * b) }}</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Our median team's completion / the division's median completion.</p>
+{% endif %}
+<script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
+{% endblock %}

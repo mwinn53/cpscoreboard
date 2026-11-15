@@ -3,7 +3,7 @@
 {% block content %}
 <p class="small"><a href="/analysis">← Analysis</a></p>
 <h1>Legacy import</h1>
-<p>{{ saved | length }} round sample{{ 's' if saved | length != 1 }} imported.</p>
+<p>{{ saved | length }} data set{{ 's' if saved | length != 1 }} imported.</p>
 <div class="table-wrap">
 <table class="board">
   <thead><tr><th>File</th><th>Result</th><th class="num">Rows skipped</th></tr></thead>
@@ -16,7 +16,7 @@
 </table>
 </div>
 {% if saved %}
-<h2>Imported rounds</h2>
-<ul>{% for r in saved %}<li><a href="/analysis/rounds/{{ r.id }}">{{ r.title }}</a> · {{ r.division }} · {{ r.status }} · {{ r.team_count }} teams</li>{% endfor %}</ul>
+<h2>Reports</h2>
+<ul>{% for r in saved %}<li><a href="/analysis/reports/{{ r.id }}">{{ r.title }}</a> · {{ r.division }} · {{ r.status }} · {{ r.team_count }} teams</li>{% endfor %}</ul>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Seasons · Analysis · {{ site_title }}{% endblock %}
+{% block content %}
+{% set sums = view.summaries %}
+<p class="small"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a></p>
+<h1>Season over season <span class="muted">· {{ division }}</span></h1>
+<form method="get" action="/analysis/seasons" class="inline">
+  <label>Division
+    <select name="division" onchange="this.form.submit()">
+      {% for d in choices %}<option value="{{ d }}" {{ 'selected' if d == division }}>{{ d }}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit">Show</button></noscript>
+</form>
+{% if not sums %}
+<p class="empty">No reports for {{ division }} yet.</p>
+{% else %}
+{% set state = sums[0].state %}
+<p class="narrative">{{ view.narrative | join(' ') }}</p>
+
+<div class="charts">
+  <section class="chart-card wide"><h3>Percentile by round</h3>
+    <p class="chart-note">The share of the division our best and our median team outscored, and where {{ state }}'s
+      median team fell. One report per round (final scores where there are both).</p>
+    {{ view.chart | safe }}</section>
+</div>
+
+<h2>Participation</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Round</th>{% for season in view.seasons %}<th class="num"><a href="/analysis/seasons/{{ season }}?division={{ division | urlencode }}">CP-{{ season }}</a></th>{% endfor %}</tr></thead>
+  <tbody>{% for label in view.labels %}
+  <tr><td>{{ label }}</td>{% for season in view.seasons %}{% set s = view.grid.get((label, season)) %}
+    <td class="num">{% if s %}<a href="/analysis/reports/{{ s.info.id }}">{{ s.counts.national }}</a>
+      <span class="muted small">· {{ state }} {{ s.counts.state }} · district {{ s.counts.district }} · ours {{ s.counts.ems }}</span>{% else %}<span class="muted">no data</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Teams nationally, then in {{ state }}, in the district (incl. ours) and ours.</p>
+
+<h2>Results</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Report</th><th class="num">National median</th><th class="num">{{ state }} median</th>
+    <th class="num">{{ state }} median team</th><th class="num">Our best</th><th class="num">Our median</th>
+    {% for f in view.families %}<th class="num">{{ f }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for s in sums %}
+  <tr><td><a href="/analysis/reports/{{ s.info.id }}">{{ s.short }}</a> <span class="muted small">{{ s.info.status }}</span></td>
+    <td class="num">{{ s.median.national | num }}</td><td class="num">{{ s.median.state | num }}</td>
+    <td class="num">{{ '%.0f%%' % s.state_median_pct if s.state_median_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % s.best_pct if s.best_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % s.median_pct if s.median_pct is not none else '–' }}</td>
+    {% for f in view.families %}{% set a = s.family_ours.get(f) %}{% set b = s.family_field.get(f) %}
+    <td class="num">{% if b is not none %}{{ '%.0f%%' % (100 * a) if a is not none else '–' }} <span class="muted small">/ {{ '%.0f%%' % (100 * b) }}</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Percentages after the medians are the share of the division outscored. Image families: our median
+  team's completion / the division's median completion.</p>
+{% endif %}
+<script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
+{% endblock %}

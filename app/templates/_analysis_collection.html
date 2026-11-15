@@ -1,0 +1,44 @@
+{# Collection status for one division (included by analysis.html; refreshed by htmx every 30 s). #}
+{% if not collector %}
+<p class="empty">Collection is off here (replay mode).</p>
+{% elif division not in configured %}
+<p class="muted">{{ division or 'This division' }} isn't collected{% if me.is_admin %}; choose it under "Divisions to collect" below{% endif %}.</p>
+{% else %}
+{% set st = status %}
+{% if not st or not st.played %}
+<p class="muted">Waiting for {{ division }} teams with play time on the board. Each team is collected once its play time
+  stops moving for 20 minutes.</p>
+{% else %}
+<div class="collect">
+  <div class="collect-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ st.played }}" aria-valuenow="{{ st.collected }}"
+       aria-label="Teams collected">
+    <span style="width: {{ st.percent }}%"></span>
+  </div>
+  <p><strong>{{ st.collected }}</strong> of {{ st.played }} teams' data sets complete ({{ st.percent }}%)
+    {%- if st.complete %}: <strong>done</strong>{% endif %}.
+    {% if st.fetching %}{{ st.fetching }} fetching now · {% endif %}
+    {% if st.waiting %}{{ st.waiting }} waiting{% if st.eta_seconds and collector.concurrency() %} · about
+    {{ (st.eta_seconds / 60) | round(0, 'ceil') | int }} min to catch up{% endif %} · {% endif %}
+    {% if st.playing %}{{ st.playing }} still playing{% endif %}
+    {% if st.round_id %}· <a href="/analysis/reports/{{ st.round_id }}">report so far</a>{% endif %}</p>
+  {% if collector.concurrency() == 0 %}<p class="error">Collection is paused.</p>{% endif %}
+</div>
+{% endif %}
+{% if collector.last_error %}<p class="muted small">Last problem: {{ collector.last_error }}</p>{% endif %}
+{% if me.is_admin %}
+<form method="post" action="/analysis/throttle" class="throttle" hx-post="/analysis/throttle" hx-target="#collection"
+      hx-trigger="change from:#concurrency">
+  <input type="hidden" name="division" value="{{ division }}">
+  <label for="concurrency">Teams fetched at once
+    <output id="concurrency-out" for="concurrency">{{ collector.concurrency() or 'paused' }}</output></label>
+  <input id="concurrency" name="concurrency" type="range" min="0" max="{{ max_concurrency }}" step="1"
+         value="{{ collector.concurrency() }}"
+         oninput="document.getElementById('concurrency-out').textContent = this.value == 0 ? 'paused' : this.value">
+  <noscript><button type="submit">Save</button></noscript>
+  <p class="muted small">Each team is three requests to the public scoreboard, then a short pause. 1 is a gentle
+    trickle; 0 pauses collection.</p>
+</form>
+{% else %}
+<p class="muted small">Fetching {{ collector.concurrency() or 'no' }} team{{ 's' if collector.concurrency() != 1 }} at a time.</p>
+{% endif %}
+{% endif %}

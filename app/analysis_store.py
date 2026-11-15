@@ -1,8 +1,8 @@
-"""Round samples for the Analysis tab: one frozen copy of a round's results per division.
+"""Data sets for the Analysis tab: one copy of a round's results per division.
 
-A *round sample* is everything the analysis needs, captured once the round's
-scoring has gone quiet (app/analysis_sampler.py) or imported from the legacy
-season files (app/analysis_legacy.py):
+A *data set* (a "round sample" in the code) is everything a report needs. Live
+data sets fill in a team at a time as teams finish playing (app/analysis_collector.py);
+legacy ones are imported from the old season files (app/analysis_legacy.py):
 
 * ``analysis_rounds``: which season, round and division; when sampled; the
   coaches' notes. Season comes from team numbers / image names (``cp19`` = 19);
@@ -14,9 +14,11 @@ season files (app/analysis_legacy.py):
   penalties, score, time).
 * ``analysis_timeline``: per team and image, the scoreboard's 5-minute score
   history for the round (in-round comparisons).
+* ``analysis_collected``: for live data sets, which teams are in and the score
+  they had when collected (a later score change collects the team again).
 
-Samples don't change when the live board does, so reports are reproducible; a
-re-sample replaces the rows and bumps ``revision``.
+An imported data set doesn't change; importing again replaces its rows and bumps
+``revision``. ``sampled_at`` is when a data set last changed.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import (Column, DateTime, Float, ForeignKey, Index, Integer, String, Table, Text, UniqueConstraint,
-                        delete, insert, select, update)
+                        delete, func, insert, select, update)
 
 from .store import SnapshotStore, _from_db, _to_db, metadata
 
@@ -106,6 +108,17 @@ analysis_timeline = Table(
     Column("at", DateTime, nullable=False),
     Column("score", Float, nullable=False),
     Index("ix_analysis_timeline_round", "round_id"),
+)
+
+analysis_collected = Table(
+    "analysis_collected", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("round_id", Integer, ForeignKey("analysis_rounds.id", ondelete="CASCADE"), nullable=False),
+    Column("team_number", String(32), nullable=False),
+    Column("score_key", String(64), nullable=False),
+    Column("collected_at", DateTime, nullable=False),
+    UniqueConstraint("round_id", "team_number", name="uq_analysis_collected"),
+    Index("ix_analysis_collected_team", "team_number"),
 )
 
 # --- names ---
@@ -268,7 +281,7 @@ class AnalysisStore:
                 values.pop("label")  # keep a coach's rename
                 conn.execute(update(analysis_rounds).where(r.id == round_id)
                              .values(**values, revision=existing.revision + 1))
-                for t in (analysis_teams, analysis_images, analysis_timeline):
+                for t in (analysis_teams, analysis_images, analysis_timeline, analysis_collected):
                     conn.execute(delete(t).where(t.c.round_id == round_id))
             if sample.teams:
                 conn.execute(insert(analysis_teams), [{"round_id": round_id, **vars(t)} for t in sample.teams])
@@ -322,6 +335,71 @@ class AnalysisStore:
                                 .order_by(t.at)).all()
         return [(r.team_number, r.image, _from_db(r.at), r.score) for r in rows]
 
+    # --- live data sets, a team at a time ---
+
+    def save_team(self, season: int, round_key: str, division: str, team: TeamRow, images: list[ImageRow],
+                  timeline: list[tuple[str, datetime, float]], score_key: str, at: datetime) -> RoundInfo:
+        """Add (or replace) one team in the round's live data set, creating the data set if needed."""
+        r = analysis_rounds.c
+        with self.store.lock, self.store.engine.begin() as conn:
+            existing = conn.execute(select(analysis_rounds).where(
+                r.season == season, r.round_key == round_key, r.division == division, r.source == LIVE)
+                .order_by(r.id.desc())).first()
+            if existing is None:
+                round_id = conn.execute(insert(analysis_rounds).values(
+                    season=season, round_key=round_key, label=default_label(round_key), division=division,
+                    status=PRELIMINARY, source=LIVE, sampled_at=_to_db(at), revision=1)).inserted_primary_key[0]
+                names: set[str] = set()
+            else:
+                round_id = existing.id
+                names = {x for x in existing.images.split(",") if x}
+            for t in (analysis_teams, analysis_images, analysis_timeline, analysis_collected):
+                conn.execute(delete(t).where(t.c.round_id == round_id, t.c.team_number == team.team_number))
+            conn.execute(insert(analysis_teams).values(round_id=round_id, **vars(team)))
+            if images:
+                conn.execute(insert(analysis_images), [{"round_id": round_id, **vars(i)} for i in images])
+            if timeline:
+                conn.execute(insert(analysis_timeline), [
+                    {"round_id": round_id, "team_number": team.team_number, "image": img, "at": _to_db(t),
+                     "score": s} for img, t, s in timeline])
+            conn.execute(insert(analysis_collected).values(round_id=round_id, team_number=team.team_number,
+                                                           score_key=score_key, collected_at=_to_db(at)))
+            count = conn.scalar(select(func.count()).select_from(analysis_teams)
+                                .where(analysis_teams.c.round_id == round_id))
+            names |= {i.image for i in images}
+            conn.execute(update(analysis_rounds).where(r.id == round_id).values(
+                team_count=count, images=",".join(sorted(names)), sampled_at=_to_db(at)))
+        return self.get(round_id)
+
+    def collected(self, division: str) -> dict[str, tuple[int, str]]:
+        """team -> (data set id, score key) of its latest collection in this division's live data sets."""
+        c, r = analysis_collected.c, analysis_rounds.c
+        q = (select(c.team_number, c.round_id, c.score_key, c.collected_at)
+             .join(analysis_rounds, r.id == c.round_id).where(r.division == division, r.source == LIVE)
+             .order_by(c.collected_at))
+        with self.store.lock, self.store.engine.connect() as conn:
+            return {row.team_number: (row.round_id, row.score_key) for row in conn.execute(q)}
+
+    def refresh_teams(self, round_id: int, rows: dict[str, dict], at: datetime) -> int:
+        """Update collected teams' board fields (places move as other teams finish). Returns rows changed."""
+        if not rows:
+            return 0
+        cols = sorted({k for v in rows.values() for k in v})
+        t = analysis_teams.c
+        changed = 0
+        with self.store.lock, self.store.engine.begin() as conn:
+            current = conn.execute(select(t.team_number, *[t[k] for k in cols]).where(t.round_id == round_id)).all()
+            for row in current:
+                new = rows.get(row.team_number)
+                if new and any(getattr(row, k) != v for k, v in new.items()):
+                    conn.execute(update(analysis_teams).where(t.round_id == round_id,
+                                                              t.team_number == row.team_number).values(**new))
+                    changed += 1
+            if changed:
+                conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id)
+                             .values(sampled_at=_to_db(at)))
+        return changed
+
     def update_round(self, round_id: int, **values) -> None:
         allowed = {k: v for k, v in values.items() if k in ("label", "notes", "status")}
         if allowed:
@@ -330,7 +408,7 @@ class AnalysisStore:
 
     def delete_round(self, round_id: int) -> None:
         with self.store.lock, self.store.engine.begin() as conn:
-            for t in (analysis_teams, analysis_images, analysis_timeline):
+            for t in (analysis_teams, analysis_images, analysis_timeline, analysis_collected):
                 conn.execute(delete(t).where(t.c.round_id == round_id))
             conn.execute(delete(analysis_rounds).where(analysis_rounds.c.id == round_id))
 

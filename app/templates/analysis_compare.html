@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Compare · Analysis · {{ site_title }}{% endblock %}
+{% block content %}
+{% set a, b = view.a, view.b %}
+<p class="small"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a></p>
+<h1>{{ a.short }} <span class="muted">vs</span> {{ b.short }} <span class="muted">· {{ division }}</span></h1>
+<p class="narrative">{{ view.narrative | join(' ') }}</p>
+
+<div class="charts">
+  <section class="chart-card wide"><h3>Percentiles in the two reports</h3>{{ view.chart | safe }}</section>
+</div>
+
+<h2>Side by side</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th></th><th class="num"><a href="/analysis/reports/{{ a.info.id }}">{{ a.short }}</a> <span class="muted small">{{ a.info.status }}</span></th>
+    <th class="num"><a href="/analysis/reports/{{ b.info.id }}">{{ b.short }}</a> <span class="muted small">{{ b.info.status }}</span></th></tr></thead>
+  <tbody>
+  {% for key, label in [('national', 'Teams nationally'), ('state', 'Teams in ' ~ a.state), ('district', 'District teams (incl. ours)'), ('ems', 'Our teams')] %}
+  <tr><td>{{ label }}</td><td class="num">{{ a.counts[key] }}</td><td class="num">{{ b.counts[key] }}</td></tr>{% endfor %}
+  <tr><td>National median score</td><td class="num">{{ a.median.national | num }}</td><td class="num">{{ b.median.national | num }}</td></tr>
+  <tr><td>{{ a.state }} median score</td><td class="num">{{ a.median.state | num }}</td><td class="num">{{ b.median.state | num }}</td></tr>
+  <tr><td>{{ a.state }} median team outscored</td><td class="num">{{ '%.0f%%' % a.state_median_pct if a.state_median_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % b.state_median_pct if b.state_median_pct is not none else '–' }}</td></tr>
+  <tr><td>Our best team outscored</td><td class="num">{{ '%.0f%%' % a.best_pct if a.best_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % b.best_pct if b.best_pct is not none else '–' }}</td></tr>
+  <tr><td>Our median team outscored</td><td class="num">{{ '%.0f%%' % a.median_pct if a.median_pct is not none else '–' }}</td>
+    <td class="num">{{ '%.0f%%' % b.median_pct if b.median_pct is not none else '–' }}</td></tr>
+  {% if a.challenge_median is not none or b.challenge_median is not none %}
+  <tr><td>Challenge median</td><td class="num">{{ a.challenge_median | num }}</td><td class="num">{{ b.challenge_median | num }}</td></tr>{% endif %}
+  {% for f in view.families %}
+  <tr><td>{{ f }} completion <span class="muted small">ours / division</span></td>
+    {% for s in (a, b) %}{% set x = s.family_ours.get(f) %}{% set y = s.family_field.get(f) %}
+    <td class="num">{% if y is not none %}{{ '%.0f%%' % (100 * x) if x is not none else '–' }} <span class="muted small">/ {{ '%.0f%%' % (100 * y) }}</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if view.matched %}
+<h2>Our teams</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th class="num">Outscored</th><th class="num">Change</th><th class="num">Score</th><th class="num">{{ a.state }} place</th><th class="num">National place</th></tr></thead>
+  <tbody>{% for oa, ob in view.matched %}{% set d = ob.percentile - oa.percentile %}
+  <tr><td>{{ ob.label }}</td><td class="num">{{ '%.0f' % oa.percentile }}% → {{ '%.0f' % ob.percentile }}%</td>
+    <td class="num {{ 'delta up' if d > 0.5 }}">{{ '%+.0f' % d }}</td><td class="num">{{ oa.score | num }} → {{ ob.score | num }}</td>
+    <td class="num">{{ oa.place_state or '–' }} → {{ ob.place_state or '–' }}</td><td class="num">{{ oa.place_national or '–' }} → {{ ob.place_national or '–' }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+
+<h2>Images</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Image</th><th class="num">{{ a.short }} median completion</th><th class="num">{{ b.short }} median completion</th></tr></thead>
+  <tbody>{% for img in view.images %}{% set x = a.image_completion.get(img) %}{% set y = b.image_completion.get(img) %}
+  <tr><td>{{ img }}</td><td class="num">{{ '%.0f%%' % (100 * x) if x is not none else '–' }}</td><td class="num">{{ '%.0f%%' % (100 * y) if y is not none else '–' }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
+{% endblock %}
