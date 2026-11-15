@@ -75,6 +75,9 @@
   {% endcall %}
 </h2>
 <p class="muted">Posts about the watched teams during a round.</p>
+{% if x_paused %}<p class="error" role="alert">Paused: X answered 402 (API credits used up) at {{ x_paused | local }}, so
+  real posts are skipped. Add credits in the X Developer Console, then send a test post below; posting resumes when one
+  goes through.</p>{% endif %}
 <form method="post" action="/admin/config/posting" class="stack compact">
   <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if post.enabled }}> Posting enabled</label>
   <fieldset class="choices">

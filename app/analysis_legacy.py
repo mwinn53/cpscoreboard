@@ -227,4 +227,21 @@ def import_files(files: list[tuple[str, bytes]], now: datetime | None = None) ->
             label=parsed.label.replace("Semi-Finals", "Semifinal").replace("Semi-Final Round", "Semifinal")))
         result.files.append(FileResult(name, f"{len(teams)} teams, {len(images)} image rows{t_note}", ok=True,
                                        skipped_rows=skipped + t_skipped))
+    _share_names(result.samples)
     return result
+
+
+def _share_names(samples: list[Sample]) -> None:
+    """Some files have no team names (CP-XI Round 1): team numbers last a season, so borrow them from its other rounds."""
+    known: dict[tuple[int, str], dict[str, tuple[str, str]]] = {}
+    for s in samples:
+        for t in s.teams:
+            if t.grp:
+                known.setdefault((s.season, s.division), {})[t.team_number] = (t.name, t.grp)
+    for s in samples:
+        if any(t.grp for t in s.teams):
+            continue
+        names = known.get((s.season, s.division), {})
+        for t in s.teams:
+            if t.team_number in names:
+                t.name, t.grp = names[t.team_number]

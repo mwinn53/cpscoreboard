@@ -42,7 +42,7 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
                  saved_credentials=poster.credentials.saved(),
                  secrets_available=poster.box.available,
                  credentials_ok=poster.credentials.get() is not None,
-                 recent=poster.recent(), detail=state.detail,
+                 recent=poster.recent(), detail=state.detail, x_paused=poster.paused_since(),
                  detail_teams=[(n, state.detail.latest.get(n, (None, []))[0]) for n in state.board.watchlist]
                  if state.detail else [])
 

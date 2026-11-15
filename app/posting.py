@@ -186,6 +186,13 @@ def oauth1_header(method: str, url: str, creds: dict[str, str], *, nonce: str | 
     return "OAuth " + ", ".join(f'{_pct(k)}="{_pct(v)}"' for k, v in sorted(params.items()))
 
 
+class CreditsDepleted(RuntimeError):
+    """X answered 402: the account's API credits are used up."""
+
+
+PAUSED_KEY = "x_paused_since"  # set when X said 402; real posts are skipped until a test post goes through
+
+
 class XNotifier:
     target = "x"
 
@@ -195,6 +202,8 @@ class XNotifier:
     async def post(self, text: str) -> str:
         resp = await self.client.post(self.url, json={"text": text},
                                       headers={"Authorization": oauth1_header("POST", self.url, self.creds)})
+        if resp.status_code == 402:
+            raise CreditsDepleted(f"X API 402: {resp.text[:300]}")
         if resp.status_code >= 400:
             raise RuntimeError(f"X API {resp.status_code}: {resp.text[:300]}")
         return str(resp.json().get("data", {}).get("id", ""))
@@ -397,6 +406,13 @@ class Poster:
         return [PostRecord(_from_db(r.at), r.kind, r.team_number, r.text, r.target, r.status, r.detail)
                 for r in rows]
 
+    def paused_since(self) -> datetime | None:
+        raw = self.board.get_value(PAUSED_KEY)
+        return datetime.fromisoformat(raw) if raw else None
+
+    def resume(self) -> None:
+        self.board.set_value(PAUSED_KEY, "")
+
     def compose(self, text: str, settings: PostSettings) -> str:
         full = f"{text} {settings.footer}".strip() if settings.footer else text
         return full if len(full) <= X_MAX_CHARS else full[:X_MAX_CHARS - 1] + "…"
@@ -412,6 +428,10 @@ class Poster:
                 await asyncio.to_thread(self._record, post, text, "x", "skipped", "X credentials are incomplete")
                 return "skipped"
             return "off"
+        if limits and notifier.target == "x" and (paused := await asyncio.to_thread(self.paused_since)):
+            why = f"paused: X said the credits are used up ({paused:%b %d %H:%M} UTC); a test post resumes"
+            await asyncio.to_thread(self._record, post, text, notifier.target, "skipped", why)
+            return "skipped"
         if limits and notifier.target == "x":
             now = datetime.now(UTC)
             hour = await asyncio.to_thread(self._sent_since, now - timedelta(hours=1))
@@ -423,6 +443,13 @@ class Poster:
         try:
             detail = await notifier.post(text)
             status = "sent"
+            if notifier.target == "x" and await asyncio.to_thread(self.paused_since):
+                await asyncio.to_thread(self.resume)
+                log.info("X posting resumed after a successful post")
+        except CreditsDepleted as e:
+            log.warning("X credits are used up; pausing real posts: %s", e)
+            await asyncio.to_thread(self.board.set_value, PAUSED_KEY, datetime.now(UTC).isoformat(timespec="seconds"))
+            detail, status = str(e), "failed"
         except Exception as e:
             log.warning("Post failed: %s", e)
             detail, status = str(e), "failed"

@@ -4,10 +4,10 @@
 {% block content %}
 <h1>Analysis
   {% call info("analysis-help", "About the analysis") %}
-  Each round is analyzed from a <strong>sample</strong>: every team in the division, with per-image results and the
-  scoreboard's 5-minute score history, taken once scoring has gone quiet (about a day after the last score change,
-  usually 72 hours after the round starts). Samples don't change when the live board does, so reports can be
-  compared across rounds and seasons. Rounds from CP-XI to CP-XIV come from the legacy analysis files.
+  Each round's report is built from a <strong>data set</strong>: every team in the division, with its per-image
+  results and the scoreboard's 5-minute score history. Live data sets fill in a team at a time, as each team finishes
+  playing; rounds from CP-XI to CP-XIV come from the legacy analysis files. Reports compare within a round, and the
+  season pages compare rounds and seasons.
   {% endcall %}
 </h1>
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
@@ -21,71 +21,69 @@
   <noscript><button type="submit">Show</button></noscript>
 </form>
 
-<h2>Rounds</h2>
+<h2>Collection</h2>
+<div id="collection" hx-get="/analysis/partials/collection?division={{ division | urlencode }}" hx-trigger="every 30s"
+     hx-swap="innerHTML">
+{% include "_analysis_collection.html" %}
+</div>
+
+<h2>Reports</h2>
 {% if not rounds %}
-<p class="empty">No samples for {{ division or 'this division' }} yet.</p>
+<p class="empty">No data sets for {{ division or 'this division' }} yet.</p>
 {% else %}
+<p class="small"><a href="/analysis/seasons?division={{ division | urlencode }}">Compare seasons →</a></p>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Round</th><th>Scores</th><th class="num">Teams</th><th>Images</th><th>Sampled</th><th>Source</th></tr></thead>
+  <thead><tr><th>Report</th><th>Scores</th><th class="num">Teams</th><th>Images</th><th>Updated</th><th>Source</th></tr></thead>
+  {% for season, rs in seasons.items() %}
   <tbody>
-  {% for r in rounds %}
-  <tr><td><a href="/analysis/rounds/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.status }}</td>
+  <tr class="season-row"><th colspan="6"><a href="/analysis/seasons/{{ season }}?division={{ division | urlencode }}">CP-{{ season }}</a>
+    <span class="muted small">· {{ rs | length }} report{{ 's' if rs | length != 1 }}, compare the season's rounds →</span></th></tr>
+  {% for r in rs %}
+  <tr><td><a href="/analysis/reports/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.status }}</td>
     <td class="num">{{ r.team_count }}</td><td class="small">{{ r.images | join(', ') }}</td>
     <td>{{ r.sampled_at | local }}{% if r.revision > 1 %} <span class="muted small">(rev. {{ r.revision }})</span>{% endif %}</td>
     <td>{{ 'legacy file' if r.source == 'legacy' else 'live board' }}</td></tr>
   {% endfor %}
   </tbody>
+  {% endfor %}
 </table>
 </div>
-{% endif %}
 
-<h2>Sampling</h2>
-{% if not sampler %}
-<p class="empty">Sampling is off here (replay mode).</p>
-{% else %}
-<p>Sampled automatically: <strong>{{ configured | join(', ') or 'none' }}</strong> · after
-  <strong>{{ sampler.quiet_hours() | num }}</strong> hours without a score change.
-  {% if last_change %}Last score change: <strong>{{ last_change | local }}</strong>{% if due_at %}; a sample is due from
-  {{ due_at | local }} (if one isn't already taken).{% endif %}{% else %}No score change seen yet.{% endif %}
-  {% if sampler.running %}<span class="badge">sampling {{ sampler.running | join(', ') }}…</span>{% endif %}</p>
-{% if sampler.last_error %}<p class="error">Last problem: {{ sampler.last_error }}</p>{% endif %}
-{% if division in on_board %}
-<form method="post" action="/analysis/sample" class="inline">
-  <input type="hidden" name="division" value="{{ division }}">
-  <button type="submit">Sample {{ division }} now</button>
-  {% call info("sample-help", "About sampling now") %}
-  Takes a sample of the division from the board as it is now: about three requests per team to the public
-  scoreboard, a few at a time, so a few minutes for a couple of hundred teams. Sampling the same round again replaces
-  its sample (the revision number goes up).
-  {% endcall %}
+{% if rounds | length > 1 %}
+<form method="get" action="/analysis/compare" class="compare-form">
+  <strong>Compare two reports</strong>
+  <label class="sr-only" for="cmp-a">First report</label>
+  <select id="cmp-a" name="a">{% for r in rounds %}<option value="{{ r.id }}" {{ 'selected' if loop.index == 2 }}>{{ r.title }} ({{ r.status }})</option>{% endfor %}</select>
+  <span class="muted">with</span>
+  <label class="sr-only" for="cmp-b">Second report</label>
+  <select id="cmp-b" name="b">{% for r in rounds %}<option value="{{ r.id }}" {{ 'selected' if loop.first }}>{{ r.title }} ({{ r.status }})</option>{% endfor %}</select>
+  <button type="submit">Compare</button>
 </form>
+{% endif %}
 {% endif %}
 
 {% if me.is_admin %}
+{% if collector %}
 <details class="admin-box">
-  <summary>Sampling settings</summary>
+  <summary>Divisions to collect</summary>
   <form method="post" action="/analysis/settings" class="stack compact">
+    <input type="hidden" name="division" value="{{ division }}">
     <fieldset class="choices">
-      <legend>Divisions to sample automatically</legend>
+      <legend>Collect these divisions as teams finish</legend>
       {% for d in (on_board + configured) | unique | sort %}
       <label><input type="checkbox" name="divisions" value="{{ d }}" {{ 'checked' if d in configured }}> {{ d }}</label>
       {% endfor %}
     </fieldset>
-    <label for="quiet_hours">Sample after this many hours without a score change</label>
-    <input id="quiet_hours" name="quiet_hours" type="number" min="1" max="240" step="1" value="{{ sampler.quiet_hours() | num }}">
     <button type="submit">Save</button>
   </form>
 </details>
 {% endif %}
-{% endif %}
-
-{% if me.is_admin %}
 <details class="admin-box">
   <summary>Import legacy analysis files</summary>
   <p class="muted">The CSVs from the old analysis (<code>legacy/cpdataanalysis/shiny/products</code>), e.g.
     <code>CP-XIV Round 1 Middle School Division_scores_final.csv</code> with its matching <code>_times_</code> file.
-    Select them all; other files are skipped, and importing again replaces those rounds.</p>
+    Select them all; other files are skipped, and importing again replaces those data sets.</p>
   <form method="post" action="/analysis/import" enctype="multipart/form-data" class="stack compact">
     <input type="file" name="files" accept=".csv" multiple required>
     <button type="submit">Import</button>
