@@ -6,8 +6,8 @@
 {% else %}
 {% set st = status %}
 {% if not st or not st.played %}
-<p class="muted">Waiting for {{ division }} teams with play time on the board. Each team is collected once its play time
-  stops moving for 20 minutes.</p>
+<p class="muted">Waiting for {{ division }} teams with play time on the board. Each team is collected once it has played
+  at least 4 hours and been idle for 60 minutes (or idle for 6 hours, if it stopped short of 4 hours).</p>
 {% else %}
 <div class="collect">
   <div class="collect-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ st.played }}" aria-valuenow="{{ st.collected }}"
@@ -19,7 +19,7 @@
     {% if st.fetching %}{{ st.fetching }} fetching now · {% endif %}
     {% if st.waiting %}{{ st.waiting }} waiting{% if st.eta_seconds and collector.concurrency() %} · about
     {{ (st.eta_seconds / 60) | round(0, 'ceil') | int }} min to catch up{% endif %} · {% endif %}
-    {% if st.playing %}{{ st.playing }} still playing{% endif %}
+    {% if st.playing %}{{ st.playing }} not finished yet{% endif %}
     {% if st.round_id %}· <a href="/analysis/reports/{{ st.round_id }}">report so far</a>{% endif %}</p>
   {% if collector.concurrency() == 0 %}<p class="error">Collection is paused.</p>{% endif %}
 </div>

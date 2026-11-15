@@ -233,7 +233,7 @@ def _collector(watch=(), n=3):
     store = SnapshotStore("sqlite://")
     board = BoardConfig(store)
     board.seed(list(watch), "", "", "", "", "Watched", "EMS")
-    teams = [t for t in parse_scores(BOARD) if t.division == "Middle School" and t.play_time][:n]
+    teams = [t for t in parse_scores(BOARD) if t.division == "Middle School" and (t.play_time or 0) >= 4 * 3600][:n]
     calls = []
 
     def handler(request):
@@ -256,7 +256,9 @@ def test_collector_waits_for_play_time_to_stop_then_collects_a_team_at_a_time():
     c, store, box, calls, clock = _collector()
     assert c.divisions() == ["Middle School"] and c.concurrency() == 1
     assert c.plan() == [] and c.status["Middle School"].playing == 3      # just seen: still playing
-    clock.now = T0 + timedelta(minutes=21)
+    clock.now = T0 + timedelta(minutes=59)
+    assert c.plan() == []                                                  # idle, but not for an hour yet
+    clock.now = T0 + timedelta(minutes=61)
     pending = c.plan()
     st = c.status["Middle School"]
     assert len(pending) == 3 and (st.waiting, st.collected, st.played) == (3, 0, 3) and st.eta_seconds > 0
@@ -289,12 +291,24 @@ def test_collector_waits_for_play_time_to_stop_then_collects_a_team_at_a_time():
     store.close()
 
 
+def test_collector_waits_longer_for_teams_that_stopped_short_of_4_hours():
+    c, store, box, calls, clock = _collector(n=1)
+    short = dataclasses.replace(box["teams"][0], play_time=2 * 3600)
+    box["teams"] = [short]
+    c.plan()
+    clock.now = T0 + timedelta(hours=5)
+    assert c.plan() == [] and c.status["Middle School"].playing == 1
+    clock.now = T0 + timedelta(hours=6, minutes=1)
+    assert [t.team_number for t in c.plan()] == [short.team_number]
+    store.close()
+
+
 def test_collector_marks_our_teams():
     c, store, box, calls, clock = _collector(n=2)
     c.board.add_watch(box["teams"][0].team_number)
     clock.now = T0
     c.plan()
-    clock.now = T0 + timedelta(minutes=25)
+    clock.now = T0 + timedelta(minutes=65)
     for t in c.plan():
         asyncio.run(c.collect(t))
     info = c.store.get(c.plan() and None or c.status["Middle School"].round_id)
@@ -363,7 +377,7 @@ def test_collection_panel_and_throttle(site):  # noqa: F811
     app.state.collector = c
     clock.now = T0 + timedelta(minutes=30)
     c.observe(box["teams"])
-    clock.now = T0 + timedelta(minutes=60)
+    clock.now = T0 + timedelta(minutes=95)
     c.plan()
     page = admin.get("/analysis/partials/collection?division=Middle+School").text
     assert "0</strong> of 3 teams' data sets complete" in page and "3 waiting" in page and 'type="range"' in page

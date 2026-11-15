@@ -2,11 +2,15 @@
 
 The poller keeps the full board in memory. For each division chosen in the
 settings (Middle School by default), the collector watches every team's **play
-time**: once it has stopped moving for ``DONE_AFTER`` the team is done, and its
-per-image results, challenge scores and 5-minute image history are fetched from its
-subpages on the public scoreboard (three requests) and saved to the round's data
-set (app/analysis_store.py). Teams finish across the whole weekend, so collection is
-a trickle rather than one burst at the end.
+time**. Reports are written after the round, so a team is collected only when it's
+surely finished: at least ``MIN_PLAY`` (4 hours) played and no play for
+``DONE_AFTER`` (60 minutes); a team that stopped short of 4 hours is collected once
+it has been idle for ``GIVE_UP_AFTER`` (6 hours). Its per-image results, challenge
+scores and 5-minute image history are then fetched from its subpages on the public
+scoreboard (three requests) and saved to the round's data set
+(app/analysis_store.py). Teams finish across the whole weekend, so collection is a
+trickle rather than one burst at the end, and waiting this long means few teams are
+fetched twice.
 
 * **Throttle:** how many teams are fetched at once (``analysis_concurrency``,
   default 1; 0 pauses), with a short pause after each team.
@@ -41,7 +45,9 @@ log = logging.getLogger(__name__)
 
 DIVISIONS_KEY, CONCURRENCY_KEY = "analysis_divisions", "analysis_concurrency"
 DEFAULT_DIVISIONS, DEFAULT_CONCURRENCY, MAX_CONCURRENCY = "Middle School", 1, 6
-DONE_AFTER = timedelta(minutes=20)   # play time not moving this long = the team is done
+MIN_PLAY = 4 * 3600                  # seconds played before a team counts as finished
+DONE_AFTER = timedelta(minutes=60)   # ...and no play for this long
+GIVE_UP_AFTER = timedelta(hours=6)   # a team that stopped short of MIN_PLAY: finished after this long idle
 TICK = 5                             # seconds between scheduling passes while there's work
 IDLE_TICK = 30
 PAUSE = 1.0                          # seconds after each team, per worker
@@ -119,7 +125,10 @@ class AnalysisCollector:
 
     def done(self, t: TeamScore) -> bool:
         seen = self.moved.get(t.team_number)
-        return bool(t.play_time) and seen is not None and self.clock() - seen[1] >= DONE_AFTER
+        if not t.play_time or seen is None:
+            return False
+        idle = self.clock() - seen[1]
+        return idle >= GIVE_UP_AFTER or (t.play_time >= MIN_PLAY and idle >= DONE_AFTER)
 
     def plan(self) -> list[TeamScore]:
         """Update each division's status; return the teams to fetch, in finishing order."""
