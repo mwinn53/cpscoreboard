@@ -12,8 +12,10 @@ import httpx
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from . import (admin_archive, admin_board, admin_config, admin_server, auth, branding, scoreboard_url, team_view,
-               templating, web)
+from . import (admin_archive, admin_board, admin_config, admin_server, analysis_web, auth, branding, scoreboard_url,
+               team_view, templating, web)
+from .analysis_sampler import AnalysisSampler
+from .analysis_store import AnalysisStore
 from .archive import Archive
 from .board_config import BoardConfig
 from .outage import OutageMonitor
@@ -93,6 +95,14 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         # An address saved on /admin/config overrides SCOREBOARD_URL (tasks haven't run yet).
         if (url := scoreboard_url.effective(board, settings.scoreboard_url)) != settings.scoreboard_url:
             scoreboard_url.apply(app.state, url)
+        # Analysis: round samples (always readable); the sampler needs the live board.
+        app.state.analysis = AnalysisStore(store)
+        sampler = sampler_task = None
+        if settings.scrape_mode.value != "replay":
+            sampler = AnalysisSampler(app.state.analysis, board, client, lambda: poller.full_board,
+                                      lambda: scoreboard_url.effective(board, settings.scoreboard_url))
+            sampler_task = asyncio.create_task(sampler.run(), name="analysis-sampler")
+        app.state.sampler = sampler
         log.info("Started in %s mode (%s); collecting %s; database %s; email via %s; access control %s",
                  settings.app_env, source.description, poller.collect.describe(),
                  store.engine.url.render_as_string(), app.state.mailer.description,
@@ -102,7 +112,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         try:
             yield
         finally:
-            for t in (task, detail_task, geo_task):
+            for t in (task, detail_task, geo_task, sampler_task):
                 if t is not None:
                     t.cancel()
                     with suppress(asyncio.CancelledError):
@@ -124,6 +134,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.include_router(auth.router)
     app.include_router(admin_board.router)
     app.include_router(admin_config.router)
+    app.include_router(analysis_web.router)
     app.include_router(admin_archive.router)
     app.include_router(admin_server.router)
     app.include_router(team_view.router)

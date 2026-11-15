@@ -12,7 +12,7 @@
   {% set ua_changed = d.first_ua != d.last_ua %}
   <tr>
     <td>
-      <div class="strong">{{ d.email }}{% if d.is_admin %} <span class="badge">admin</span>{% endif %}{% if d.id == me.id %} <span class="badge">you</span>{% endif %}</div>
+      <div class="strong">{{ d.email }}{% if d.is_admin %} <span class="badge">admin</span>{% endif %}{% if d.is_coach %} <span class="badge">coach</span>{% endif %}{% if d.id == me.id %} <span class="badge">you</span>{% endif %}</div>
       <form method="post" action="/admin/devices/{{ d.id }}/label" class="inline label-form">
         <input name="label" value="{{ d.label }}" placeholder="Add a label" aria-label="Label for {{ d.email }}" maxlength="100">
         <button type="submit" class="link">Save</button>
@@ -28,7 +28,8 @@
     <td>{% if d.status == 'approved' %}{{ d.expires_at | date }}{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="actions">
       {% for action, text, style in actions %}
-        {% if not (d.id == me.id and action in ('revoke', 'delete')) and not (action == 'make-admin' and d.is_admin) %}
+        {% if not (d.id == me.id and action in ('revoke', 'delete')) and not (action == 'make-admin' and d.is_admin)
+              and not (action == 'make-coach' and (d.is_coach or d.is_admin)) and not (action == 'remove-coach' and not d.is_coach) %}
         <form method="post" action="/admin/devices/{{ d.id }}/{{ action }}" class="inline"
               {% if action == 'delete' %}onsubmit="return confirm('Delete this device record?')"{% endif %}>
           <button type="submit" class="{{ style }}">{{ text }}</button>
@@ -53,7 +54,7 @@
 
 <h2>Approved <span class="muted">· {{ groups.approved | length }}</span></h2>
 {% if groups.approved %}
-  {{ device_rows(groups.approved, [('revoke', 'Revoke', ''), ('make-admin', 'Make admin', '')]) }}
+  {{ device_rows(groups.approved, [('revoke', 'Revoke', ''), ('make-coach', 'Make coach', ''), ('remove-coach', 'Remove coach', ''), ('make-admin', 'Make admin', '')]) }}
 {% else %}<p class="empty">No approved devices.</p>{% endif %}
 
 <h2>Revoked or denied <span class="muted">· {{ groups.revoked | length }}</span></h2>

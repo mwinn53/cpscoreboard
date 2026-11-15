@@ -100,6 +100,16 @@ async def require_admin(request: Request) -> Device:
     return device
 
 
+async def require_coach(request: Request) -> Device:
+    """Coaches and admins (the Analysis tab)."""
+    if not request.app.state.settings.auth_enabled:
+        raise NotAllowed(403, "The Analysis tab needs AUTH_ENABLED=true.")
+    device = await require_viewer(request)
+    if not device.can_analyze:
+        raise NotAllowed(403, "Only coaches can open the analysis.")
+    return device
+
+
 def same_origin(request: Request) -> None:
     """Reject cross-site form posts (defence in depth on top of SameSite=Lax cookies)."""
     origin = request.headers.get("origin")
@@ -276,6 +286,13 @@ async def admin_action(request: Request, device_id: int, action: str, label: str
         "label": lambda: devices.set_label(device_id, label),
         "make-admin": lambda: devices.make_admin(device_id),
     }
+    if action in ("make-coach", "remove-coach"):  # per person: applies to every device with this email
+        target = await asyncio.to_thread(devices.get, device_id)
+        if target is None:
+            raise NotAllowed(404, "No such device.")
+        await asyncio.to_thread(devices.set_coach, target.email, action == "make-coach")
+        log.info("Admin device %d: %s %s", admin.id, action, target.email)
+        return RedirectResponse("/admin", status_code=303)
     if action not in handlers:
         raise NotAllowed(404, "Unknown action.")
     before = await asyncio.to_thread(devices.get, device_id)

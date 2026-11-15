@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ info.title }} · Analysis · {{ site_title }}{% endblock %}
+{% block content %}
+{% set r = report %}
+<p class="small"><a href="/analysis?division={{ info.division | urlencode }}">← Analysis</a></p>
+<h1>{{ info.title }} <span class="muted">· {{ info.division }}</span></h1>
+<p class="muted">{{ info.status | capitalize }} scores · {{ 'legacy file' if info.source == 'legacy' else 'sampled from the live board' }}
+  {{ info.sampled_at | local }}{% if info.revision > 1 %} (revision {{ info.revision }}){% endif %} ·
+  images: {{ info.images | join(', ') }}</p>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+
+<h2>Findings</h2>
+<ul class="findings">{% for f in r.findings %}<li>{{ f }}</li>{% endfor %}</ul>
+
+<h2>Participation</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th>
+    <th class="num">Mean</th><th class="num">Best</th></tr></thead>
+  <tbody>
+  {% for key, label in [('national', 'Nationally'), ('state', r.state), ('district', 'District (incl. ours)'), ('ems', 'Our teams')] %}
+  {% set d = r.score[key] %}
+  <tr><td>{{ label }}</td><td class="num">{{ d.n }}</td><td class="num">{{ d.median | num }}</td>
+    <td class="num">{% if d.n > 1 %}{{ d.q1 | num }}–{{ d.q3 | num }}{% endif %}</td>
+    <td class="num">{{ d.mean | num }}</td><td class="num">{{ d.max | num }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted small">Play time: median {{ r.play_time.median | num }} minutes; {{ r.over_limit }} teams over the
+  6-hour limit.</p>
+
+<h2>Our teams</h2>
+{% if not r.ems %}
+<p class="empty">None of our teams are in this sample.</p>
+{% else %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th class="num">Score</th>{% if r.has_challenge %}<th class="num">Challenge</th>{% endif %}
+    <th class="num">State</th><th class="num">National</th><th class="num">Outscored</th><th class="num">Play time</th>
+    {% for img in r.images %}<th class="num" title="Found / completion / score">{{ img.name }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for res in r.ems %}{% set t = res.team %}
+  <tr><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
+    <td class="num strong">{{ t.score | num }}</td>
+    {% if r.has_challenge %}<td class="num">{{ t.challenge_1 | num }}</td>{% endif %}
+    <td class="num">{{ t.place_state_division or '' }}</td><td class="num">{{ t.place_division or '' }}</td>
+    <td class="num">{{ '%.0f' % res.percentile }}%</td><td class="num mono">{{ t.play_time | hms }}</td>
+    {% for img in r.images %}{% set i = res.images.get(img.name) %}
+    <td class="num">{% if i %}{{ i.found if i.found is not none }} · {{ '%.0f%%' % (100 * res.completion[img.name]) if res.completion[img.name] is not none else '–' }} · {{ i.score | num }}{% else %}<span class="muted">–</span>{% endif %}</td>
+    {% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<h2>Images</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Image</th><th class="num">Items</th><th class="num">Teams attempted</th><th class="num">Median completion</th>
+    <th class="num">Middle half</th><th class="num">Median score</th><th class="num">Best score</th></tr></thead>
+  <tbody>
+  {% for img in r.images %}
+  <tr><td>{{ img.name }}</td><td class="num">{{ img.total_items or '' }}</td><td class="num">{{ img.attempted }}</td>
+    <td class="num">{{ '%.0f%%' % (100 * img.completion.median) if img.completion.median is not none else '–' }}</td>
+    <td class="num">{% if img.completion.n > 1 %}{{ '%.0f' % (100 * img.completion.q1) }}–{{ '%.0f%%' % (100 * img.completion.q3) }}{% endif %}</td>
+    <td class="num">{{ img.score.median | num }}</td><td class="num">{{ img.score.max | num }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>{{ r.state }} teams</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th class="num">State</th><th>Team</th><th class="num">National</th><th class="num">Score</th>
+    <th class="num">Behind the team above</th><th class="num">Behind the leader</th></tr></thead>
+  <tbody>
+  {% for t, gap, lead in r.state_table %}
+  <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_state_division or loop.index }}</td>
+    <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
+    <td class="num">{{ t.place_division or '' }}</td><td class="num strong">{{ t.score | num }}</td>
+    <td class="num">{{ gap | num if gap else '' }}</td><td class="num">{{ lead | num if lead else '' }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2 id="notes">Coaches' notes</h2>
+<form method="post" action="/analysis/rounds/{{ info.id }}" class="stack compact">
+  <label for="label">Round name</label>
+  <input id="label" name="label" value="{{ info.label }}" maxlength="100">
+  <label for="notes">Notes (interpretation, context, what to practice)</label>
+  <textarea id="notes" name="notes" rows="8">{{ info.notes }}</textarea>
+  <label for="status">Scores</label>
+  <select id="status" name="status">
+    {% for s in ['preliminary', 'final'] %}<option value="{{ s }}" {{ 'selected' if s == info.status }}>{{ s | capitalize }}</option>{% endfor %}
+  </select>
+  <button type="submit">Save</button>
+</form>
+{% if me.is_admin %}
+<form method="post" action="/analysis/rounds/{{ info.id }}/delete" class="inline"
+      onsubmit="return confirm('Delete this round sample? It can be re-sampled while the round is on the board, or re-imported.')">
+  <button type="submit" class="danger">Delete this sample</button>
+</form>
+{% endif %}
+{% endblock %}

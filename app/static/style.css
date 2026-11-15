@@ -225,3 +225,8 @@ svg.spark .end { fill: var(--series-1); }
 .stack.compact > button { align-self: flex-start; padding-left: 18px; padding-right: 18px; }
 .url-form input[type="url"] { width: min(560px, 100%); padding: 6px 8px; font: inherit; font-size: 14px; }
 h2 .info, h3 .info, label .info { margin-left: 2px; }
+/* Analysis tab */
+.findings { margin: 0 0 12px; padding-left: 20px; line-height: 1.5; }
+.findings li { margin: 2px 0; }
+details.admin-box { margin: 16px 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+details.admin-box > summary { cursor: pointer; font-weight: 600; }
