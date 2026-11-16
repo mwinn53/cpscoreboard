@@ -5,6 +5,7 @@ import dataclasses
 import gzip
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import unquote
 
 import httpx
 
@@ -420,4 +421,28 @@ def test_collection_panel_and_throttle(site):  # noqa: F811
     r = admin.post("/analysis/collect-all", data={"division": "Middle School"}, headers={"HX-Request": "true"})
     assert r.status_code == 200 and "Collecting all teams now" in r.text and "Middle School" in c.forced
     assert admin.post("/analysis/collect-all", data={"division": "Open"}).status_code == 400
+    store.close()
+
+
+def test_round_setting_overrides_image_names_and_moves_the_data_set(site):  # noqa: F811
+    admin = make_admin(site)
+    app = admin.app
+    c, store, box, calls, clock = _collector(n=2)
+    c.store, c.board = app.state.analysis, app.state.board
+    app.state.collector = c
+    asyncio.run(c.collect(box["teams"][0]))                                 # images say r2
+    c.plan()
+    first = c.store.get(c.status["Middle School"].round_id)
+    assert first.round_key == "r2" and first.label == "Round 2"
+    r = admin.post("/analysis/round", data={"round_key": "r1", "division": "Middle School"}, follow_redirects=False)
+    assert r.status_code == 303 and "Moved the data set" in unquote(r.headers["location"])
+    moved = c.store.get(first.id)
+    assert (moved.round_key, moved.label, c.round_key()) == ("r1", "Round 1", "r1")
+    asyncio.run(c.collect(box["teams"][1]))                                 # later teams land in Round 1 too
+    assert c.store.get(first.id).team_count == 2 and len(c.store.rounds("Middle School")) == 1
+    # a report's round can be fixed by hand; a renamed label is kept
+    c.store.update_round(first.id, label="Opening round")
+    assert admin.post(f"/analysis/reports/{first.id}", data={"label": "Opening round", "round_key": "r3"}).status_code == 303
+    assert (c.store.get(first.id).round_key, c.store.get(first.id).label) == ("r3", "Opening round")
+    assert "Round being collected" in admin.get("/analysis?division=Middle+School").text
     store.close()

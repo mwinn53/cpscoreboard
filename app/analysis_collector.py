@@ -22,7 +22,9 @@ fetched twice.
 * **Progress:** per division, teams collected out of those that have played, the
   number waiting, the number still playing and an ETA from the recent pace.
 
-The round and season come from the team's image names (``…_cp19_…_r2_…``).
+The season comes from the team's image names (``…_cp19_…``). The round does too, unless
+the admin sets it on the Analysis page: image names aren't reliable for the round
+(CP-19 Round 1 used ``…_cp19_intro_r2_…`` images).
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ from .team_detail import _float, chart_url, detail_url, parse_image_chart, parse
 
 log = logging.getLogger(__name__)
 
-DIVISIONS_KEY, CONCURRENCY_KEY = "analysis_divisions", "analysis_concurrency"
+DIVISIONS_KEY, CONCURRENCY_KEY, ROUND_KEY = "analysis_divisions", "analysis_concurrency", "analysis_round"
 DEFAULT_DIVISIONS, DEFAULT_CONCURRENCY, MAX_CONCURRENCY = "Middle School", 1, 6
 MIN_PLAY = int(3.75 * 3600)          # seconds played before a team counts as finished
 DONE_AFTER = timedelta(minutes=60)   # ...and no play for this long
@@ -115,6 +117,13 @@ class AnalysisCollector:
 
     def set_concurrency(self, n: int) -> None:
         self.board.set_value(CONCURRENCY_KEY, str(max(0, min(n, MAX_CONCURRENCY))))
+
+    def round_key(self) -> str:
+        """The round being collected, as set by the admin ("" = from the image names)."""
+        return self.board.get_value(ROUND_KEY)
+
+    def set_round(self, key: str) -> None:
+        self.board.set_value(ROUND_KEY, key)
 
     def collect_all(self, division: str) -> None:
         """Fetch the division's remaining teams now, finished or not (same throttle and pace)."""
@@ -231,6 +240,7 @@ class AnalysisCollector:
             except ValueError:
                 pass
         season, round_key = round_identity([i.image for i in img_rows], [t.team_number])
+        round_key = self.round_key() or round_key
         if season is None or round_key is None:
             current = self.store.get(self.status[t.division].round_id) if self.status.get(t.division) and \
                 self.status[t.division].round_id else None

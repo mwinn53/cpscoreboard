@@ -326,7 +326,10 @@ across seasons.
   teams' data sets are complete, how many are waiting, how many are still playing and
   an ETA. A team is fetched again only if its score changes later; places keep moving
   while others play, so collected teams' places are refreshed from the board without
-  fetching. Season and round come from image names (`…_cp19_…_r2_…` = CP-19 Round 2).
+  fetching. The season comes from image names (`…_cp19_…`). The round can't be trusted from
+  them (CP-19 Round 1 used `…_intro_r2_…` images), so the admin sets **Round being collected**
+  on the Analysis page; setting it also moves the data set being filled. A report's round
+  can be corrected with its name and notes.
 - **Groups:** national (the division), the state (the board's default state), the
   district (district schools plus ours) and our teams (the watchlist).
 - **Report:** "In brief" conclusions, then sections that each pair a narrative with

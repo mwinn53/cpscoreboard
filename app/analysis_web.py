@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .analysis_collector import MAX_CONCURRENCY
 from .analysis_legacy import import_files
-from .analysis_store import FINAL, LIVE, PRELIMINARY
+from .analysis_store import FINAL, LIVE, PRELIMINARY, ROUND_CHOICES
 from .auth import NotAllowed, _page, require_coach, same_origin
 from .devices import Device
 
@@ -78,7 +78,7 @@ def _collection(request: Request, collector, division: str) -> dict:
     return {"collector": collector, "division": division,
             "configured": collector.divisions() if collector else [],
             "status": collector.status.get(division) if collector else None,
-            "max_concurrency": MAX_CONCURRENCY}
+            "max_concurrency": MAX_CONCURRENCY, "round_choices": ROUND_CHOICES}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -128,6 +128,32 @@ async def throttle(request: Request, me: Device = Depends(require_coach),
     if request.headers.get("HX-Request"):
         return _page(request, "_analysis_collection.html", me=me, **_collection(request, collector, division))
     return _done(f"/analysis?division={quote(division)}", "Saved the throttle.")
+
+
+@router.post("/round", dependencies=[Depends(same_origin)])
+async def set_round(request: Request, me: Device = Depends(require_coach), round_key: Annotated[str, Form()] = "",
+                    division: Annotated[str, Form()] = ""):
+    """The round being collected; the division's current live data set moves to it too."""
+    _admin(me)
+    store, collector = _state(request)
+    if collector is None:
+        raise NotAllowed(400, "Collection is off here (replay).")
+    if round_key and round_key not in dict(ROUND_CHOICES):
+        raise NotAllowed(400, "Unknown round.")
+    await asyncio.to_thread(collector.set_round, round_key)
+    notice = f"Collecting as {dict(ROUND_CHOICES)[round_key]}." if round_key else "Taking the round from image names."
+    st = collector.status.get(division)
+    if round_key and st and st.round_id:
+        info = await asyncio.to_thread(store.get, st.round_id)
+        if info and info.round_key != round_key:
+            try:
+                await asyncio.to_thread(store.update_round, info.id, round_key=round_key)
+                notice += f" Moved the data set CP-{info.season} {info.label} to {dict(ROUND_CHOICES)[round_key]}."
+            except Exception:
+                notice += f" There's already a CP-{info.season} {dict(ROUND_CHOICES)[round_key]} data set, so " \
+                          "the current one wasn't moved; fix it on its report."
+    log.info("Device %d set the collected round to %s", me.id, round_key or "auto")
+    return _done(f"/analysis?division={quote(division)}", notice)
 
 
 @router.post("/collect-all", response_class=HTMLResponse, dependencies=[Depends(same_origin)])
@@ -195,6 +221,7 @@ async def report_page(request: Request, round_id: int, top: int = 25, me: Device
     top = top if top in TOP_CHOICES else 25
     others = [r for r in await asyncio.to_thread(store.rounds, info.division) if r.id != info.id]
     return _page(request, "analysis_round.html", me=me, info=info, report=report, charts=charts, context=context,
+                 round_choices=ROUND_CHOICES,
                  legend=team_legend(state), progress_legend=progress_legend(report), status=status, top=top,
                  top_choices=TOP_CHOICES, others=others, notice=request.query_params.get("notice"))
 
@@ -202,16 +229,18 @@ async def report_page(request: Request, round_id: int, top: int = 25, me: Device
 @router.post("/reports/{round_id}", dependencies=[Depends(same_origin)])
 async def report_update(request: Request, round_id: int, me: Device = Depends(require_coach),
                         label: Annotated[str, Form()] = "", notes: Annotated[str, Form()] = "",
-                        status: Annotated[str, Form()] = ""):
+                        status: Annotated[str, Form()] = "", round_key: Annotated[str, Form()] = ""):
     store, _ = _state(request)
     info = await _get_round(store, round_id)
     values = {"label": label.strip()[:100] or info.label, "notes": notes.strip()[:20000]}
     if status in (PRELIMINARY, FINAL):
         values["status"] = status
+    if round_key in dict(ROUND_CHOICES):
+        values["round_key"] = round_key
     try:
         await asyncio.to_thread(store.update_round, round_id, **values)
     except Exception:
-        raise NotAllowed(400, "There's already a data set of this round with that status.") from None
+        raise NotAllowed(400, "There's already a data set of that round with that status.") from None
     return _done(f"/analysis/reports/{round_id}", "Saved.")
 
 

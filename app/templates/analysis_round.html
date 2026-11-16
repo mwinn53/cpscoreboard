@@ -200,6 +200,11 @@
   <input id="label" name="label" value="{{ info.label }}" maxlength="100">
   <label for="notes">Notes (interpretation, context, what to practice)</label>
   <textarea id="notes" name="notes" rows="8">{{ info.notes }}</textarea>
+  <label for="round_key">Round</label>
+  <select id="round_key" name="round_key">
+    {% for key, label in round_choices %}<option value="{{ key }}" {{ 'selected' if key == info.round_key }}>{{ label }}</option>{% endfor %}
+    {% if info.round_key not in round_choices | map(attribute=0) %}<option value="" selected>{{ info.round_key }}</option>{% endif %}
+  </select>
   <label for="status">Scores</label>
   <select id="status" name="status">
     {% for s in ['preliminary', 'final'] %}<option value="{{ s }}" {{ 'selected' if s == info.status }}>{{ s | capitalize }}</option>{% endfor %}

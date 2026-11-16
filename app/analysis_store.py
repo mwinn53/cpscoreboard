@@ -41,6 +41,8 @@ EMS, DISTRICT = "ems", "district"
 ROUND_LABELS = {"r1": "Round 1", "r2": "Round 2", "r3": "Round 3", "state": "State Round", "st": "State Round",
                 "sf": "Semifinal", "semi": "Semifinal", "semis": "Semifinal", "nf": "National Finals",
                 "final": "National Finals"}
+ROUND_CHOICES = [("r1", "Round 1"), ("r2", "Round 2"), ("r3", "Round 3"), ("state", "State Round"),
+                 ("sf", "Semifinal"), ("nf", "National Finals")]
 ROUND_ORDER = {"r1": 1, "r2": 2, "r3": 3, "state": 4, "st": 4, "sf": 5, "semi": 5, "semis": 5, "nf": 6, "final": 6}
 
 analysis_rounds = Table(
@@ -407,10 +409,18 @@ class AnalysisStore:
         return changed
 
     def update_round(self, round_id: int, **values) -> None:
-        allowed = {k: v for k, v in values.items() if k in ("label", "notes", "status")}
-        if allowed:
-            with self.store.lock, self.store.engine.begin() as conn:
-                conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id).values(**allowed))
+        """Change a data set's label, notes, status or round (a default label follows a round change)."""
+        allowed = {k: v for k, v in values.items() if k in ("label", "notes", "status", "round_key")}
+        if not allowed:
+            return
+        with self.store.lock, self.store.engine.begin() as conn:
+            row = conn.execute(select(analysis_rounds).where(analysis_rounds.c.id == round_id)).first()
+            if row is None:
+                return
+            new_key = allowed.get("round_key")
+            if new_key and new_key != row.round_key and allowed.get("label", row.label) == default_label(row.round_key):
+                allowed["label"] = default_label(new_key)
+            conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id).values(**allowed))
 
     def delete_round(self, round_id: int) -> None:
         with self.store.lock, self.store.engine.begin() as conn:
