@@ -27,14 +27,14 @@
 {% else %}
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Team</th><th class="num">Score</th>{% if r.has_challenge %}<th class="num">Challenge</th>{% endif %}
+  <thead><tr><th>Team</th><th class="num">Score</th>{% if r.has_challenge %}<th class="num" title="Cisco Networking Challenge: quiz + Packet Tracer">Cisco</th>{% endif %}
     <th class="num">State</th><th class="num">National</th><th class="num">Outscored</th><th class="num">Play time</th>
     {% for img in r.images %}<th class="num" title="Found · completion · score">{{ img.name }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for res in r.ems %}{% set t = res.team %}
   <tr><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
     <td class="num strong">{{ t.score | num }}</td>
-    {% if r.has_challenge %}<td class="num">{{ t.challenge_1 | num }}</td>{% endif %}
+    {% if r.has_challenge %}<td class="num">{{ t.cisco | num }}{% if t.challenge_2 is not none and t.challenge_2 > 0 %} <span class="muted small">({{ t.challenge_1 | num }} + {{ t.challenge_2 | num }})</span>{% endif %}</td>{% endif %}
     <td class="num">{{ t.place_state_division or '' }}</td><td class="num">{{ t.place_division or '' }}</td>
     <td class="num">{{ '%.0f' % res.percentile }}%</td><td class="num mono">{{ t.play_time | hms }}</td>
     {% for img in r.images %}{% set i = res.images.get(img.name) %}
@@ -125,7 +125,7 @@
 </div>
 
 {% if n.challenge %}
-<h2>Challenge</h2>
+<h2>Cisco Networking Challenge</h2>
 {{ para(n.challenge) }}
 {% endif %}
 
@@ -133,7 +133,7 @@
 {% if r.progress %}
 {{ para(n.progress) }}
 <div class="charts">
-  {{ card('Score by time since each team started', charts.progress, progress_legend ~ '<p class="chart-note">Image scores only (the challenge isn\'t in the 5-minute history), from each team\'s first scored check.</p>', 'wide') }}
+  {{ card('Score by time since each team started', charts.progress, progress_legend ~ '<p class="chart-note">Image scores only (Cisco isn\'t in the 5-minute history), from each team\'s first scored check.</p>', 'wide') }}
 </div>
 <details class="table-view"><summary>Progress by hour (table)</summary>
 <div class="table-wrap">
@@ -172,13 +172,13 @@
 <h2>{{ r.state }} teams</h2>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th class="num">State</th><th>Team</th><th class="num">National</th>{% if r.has_challenge %}<th class="num">Challenge</th>{% endif %}<th class="num">Score</th>
+  <thead><tr><th class="num">State</th><th>Team</th><th class="num">National</th>{% if r.has_challenge %}<th class="num">Cisco</th>{% endif %}<th class="num">Score</th>
     <th class="num">Behind the team above</th><th class="num">Behind the leader</th></tr></thead>
   <tbody>
   {% for t, gap, lead in r.state_table %}
   <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_state_division or loop.index }}</td>
     <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
-    <td class="num">{{ t.place_division or '' }}</td>{% if r.has_challenge %}<td class="num">{{ t.challenge_1 | num }}</td>{% endif %}<td class="num strong">{{ t.score | num }}</td>
+    <td class="num">{{ t.place_division or '' }}</td>{% if r.has_challenge %}<td class="num">{{ t.cisco | num }}</td>{% endif %}<td class="num strong">{{ t.score | num }}</td>
     <td class="num">{{ gap | num if gap else '' }}</td><td class="num">{{ lead | num if lead else '' }}</td></tr>
   {% endfor %}
   </tbody>

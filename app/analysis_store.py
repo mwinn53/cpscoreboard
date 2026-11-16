@@ -187,13 +187,19 @@ class TeamRow:
     play_time: int | None = None
     score_time: int | None = None
     ccs_score: float | None = None
-    challenge_1: float | None = None
-    challenge_2: float | None = None
+    challenge_1: float | None = None   # Cisco quiz (live) or the combined Cisco score (legacy)
+    challenge_2: float | None = None   # Cisco Packet Tracer (live)
     adjustment: float | None = None
     total: float | None = None
     code: str = ""
     place_division: int | None = None
     place_state_division: int | None = None
+
+    @property
+    def cisco(self) -> float | None:
+        """Cisco Networking Challenge: quiz + Packet Tracer (live), or the one combined score (legacy files)."""
+        parts = [v for v in (self.challenge_1, self.challenge_2) if v is not None]
+        return sum(parts) if parts else None
 
     @property
     def score(self) -> float:

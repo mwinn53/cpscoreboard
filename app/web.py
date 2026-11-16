@@ -160,7 +160,6 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "shown_on_board": len(teams),
         "cols": columns(shown),
         "watch_cols": columns(watched, school=False),  # all one school; it's in the heading
-        "has_totals": any(t.total is not None for t in teams),
         "divisions": divisions,
         "states": states,
         "refresh": max(5, round(_settings(request).poll_interval)),

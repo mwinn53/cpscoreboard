@@ -341,7 +341,7 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
         "ems": [t for t in teams if t.grp == EMS],
     }
     state_scores = [t.score for t in groups["state"]]
-    challenge = [t.challenge_1 for t in teams if t.challenge_1 is not None]
+    challenge = [t.cisco for t in teams if t.cisco is not None]
 
     def completion(team: str, image: str) -> float | None:
         row = by_team[team].get(image)
@@ -360,7 +360,7 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
     ems = [TeamResult(t, percentile(t.score, scores), by_team[t.team_number],
                       {n: completion(t.team_number, n) for n in names},
                       percentile(t.score, state_scores) if t.location == state and len(state_scores) > 1 else None,
-                      percentile(t.challenge_1, challenge) if t.challenge_1 is not None and challenge else None)
+                      percentile(t.cisco, challenge) if t.cisco is not None and challenge else None)
            for t in groups["ems"]]
     in_state = groups["state"]
     leader = in_state[0].score if in_state else 0.0
@@ -372,7 +372,7 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
         score={k: describe(t.score for t in v) for k, v in groups.items()},
         play_time=describe(minutes), over_limit=sum(1 for t in teams if (t.play_time or 0) > ROUND_SECONDS),
         images=image_summaries, ems=ems, top=teams[:25], state_table=state_table,
-        has_challenge=any(t.challenge_1 for t in teams), teams=teams, by_team=dict(by_team), totals=totals,
+        has_challenge=any(t.cisco for t in teams), teams=teams, by_team=dict(by_team), totals=totals,
         challenge=describe(challenge), challenge_attempted=sum(1 for c in challenge if c > 0))
     report.density = _density(teams, state)
     report.attempts = _attempts(report)
@@ -478,7 +478,7 @@ def round_summary(r: RoundReport) -> RoundSummary:
             fam_field[f].append(v)
     ours = [OurTeam(res.team.team_number, res.team.name, res.team.score, res.percentile,
                     res.team.place_state_division, res.team.place_division, res.completion,
-                    _family_values(res.completion), res.team.challenge_1) for res in r.ems]
+                    _family_values(res.completion), res.team.cisco) for res in r.ems]
     fam_ours: dict[str, list[float]] = defaultdict(list)
     for o in ours:
         for f, v in o.family.items():
