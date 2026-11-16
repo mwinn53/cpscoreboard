@@ -234,7 +234,7 @@ details.admin-box > summary { cursor: pointer; font-weight: 600; }
 .charts .chart-card.wide { grid-column: 1 / -1; }
 .charts.small-multiples { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .chart-note { margin: 0 0 6px; font-size: 12px; color: var(--muted); }
-.narrative { max-width: 75ch; line-height: 1.55; }
+.narrative { line-height: 1.55; }
 details.table-view { margin: 10px 0 4px; }
 details.table-view > summary { cursor: pointer; color: var(--accent); font-size: 13px; }
 svg.chart .axis-title, svg.chart .row-label { fill: var(--muted); font-size: 11px; }
