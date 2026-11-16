@@ -87,3 +87,38 @@ def test_configuration_page_saves_only_after_a_good_test(site):  # noqa: F811
     assert f'value="{NEW}"' in page and "Reset to default" in page
     assert admin.post("/admin/config/scoreboard-url", data={"reset": "1"}).status_code == 303
     assert app.state.board.get_value(scoreboard_url.KEY) == ""
+
+
+def test_variable_interval_backs_off_while_quiet_and_resets_on_a_change():
+    from app.poller import Poller
+    from app.sources import Source
+
+    class Fixed(Source):
+        description = "fixed"
+
+        async def fetch(self):
+            return None
+    p = Poller(Fixed(), 60)
+    p.configure(60, True)
+    assert p.current_interval() == 60
+    p.quiet = 3
+    assert p.current_interval() == 120 and p.next_delay() == 120
+    p.quiet = 9
+    assert p.current_interval() == 480
+    p.quiet = 30
+    assert p.current_interval() == 600            # capped
+    p.configure(60, False)
+    p.quiet = 30
+    assert p.current_interval() == 60             # fixed interval ignores quiet polls
+
+
+def test_update_interval_on_the_config_page(site):  # noqa: F811
+    admin = make_admin(site)
+    page = admin.get("/admin/config").text
+    assert "Update interval" in page and "Variable interval" in page and "Per-image detail" not in page
+    assert admin.post("/admin/config/polling", data={"interval": "90", "variable": "1"}).status_code == 303
+    poller = admin.app.state.poller
+    assert (poller.interval, poller.variable) == (90, True)
+    assert admin.app.state.board.get_value("poll_interval") == "90"
+    assert admin.post("/admin/config/polling", data={"interval": "5"}).status_code == 303
+    assert (poller.interval, poller.variable) == (15, False)      # clamped; unchecked = fixed

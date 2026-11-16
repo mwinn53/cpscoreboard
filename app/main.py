@@ -71,6 +71,8 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         poller = Poller(source, settings.poll_interval, board.collection_filter(), store=store, archive=archive,
                         monitor=monitor, poster=poster)
         poller.restore()
+        from .admin_config import apply_polling
+        apply_polling(board, poller, settings.poll_interval)
         app.state.poller = poller
         app.state.store = store
         task = asyncio.create_task(poller.run(), name="poller")

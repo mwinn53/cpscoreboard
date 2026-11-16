@@ -54,12 +54,16 @@ class BoardState:
 
 class Poller:
     MAX_BACKOFF = 600.0
+    QUIET_POLLS = 3          # variable interval: after this many polls without a change, double the wait...
+    MAX_VARIABLE = 600.0     # ...up to this; the first change goes back to the set interval
 
     def __init__(self, source: Source, interval: float, collect: CollectionFilter | None = None,
                  store: SnapshotStore | None = None, notifier: BoardNotifier | None = None,
                  archive: Archive | None = None, monitor: OutageMonitor | None = None, poster=None):
         self.source = source
         self.interval = interval
+        self.variable = False   # set from /admin/config (app/admin_config.py)
+        self.quiet = 0          # successful polls in a row without a change
         self.collect = collect or CollectionFilter()
         self.store = store
         self.archive = archive
@@ -231,15 +235,30 @@ class Poller:
 
         self._post_task = asyncio.create_task(run(), name="post")
 
+    def current_interval(self) -> float:
+        """The wait between polls now: the set interval, or longer while a variable interval sees no changes."""
+        if not self.variable or self.quiet < self.QUIET_POLLS:
+            return self.interval
+        return min(self.interval * 2 ** (self.quiet // self.QUIET_POLLS), max(self.MAX_VARIABLE, self.interval))
+
     def next_delay(self) -> float:
         if self._failures:
             return min(self.interval * 2 ** self._failures, self.MAX_BACKOFF)
-        return self.source.next_delay(self.interval)
+        return self.source.next_delay(self.current_interval())
+
+    def configure(self, interval: float, variable: bool) -> None:
+        if (interval, variable) != (self.interval, self.variable):
+            log.info("Polling every %gs%s", interval, " (variable)" if variable else "")
+        self.interval, self.variable, self.quiet = interval, variable, 0
 
     async def run(self) -> None:
         log.info("Poller started (%s)", self.source.description)
         while True:
-            await self.poll_once()
+            changed = await self.poll_once()
+            if changed:
+                self.quiet = 0
+            elif not self._failures:
+                self.quiet += 1
             if self.state.finished:
                 log.info("Replay finished; keeping the last board")
                 return

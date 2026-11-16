@@ -79,7 +79,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, in-round progress, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
 | `/analysis/seasons`, `/analysis/seasons/{season}` | Season over season (participation, percentiles, image families); one season's rounds |
 | `/analysis/compare?a=&b=` | Any two reports side by side (e.g. preliminary against final, or two rounds) |
-| `/admin/config` | Configuration (admin only): scoreboard address, competition start, per-image detail status, posting to X and its keys; an (i) help bubble on each section |
+| `/admin/config` | Configuration (admin only): scoreboard address and update interval (fixed or variable), competition start, posting to X and its keys; an (i) help bubble on each section |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
@@ -135,7 +135,7 @@ All settings are environment variables; see [.env.example](.env.example).
 | `LOG_LEVEL` | `INFO` | |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
 | `SCOREBOARD_URL` | the public `scores.php` API | Default address; an admin can change it on `/admin/config` (tested before it's saved, applied without a restart) |
-| `POLL_INTERVAL` | `60` | Seconds between polls |
+| `POLL_INTERVAL` | `60` | Seconds between polls, until the admin sets the update interval on /admin/config |
 | `SITE_TITLE` | `EMS CyberPatriot Next Generation Scorebot` | Header, browser tab, and email subjects/sender name |
 | `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
 | `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |

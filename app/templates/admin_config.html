@@ -9,7 +9,7 @@
 
 <h2 id="scoreboard">Scoreboard address
   {% call info("scoreboard-help", "About the scoreboard address") %}
-  The public scoreboard's scores feed, polled every minute. The per-image detail and image charts come from the same
+  The public scoreboard's scores feed, fetched at the update interval below. The per-image detail and image charts come from the same
   site (<code>…/api/image/…</code> next to <code>…/api/team/scores.php</code>), so they follow this address.
   A new address is <strong>tested before it's saved</strong>: it has to return a readable scoreboard. It takes effect
   at once, without a restart. <strong>Reset to default</strong> goes back to
@@ -27,6 +27,22 @@
   <input type="hidden" name="reset" value="1"><button type="submit" class="link">Reset to default</button>
 </form>
 {% endif %}
+<form method="post" action="/admin/config/polling" class="stack compact poll-form">
+  <label for="interval">Update interval: <output id="interval-out" for="interval">{{ poller.interval | int }}</output> seconds</label>
+  <input id="interval" name="interval" type="range" min="{{ poll_min }}" max="{{ poll_max }}" step="15"
+         value="{{ poller.interval | int }}" oninput="document.getElementById('interval-out').textContent = this.value">
+  <label class="check"><input type="checkbox" name="variable" value="1" {{ 'checked' if poller.variable }}> Variable interval
+    {% call info("variable-help", "About the variable interval") %}
+    Between rounds the scoreboard can go hours without changing. With a variable interval, after
+    {{ poller.QUIET_POLLS }} checks in a row with no change the wait doubles (60 s, then 120 s, 240 s… up to
+    {{ (poller.MAX_VARIABLE / 60) | int }} minutes), and the first change puts it straight back to the interval set
+    above. It saves requests when nothing is happening, at the cost of noticing the start of a round a few minutes
+    later. Failed fetches back off on their own either way.
+    {% endcall %}</label>
+  {% if poller.variable %}<p class="muted small">Now waiting {{ poller.current_interval() | int }} seconds between checks
+    ({{ poller.quiet }} check{{ 's' if poller.quiet != 1 }} in a row without a change).</p>{% endif %}
+  <button type="submit">Save</button>
+</form>
 
 <h2 id="competition-start">Competition start
   {% call info("competition-help", "About the competition start") %}
@@ -47,21 +63,6 @@
   <label>Competition start <input type="datetime-local" name="start"></label>
   <button type="submit">Save</button>
 </form>
-{% endif %}
-
-<h2 id="image-detail">Per-image detail
-  {% call info("detail-help", "About per-image detail") %}
-  For watched teams, the app fetches the scoreboard's per-image scores (found, remaining, penalties, time and flags)
-  every few minutes while the team's play time is moving, and stores each change. Team pages show it, together with
-  the public scoreboard's own 5-minute image history for the current round (that part works for any team).
-  {% endcall %}
-</h2>
-{% if not detail %}
-<p class="empty">Off here (<code>DETAIL_ENABLED=false</code>, or a replay without an <code>images/</code> folder).</p>
-{% else %}
-<ul class="muted">
-  {% for n, at in detail_teams %}<li><a href="/teams/{{ n }}">{{ n }}</a>: {{ ('last fetched ' ~ (at | local)) if at else 'not fetched yet' }}</li>{% endfor %}
-</ul>
 {% endif %}
 
 <h2 id="posting">Posting to X

@@ -42,9 +42,8 @@ def _render(request: Request, admin: Device, status_code: int = 200, error: str 
                  saved_credentials=poster.credentials.saved(),
                  secrets_available=poster.box.available,
                  credentials_ok=poster.credentials.get() is not None,
-                 recent=poster.recent(), detail=state.detail, x_paused=poster.paused_since(),
-                 detail_teams=[(n, state.detail.latest.get(n, (None, []))[0]) for n in state.board.watchlist]
-                 if state.detail else [])
+                 recent=poster.recent(), x_paused=poster.paused_since(), poller=state.poller,
+                 poll_min=POLL_MIN, poll_max=POLL_MAX)
 
 
 def _done(notice: str, anchor: str = "") -> RedirectResponse:
@@ -54,6 +53,39 @@ def _done(notice: str, anchor: str = "") -> RedirectResponse:
 @router.get("", response_class=HTMLResponse)
 async def config_page(request: Request, admin: Device = Depends(require_admin)):
     return _render(request, admin)
+
+
+POLL_KEY, VARIABLE_KEY = "poll_interval", "poll_variable"
+POLL_MIN, POLL_MAX = 15, 300
+
+
+def polling(board, default: float) -> tuple[float, bool]:
+    """The update interval (seconds) and whether it's variable, from the saved settings."""
+    try:
+        interval = float(board.get_value(POLL_KEY) or default)
+    except ValueError:
+        interval = default
+    return interval, board.get_value(VARIABLE_KEY) == "1"
+
+
+def apply_polling(board, poller, default: float) -> None:
+    poller.configure(*polling(board, default))
+
+
+@router.post("/polling", dependencies=[Depends(same_origin)])
+async def set_polling(request: Request, admin: Device = Depends(require_admin),
+                      interval: Annotated[str, Form()] = "60", variable: Annotated[str, Form()] = ""):
+    """How often the scoreboard is fetched, and whether the wait grows while nothing changes."""
+    state = request.app.state
+    try:
+        seconds = max(POLL_MIN, min(int(float(interval)), POLL_MAX))
+    except ValueError:
+        return _render(request, admin, 400, error="The update interval must be a number of seconds.")
+    await asyncio.to_thread(state.board.set_value, POLL_KEY, str(seconds))
+    await asyncio.to_thread(state.board.set_value, VARIABLE_KEY, "1" if variable else "")
+    state.poller.configure(seconds, bool(variable))
+    log.info("Admin device %d set polling to every %ds%s", admin.id, seconds, " (variable)" if variable else "")
+    return _done(f"Updating every {seconds} seconds{', variable' if variable else ''}.", "#scoreboard")
 
 
 @router.post("/scoreboard-url", dependencies=[Depends(same_origin)])
