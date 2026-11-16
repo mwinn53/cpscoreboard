@@ -422,6 +422,18 @@ class AnalysisStore:
                 allowed["label"] = default_label(new_key)
             conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id).values(**allowed))
 
+    def set_team_group(self, round_id: int, team_number: str, grp: str, name: str | None = None) -> bool:
+        """Correct a team's group (ours / district / none) in a data set; bumps the revision. False if not found."""
+        values = {"grp": grp} if name is None else {"grp": grp, "name": name}
+        t = analysis_teams.c
+        with self.store.lock, self.store.engine.begin() as conn:
+            done = conn.execute(update(analysis_teams).where(t.round_id == round_id, t.team_number == team_number)
+                                .values(**values)).rowcount
+            if done:
+                conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id)
+                             .values(revision=analysis_rounds.c.revision + 1))
+        return bool(done)
+
     def delete_round(self, round_id: int) -> None:
         with self.store.lock, self.store.engine.begin() as conn:
             for t in (analysis_teams, analysis_images, analysis_timeline, analysis_collected):

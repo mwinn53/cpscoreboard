@@ -19,9 +19,9 @@
 {%- if n is not none %}<span class="muted count" title="Teams ranked"> ({{ n }})</span>{% endif -%}
 {%- endmacro %}
 
-{% macro team_table(teams, cols, counts) %}
+{% macro team_table(teams, cols, counts, cls="") %}
 <div class="table-wrap">
-<table class="board">
+<table class="board {{ cls }}">
   <thead>
     <tr class="group">
       <th rowspan="2">Team</th>
@@ -88,7 +88,7 @@
 
 {% if watched or watch_missing %}
 <h2>{{ watch_label }}</h2>
-{% if watched %}{{ team_table(watched, watch_cols, watch_counts) }}{% endif %}
+{% if watched %}{{ team_table(watched, watch_cols, watch_counts, 'watch-table') }}{% endif %}
 {% if watch_missing %}<p class="muted">Not on the board yet: {{ watch_missing | join(', ') }}</p>{% endif %}
 {% endif %}
 

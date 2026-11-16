@@ -162,7 +162,7 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
         "watch_cols": columns(watched, school=False),  # all one school; it's in the heading
         "divisions": divisions,
         "states": states,
-        "refresh": max(5, round(_settings(request).poll_interval)),
+        "refresh": max(5, round(request.app.state.poller.interval)),
         "filters": {"q": q, "division": division, "state": state, "limit": limit},
     }
 

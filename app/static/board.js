@@ -1,9 +1,11 @@
 // Expandable rows on the scoreboard: the ▸ button under a team inserts a row with this
 // round's sparklines (/partials/spark/<team>). Open rows survive the board's auto-refresh:
 // they're re-inserted from the last copy at once, then refreshed in the background.
+// The watched teams' rows (the first table) open by default; one the viewer closes stays closed.
 (function () {
   "use strict";
   var open = new Set();   // "tableIndex:team"
+  var closed = new Set(); // watched rows the viewer closed
   var cache = {};         // team -> last HTML
 
   function keyOf(btn) {
@@ -41,14 +43,23 @@
     var btn = e.target.closest("#board button.expand");
     if (!btn) return;
     var key = keyOf(btn);
-    if (btn.getAttribute("aria-expanded") === "true") { collapse(btn); open.delete(key); }
-    else { expand(btn); open.add(key); }
+    if (btn.getAttribute("aria-expanded") === "true") { collapse(btn); open.delete(key); closed.add(key); }
+    else { expand(btn); open.add(key); closed.delete(key); }
   });
 
-  document.body.addEventListener("htmx:afterSwap", function (e) {
-    if (!e.detail.target || e.detail.target.id !== "board" || !open.size) return;
-    document.querySelectorAll("#board button.expand").forEach(function (btn) {
-      if (open.has(keyOf(btn))) expand(btn);
+  function restore() {
+    document.querySelectorAll("#board table.watch-table button.expand").forEach(function (btn) {
+      var key = keyOf(btn);
+      if (!closed.has(key)) open.add(key);
     });
+    document.querySelectorAll("#board button.expand").forEach(function (btn) {
+      if (open.has(keyOf(btn)) && btn.getAttribute("aria-expanded") !== "true") expand(btn);
+    });
+  }
+
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.detail.target && e.detail.target.id === "board") restore();
   });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", restore);
+  else restore();
 })();

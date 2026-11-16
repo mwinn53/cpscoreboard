@@ -24,6 +24,8 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
+| [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🗒 Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
+| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🗒 Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), evaluate against the R reports ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)) | Make the analysis more useful to coaches |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -77,7 +79,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, in-round progress, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
 | `/analysis/seasons`, `/analysis/seasons/{season}` | Season over season (participation, percentiles, image families); one season's rounds |
 | `/analysis/compare?a=&b=` | Any two reports side by side (e.g. preliminary against final, or two rounds) |
-| `/admin/config` | Configuration (admin only): scoreboard address, competition start, per-image detail status, posting to X and its keys; an (i) help bubble on each section |
+| `/admin/config` | Configuration (admin only): scoreboard address and update interval (fixed or variable), competition start, posting to X and its keys; an (i) help bubble on each section |
 | `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
@@ -110,7 +112,8 @@ approved device (see [Access control](#access-control)).
 - **Watched teams** are pinned under their own heading (default "Watchlist"), without the
   School column; the main table still shows their school.
 - **Trends:** the ▸ next to a team opens a row with this round's sparklines (total score,
-  District, State, National); open rows stay open through auto-refreshes.
+  District, State, National); open rows stay open through auto-refreshes. The watched
+  teams' rows open by default; one you close stays closed.
 - **Team history:** each team number links to `/teams/{team}`. Placement charts follow the
   scoreboard's order (District, State, National); the District chart appears for district
   schools' and watched teams. Scoring shows the total score and, like the official team page,
@@ -132,7 +135,7 @@ All settings are environment variables; see [.env.example](.env.example).
 | `LOG_LEVEL` | `INFO` | |
 | `SCRAPE_MODE` | `live` | `live`, `capture`, or `replay` |
 | `SCOREBOARD_URL` | the public `scores.php` API | Default address; an admin can change it on `/admin/config` (tested before it's saved, applied without a restart) |
-| `POLL_INTERVAL` | `60` | Seconds between polls |
+| `POLL_INTERVAL` | `60` | Seconds between polls, until the admin sets the update interval on /admin/config |
 | `SITE_TITLE` | `EMS CyberPatriot Next Generation Scorebot` | Header, browser tab, and email subjects/sender name |
 | `DISPLAY_TIMEZONE` | `America/New_York` | Times on the site; the database stays in UTC |
 | `DATA_DIR` | `data` (`/data` in the image) | Where the SQLite database lives |
@@ -346,6 +349,8 @@ across seasons.
     the field's median and middle half.
   Plus the top N teams (10–100), the state table and coaches' notes. A report also notes
   participation against the season's previous round and the same round last season.
+  Coaches can correct a team's group (ours / district / neither) in a data set from the
+  report page.
 - **Comparisons.** Scores aren't comparable across rounds, so comparisons use
   percentiles (the share of the division outscored) and completion by image family
   (Windows, Windows Server, Linux). Final scores are used where a round has both.

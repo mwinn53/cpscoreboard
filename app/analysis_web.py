@@ -244,6 +244,25 @@ async def report_update(request: Request, round_id: int, me: Device = Depends(re
     return _done(f"/analysis/reports/{round_id}", "Saved.")
 
 
+@router.post("/reports/{round_id}/group", dependencies=[Depends(same_origin)])
+async def report_group(request: Request, round_id: int, me: Device = Depends(require_coach),
+                       team_number: Annotated[str, Form()] = "", grp: Annotated[str, Form()] = "",
+                       name: Annotated[str, Form()] = ""):
+    """Correct a team's group in this data set (e.g. a district team the import didn't recognize)."""
+    from .analysis_store import DISTRICT, EMS
+    store, _ = _state(request)
+    await _get_round(store, round_id)
+    team_number = team_number.strip()
+    if grp not in (EMS, DISTRICT, ""):
+        raise NotAllowed(400, "Unknown group.")
+    ok = await asyncio.to_thread(store.set_team_group, round_id, team_number, grp, name.strip()[:100] or None)
+    if not ok:
+        return _done(f"/analysis/reports/{round_id}#groups", f"No team {team_number} in this data set.")
+    label = {EMS: "one of our teams", DISTRICT: "a district team", "": "neither ours nor district"}[grp]
+    log.info("Device %d set %s to %s in data set %d", me.id, team_number, grp or "none", round_id)
+    return _done(f"/analysis/reports/{round_id}#groups", f"{team_number} is now {label} in this report.")
+
+
 @router.post("/reports/{round_id}/delete", dependencies=[Depends(same_origin)])
 async def report_delete(request: Request, round_id: int, me: Device = Depends(require_coach)):
     _admin(me)

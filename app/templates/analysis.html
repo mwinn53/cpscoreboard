@@ -59,7 +59,7 @@
   <span class="muted">with</span>
   <label class="sr-only" for="cmp-b">Second report</label>
   <select id="cmp-b" name="b">{% for r in rounds %}<option value="{{ r.id }}" {{ 'selected' if loop.first }}>{{ r.title }} ({{ r.status }})</option>{% endfor %}</select>
-  <button type="submit">Compare</button>
+  <button type="submit" class="primary">Compare</button>
 </form>
 {% endif %}
 {% endif %}
