@@ -23,7 +23,7 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M3b – Admin settings](https://github.com/mwinn53/cpscoreboard/milestone/2) | ✅ Live ([#29](https://github.com/mwinn53/cpscoreboard/pull/29), [#30](https://github.com/mwinn53/cpscoreboard/pull/30), [#32](https://github.com/mwinn53/cpscoreboard/pull/32)); open: Alembic [#16](https://github.com/mwinn53/cpscoreboard/issues/16) | Watchlist, district schools, collection filter, logos and legacy import on `/admin/board` |
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
-| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, and Collect all, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
+| [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -101,6 +101,10 @@ approved device (see [Access control](#access-control)).
   **National (205)**. A count appears only when every team in the table shares one division
   (and, for State, one state); with the filter on All there's no single total.
   State, Division and Tier columns appear only when the filter is set to All.
+- **Total Score:** one column: the official total (images, Cisco and any adjustment)
+  once it's published, otherwise the image score.
+- **Flags:** the official warning codes, plus a blue **C** when a team has scored Cisco
+  points (quiz or Packet Tracer); the key under the table explains each.
 - **Trends:** ▲▼ for place and +/− for score since the last change, in fixed slots so
   numbers line up.
 - **Watched teams** are pinned under their own heading (default "Watchlist"), without the
@@ -110,8 +114,9 @@ approved device (see [Access control](#access-control)).
 - **Team history:** each team number links to `/teams/{team}`. Placement charts follow the
   scoreboard's order (District, State, National); the District chart appears for district
   schools' and watched teams. Scoring shows the total score and, like the official team page,
-  the per-image table and one chart of every image's score: live from the public scoreboard
-  for the current round (any team), or from stored detail for watched teams.
+  the per-image table (with Cisco Quiz and Cisco Packet Tracer rows for the current round)
+  and one chart of every image's score: live from the public scoreboard for the current
+  round (any team), or from stored detail for watched teams.
 - **Live updates:** the board refreshes on every change (via `/events`) and every polling
   interval. Times are shown in `DISPLAY_TIMEZONE`.
 - **Logos:** a square logo sits at each end of the header. Each can link somewhere:
@@ -313,10 +318,10 @@ across seasons.
   (Middle School by default), a team is collected once it has surely finished: at
   least 3¾ hours of play time and idle for 60 minutes, or idle for 4 hours whatever it
   played. Reports are written after the round, so waiting costs nothing and few teams
-  are fetched twice. **Collect all** (admin) fetches the division's remaining teams now,
+  are fetched twice. Each team is two requests (its per-image table and 5-minute image
+  history); the Cisco scores and total come from the board feed. **Collect all** (admin) fetches the division's remaining teams now,
   finished or not, at the same throttle and pace; teams still playing are fetched
-  again when their score changes. Each team is three requests to its subpages
-  on the public scoreboard, then a short pause. Teams finish across the weekend, so it's a trickle. **Teams fetched at
+  again when their score changes. A short pause follows each team. Teams finish across the weekend, so it's a trickle. **Teams fetched at
   once** (a slider, default 1; 0 pauses) is the throttle. The page shows how many
   teams' data sets are complete, how many are waiting, how many are still playing and
   an ETA. A team is fetched again only if its score changes later; places keep moving

@@ -291,3 +291,4 @@ svg.chart .key-mark.s1 { fill: var(--s1); } svg.chart .key-mark.s2 { fill: var(-
 svg.chart .key-mark.s4 { fill: var(--s4); } svg.chart .key-mark.s5 { fill: var(--s5); } svg.chart .key-mark.s6 { fill: var(--s6); }
 svg.chart .key-mark.s7 { fill: var(--s7); } svg.chart .key-mark.s8 { fill: var(--s8); }
 @media (max-width: 700px) { .charts.pair { grid-template-columns: 1fr; } }
+.cisco { color: var(--s1); font-weight: 700; }

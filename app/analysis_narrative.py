@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .analysis import describe
 from .posting import ordinal
 
 
@@ -132,7 +133,7 @@ def _overview(r) -> list[str]:
     if r.images:
         best = ", ".join(f"{i.name} {num(i.score.max)}" for i in r.images if i.score.n)
         out.append(f"The top score was {num(r.score['national'].max)} (best per image: {best}"
-                   + (f"; challenge {num(r.challenge.max)}" if r.has_challenge else "") + ").")
+                   + (f"; Cisco {num(r.challenge.max)}" if r.has_challenge else "") + ").")
         perfect = [f"{plural(i.perfect, 'team')} on {i.name}" for i in r.images if i.perfect]
         out.append(f"Teams that found everything: {listing(perfect)}." if perfect
                    else "No team found everything on any image.")
@@ -304,10 +305,19 @@ def _challenge(r) -> list[str]:
     if not r.has_challenge or not r.challenge.n:
         return []
     c = r.challenge
-    out = [f"The challenge (Cisco) median was {num(c.median)} (middle half {num(c.q1)}–{num(c.q3)}, best "
-           f"{num(c.max)}); {r.challenge_attempted} of {c.n} teams scored on it."]
-    ours = [f"{res.label} {num(res.team.challenge_1)} (outscored {share(res.challenge_percentile)})"
-            for res in r.ems if res.team.challenge_1 is not None]
+    out = [f"The Cisco Networking Challenge (quiz + Packet Tracer) median was {num(c.median)} (middle half "
+           f"{num(c.q1)}–{num(c.q3)}, best {num(c.max)}); {r.challenge_attempted} of {c.n} teams scored on it."]
+    split = [t for t in r.teams if t.challenge_2 is not None and t.challenge_2 > 0]
+    if split:
+        quiz = describe(t.challenge_1 for t in r.teams if t.challenge_1 is not None)
+        pt = describe(t.challenge_2 for t in r.teams if t.challenge_2 is not None)
+        out.append(f"Median quiz {num(quiz.median)} (best {num(quiz.max)}), median Packet Tracer {num(pt.median)} "
+                   f"(best {num(pt.max)}).")
+    ours = [f"{res.label} {num(res.team.cisco)}"
+            + (f" (quiz {num(res.team.challenge_1)}, Packet Tracer {num(res.team.challenge_2)})"
+               if res.team.challenge_2 is not None and split else "")
+            + f", outscoring {share(res.challenge_percentile)}"
+            for res in r.ems if res.team.cisco is not None]
     if ours:
         out.append(f"Ours: {listing(ours)}.")
     return out
@@ -370,7 +380,7 @@ def _summary(r) -> list[str]:
     if r.density and r.density.r is not None and abs(r.density.r) < 0.3:
         out.append(f"The number of teams in a state had little to do with its scores (r = {corr(r.density.r)}).")
     if r.has_challenge and r.challenge.n:
-        out.append(f"Challenge (Cisco): median {num(r.challenge.median)} of a best {num(r.challenge.max)}, so "
+        out.append(f"Cisco: median {num(r.challenge.median)} of a best {num(r.challenge.max)}, so "
                    "there's room to gain on it.")
     return out
 

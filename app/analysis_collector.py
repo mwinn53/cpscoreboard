@@ -8,7 +8,7 @@ surely finished: at least ``MIN_PLAY`` (3¾ hours) played and no play for
 played. **Collect all** fetches a division's remaining teams now, finished or not, at
 the same throttle and pace. Its per-image results, challenge
 scores and 5-minute image history are then fetched from its subpages on the public
-scoreboard (three requests) and saved to the round's data set
+scoreboard (two requests: the Cisco scores and total come from the board itself) and saved to the round's data set
 (app/analysis_store.py). Teams finish across the whole weekend, so collection is a
 trickle rather than one burst at the end, and waiting this long means few teams are
 fetched twice.
@@ -202,7 +202,9 @@ class AnalysisCollector:
         """Fetch one team's subpages and save it to its round's data set."""
         started = time.monotonic()
         base = self.scoreboard_url()
-        detail = await self._get(base, t.team_number)
+        # The board feed carries Cisco Quiz (score_1), Packet Tracer (score_2) and the total, so the team's own
+        # row is fetched only when the board row isn't the live one (restored from the database).
+        detail = json.dumps({"data": [t.raw]}).encode() if "score_1" in t.raw else await self._get(base, t.team_number)
         images = await self._get(detail_url(base), t.team_number)
         chart = await self._get(chart_url(base), t.team_number)
         now = self.clock()

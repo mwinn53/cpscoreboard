@@ -320,6 +320,17 @@ def test_collect_all_takes_unfinished_teams_once_at_the_same_throttle():
     store.close()
 
 
+def test_collector_takes_the_cisco_scores_from_the_board_feed():
+    c, store, box, calls, clock = _collector(n=1)
+    t = box["teams"][0]
+    t.raw.update({"score_1": "7.00", "score_2": "3.00", "total": "150.00"})
+    asyncio.run(c.collect(t))
+    assert len(calls) == 2                                                 # no request for the team's own row
+    row = c.store.teams(c.store.rounds("Middle School")[0].id)[0]
+    assert (row.challenge_1, row.challenge_2, row.cisco, row.total) == (7.0, 3.0, 10.0, 150.0)
+    store.close()
+
+
 def test_collector_marks_our_teams():
     c, store, box, calls, clock = _collector(n=2)
     c.board.add_watch(box["teams"][0].team_number)

@@ -12,7 +12,7 @@
            value="{{ collector.concurrency() }}"
            oninput="document.getElementById('concurrency-out').textContent = this.value == 0 ? 'paused' : this.value">
     <noscript><button type="submit">Save</button></noscript>
-    <p class="muted small">Each team is three requests to the public scoreboard, then a short pause. 1 is a gentle
+    <p class="muted small">Each team is two requests to the public scoreboard, then a short pause. 1 is a gentle
       trickle; 0 pauses collection.</p>
   </form>
   <form method="post" action="/analysis/collect-all" class="inline" hx-post="/analysis/collect-all" hx-target="#collection">
@@ -22,7 +22,7 @@
     Fetches every {{ division }} team that has played and isn't collected yet, <strong>including teams still
     playing</strong>, instead of waiting for each to finish (3¾ hours played and 60 minutes idle, or 4 hours idle). It
     runs at the throttle above, with the same pause after each team, so the scoreboard sees the same request rate,
-    just for longer: three requests per team, so a few hundred teams is about a thousand requests over roughly half an
+    just for longer: two requests per team, so a few hundred teams is several hundred requests over roughly half an
     hour at 1 team at a time. Teams still playing are fetched again when their score changes, which adds requests.
     Best used once a round is over.
     {% endcall %}

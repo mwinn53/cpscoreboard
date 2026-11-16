@@ -58,3 +58,24 @@ def test_dashboard_renders_watchlist_and_filters():
 
         none = client.get("/partials/board", params={"q": "no-such-team"}).text
         assert "No teams match" in none
+
+
+def test_cisco_scores_flag_the_board_and_show_on_the_team_page():
+    with make_client() as client:
+        wait_for_teams(client)
+        deadline = time.monotonic() + 5  # the replay loads season 17, then season 19: edit the final board
+        while not client.app.state.poller.state.teams[0].team_number.startswith("19-"):
+            assert time.monotonic() < deadline
+            time.sleep(0.05)
+        team = client.app.state.poller.state.teams[0]
+        team.raw.update({"score_1": "10.00", "score_2": "4.50"})
+        for t in client.app.state.poller.full_board:  # the team page reads the full board
+            if t.team_number == team.team_number:
+                t.raw.update(team.raw)
+        assert (team.cisco_quiz, team.cisco_pt) == (10.0, 4.5)
+        partial = client.get("/partials/board").text
+        assert 'class="cisco"' in partial and "Packet Tracer 4.5" in partial
+        assert "Adjusted total" not in partial and ">Adj<" not in partial
+        assert "C</span> = Cisco Points Scored" in client.get("/").text
+        page = client.get(f"/teams/{team.team_number}").text
+        assert "Cisco Quiz" in page and "Cisco Packet Tracer" in page

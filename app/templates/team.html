@@ -50,7 +50,9 @@
   {% endif %}
 </div>
 
-{% if images %}
+{% set cisco = [('Cisco Quiz', current.cisco_quiz), ('Cisco Packet Tracer', current.cisco_pt)]
+     | selectattr(1, 'ne', none) | list if current and round == 0 else [] %}
+{% if images or cisco %}
 <div class="table-wrap">
 <table class="board">
   <thead><tr><th>Image</th><th class="num">Score</th><th class="num">Found</th><th class="num">Remaining</th>
@@ -61,6 +63,10 @@
     <td class="num">{{ i.found if i.found is not none }}</td><td class="num">{{ i.remaining if i.remaining is not none }}</td>
     <td class="num">{{ i.penalties if i.penalties is not none }}</td><td class="num mono">{{ i.duration | hms }}</td>
     <td>{{ i.code }}</td></tr>
+  {% endfor %}
+  {% for name, value in cisco %}
+  <tr class="challenge"><td>{{ name }}</td><td class="num strong">{{ value | num }}</td>
+    <td colspan="5" class="muted small">{{ 'Cisco Networking Challenge' if loop.first }}</td></tr>
   {% endfor %}
   </tbody>
 </table>

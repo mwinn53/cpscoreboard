@@ -47,6 +47,16 @@ class TeamScore:
     raw: Mapping[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     @property
+    def cisco_quiz(self) -> float | None:
+        """Cisco Networking Challenge quiz (the feed's ``score_1``; not stored, so None until the first poll)."""
+        return _float(self.raw.get("score_1"))
+
+    @property
+    def cisco_pt(self) -> float | None:
+        """Cisco Networking Challenge Packet Tracer (the feed's ``score_2``)."""
+        return _float(self.raw.get("score_2"))
+
+    @property
     def score(self) -> float:
         """The score the board is ranked by: total when published, else the CCS score."""
         if self.total is not None:

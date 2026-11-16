@@ -26,8 +26,7 @@
     <tr class="group">
       <th rowspan="2">Team</th>
       {% if cols.school %}<th rowspan="2">School</th>{% endif %}
-      <th rowspan="2" class="num">Total Score</th>
-      {% if has_totals %}<th rowspan="2" class="num">Adj</th><th rowspan="2" class="num">Adjusted total</th>{% endif %}
+      <th rowspan="2" class="num" title="The official total (images, Cisco and any adjustment) once it's published; until then the image score">Total Score</th>
       {% if cols.state %}<th rowspan="2">State</th>{% endif %}
       {% if cols.division %}<th rowspan="2">Division</th>{% endif %}
       {% if cols.tier %}<th rowspan="2">Tier</th>{% endif %}
@@ -51,8 +50,7 @@
       <td class="team"><button type="button" class="expand" data-team="{{ t.team_number }}" aria-expanded="false"
         aria-label="Show this round's trend for {{ t.team_number }}" title="This round's trend"></button><a href="/teams/{{ t.team_number }}" title="Score and places over time">{{ t.team_number }}</a></td>
       {% if cols.school %}<td class="school">{{ aliases.get(t.team_number, '') }}</td>{% endif %}
-      <td class="num strong">{{ t.ccs_score | num }}{{ score_trend(ch if shown and not has_totals else none) }}</td>
-      {% if has_totals %}<td class="num">{{ t.adjustment | num }}</td><td class="num strong">{{ t.total | num }}{{ score_trend(ch if shown else none) }}</td>{% endif %}
+      <td class="num strong">{{ t.score | num }}{{ score_trend(ch if shown else none) }}</td>
       {% if cols.state %}<td>{{ t.location }}</td>{% endif %}
       {% if cols.division %}<td>{{ t.division }}</td>{% endif %}
       {% if cols.tier %}<td>{{ t.tier }}</td>{% endif %}
@@ -62,7 +60,8 @@
       <td class="num">{{ t.images if t.images is not none }}</td>
       <td class="num mono">{{ t.score_time | hms }}</td>
       <td class="num mono">{{ t.play_time | hms }}</td>
-      <td>{% if t.code %}<span class="warn" title="{% for c in t.code %}{{ warning_codes.get(c, c) }}{{ ', ' if not loop.last }}{% endfor %}">{{ t.code }}</span>{% endif %}</td>
+      <td>{% if t.code %}<span class="warn" title="{% for c in t.code %}{{ warning_codes.get(c, c) }}{{ ', ' if not loop.last }}{% endfor %}">{{ t.code }}</span>{% endif %}
+        {%- if (t.cisco_quiz or 0) > 0 or (t.cisco_pt or 0) > 0 %} <span class="cisco" title="Cisco points scored: quiz {{ t.cisco_quiz | num }}, Packet Tracer {{ t.cisco_pt | num }}">C</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -72,7 +71,7 @@
 
 {% macro warning_key() %}
 <p class="key small muted"><span class="strong">Flags:</span>
-  {% for code, meaning in warning_codes.items() %}<span><span class="warn">{{ code }}</span> = {{ meaning }}</span>{% endfor %}
+  {% for code, meaning in warning_codes.items() %}<span><span class="warn">{{ code }}</span> = {{ meaning }}</span>{% endfor %}<span><span class="cisco">C</span> = Cisco Points Scored</span>
 </p>
 {% endmacro %}
 
