@@ -446,3 +446,18 @@ def test_round_setting_overrides_image_names_and_moves_the_data_set(site):  # no
     assert (c.store.get(first.id).round_key, c.store.get(first.id).label) == ("r3", "Opening round")
     assert "Round being collected" in admin.get("/analysis?division=Middle+School").text
     store.close()
+
+
+def test_coaches_correct_a_teams_group(site):  # noqa: F811
+    admin = make_admin(site)
+    a = admin.app.state.analysis
+    info = a.save(_synthetic(19, "r1"))
+    r = admin.post(f"/analysis/reports/{info.id}/group", data={"team_number": "19-0003", "grp": "ems", "name": "New"},
+                   follow_redirects=False)
+    assert r.status_code == 303 and "one of our teams" in unquote(r.headers["location"])
+    row = {t.team_number: t for t in a.teams(info.id)}["19-0003"]
+    assert (row.grp, row.name) == (EMS, "New") and a.get(info.id).revision == 2
+    assert "19-0003 (New)" in admin.get(f"/analysis/reports/{info.id}").text   # the cached report is redone
+    r = admin.post(f"/analysis/reports/{info.id}/group", data={"team_number": "99-9999", "grp": ""},
+                   follow_redirects=False)
+    assert "No team 99-9999" in unquote(r.headers["location"])

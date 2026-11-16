@@ -22,7 +22,7 @@
       <option value="" {{ 'selected' if not collector.round_key() }}>From the image names</option>
       {% for key, label in round_choices %}<option value="{{ key }}" {{ 'selected' if key == collector.round_key() }}>{{ label }}</option>{% endfor %}
     </select>
-    <button type="submit">Set</button>
+    <button type="submit" class="primary">Set</button>
     {% call info("round-help", "About the round") %}
     The season comes from the image names (<code>…_cp19_…</code>), but the round can't be trusted from them: CP-19
     Round 1 used <code>…_intro_r2_…</code> images. Set the round here at the start of each round. Setting it also moves
@@ -31,7 +31,7 @@
   </form>
   <form method="post" action="/analysis/collect-all" class="inline" hx-post="/analysis/collect-all" hx-target="#collection">
     <input type="hidden" name="division" value="{{ division }}">
-    <button type="submit">Collect all {{ division }} teams now</button>
+    <button type="submit" class="primary">Collect all {{ division }} teams now</button>
     {% call info("collect-all-help", "About Collect all") %}
     Fetches every {{ division }} team that has played and isn't collected yet, <strong>including teams still
     playing</strong>, instead of waiting for each to finish (3¾ hours played and 60 minutes idle, or 4 hours idle). It

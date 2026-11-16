@@ -51,6 +51,7 @@ def test_dashboard_renders_watchlist_and_filters():
         # The first fixture (season 17) is loaded; the replay then waits ~0 s and loads season 19.
         page = client.get("/").text
         assert "Watchlist" in page and "99-9999" in page  # missing team listed
+        assert 'class="board watch-table"' in page  # board.js opens these rows by default
 
         partial = client.get("/partials/board", params={"state": "OR", "limit": 5}).text
         assert "<html" not in partial

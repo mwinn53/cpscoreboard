@@ -190,7 +190,7 @@
   <input type="hidden" name="a" value="{{ info.id }}">
   <label for="cmp-b"><strong>Compare with</strong></label>
   <select id="cmp-b" name="b">{% for o in others %}<option value="{{ o.id }}">{{ o.title }} ({{ o.status }})</option>{% endfor %}</select>
-  <button type="submit">Compare</button>
+  <button type="submit" class="primary">Compare</button>
 </form>
 {% endif %}
 
@@ -211,6 +211,19 @@
   </select>
   <button type="submit">Save</button>
 </form>
+<h3 id="groups">Correct a team's group</h3>
+<p class="muted small">Our teams and district teams come from the watchlist and the district schools (or, in legacy files,
+  from team names). Fix one here if it's wrong in this data set; the report updates at once. A live data set's team is
+  regrouped from the board settings if it's collected again.</p>
+<form method="post" action="/analysis/reports/{{ info.id }}/group" class="inline group-form">
+  <label>Team <input name="team_number" required maxlength="32" size="9" placeholder="19-1234"></label>
+  <label>Group
+    <select name="grp"><option value="ems">Our team</option><option value="district">District team</option>
+      <option value="">Neither</option></select></label>
+  <label>Name <input name="name" maxlength="100" size="16" placeholder="(keep)"></label>
+  <button type="submit" class="primary">Save</button>
+</form>
+
 {% if me.is_admin %}
 <form method="post" action="/analysis/reports/{{ info.id }}/delete" class="inline"
       onsubmit="return confirm('Delete this data set and its report? Live data sets fill again while the round is on the board; legacy ones can be re-imported.')">

@@ -4,8 +4,6 @@
 {% block content %}
 {% with active="/admin/config" %}{% include "_admin_nav.html" %}{% endwith %}
 <h1>Configuration</h1>
-<p class="muted">How the app runs around the scoreboard. What it shows and collects is under
-  <a href="/admin/board">Board settings</a>.</p>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 
@@ -32,7 +30,7 @@
 
 <h2 id="competition-start">Competition start
   {% call info("competition-help", "About the competition start") %}
-  The end-of-season outage alert counts from this. Starting {{ grace_hours | int }} hours after the competition starts,
+  The end-of-round outage alert counts from this. Starting {{ grace_hours | int }} hours after the competition starts,
   if the public scoreboard is unavailable for {{ alert_hours | int }} hours in a row, the admin is emailed a
   recommendation to shut the server down, and the <strong>Server</strong> page (snapshot and shut down) appears.
   It's recorded automatically the first time teams show play time; set it only if that was missed or is wrong.
