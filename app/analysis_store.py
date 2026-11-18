@@ -17,6 +17,10 @@ legacy ones are imported from the old season files (app/analysis_legacy.py):
 * ``analysis_collected``: for live data sets, which teams are in and the score
   they had when collected (a later score change collects the team again).
 
+A live data set is final once its report is **run** (``report_run_at``): by hand
+once it's complete, or 24 hours after it first was (``complete_at``). After that
+nothing more is collected into it and places stop updating.
+
 An imported data set doesn't change; importing again replaces its rows and bumps
 ``revision``. ``sampled_at`` is when a data set last changed.
 """
@@ -59,6 +63,8 @@ analysis_rounds = Table(
     Column("team_count", Integer, nullable=False, server_default="0"),
     Column("images", String(500), nullable=False, server_default=""),  # comma-separated short names
     Column("notes", Text, nullable=False, server_default=""),
+    Column("complete_at", DateTime),     # live: when every team that played was first collected
+    Column("report_run_at", DateTime),   # live: when the report was run; the data set is final from then on
     UniqueConstraint("season", "round_key", "division", "status", name="uq_analysis_round"),
 )
 
@@ -251,6 +257,13 @@ class RoundInfo:
     team_count: int
     images: tuple[str, ...]
     notes: str
+    complete_at: datetime | None = None
+    report_run_at: datetime | None = None
+
+    @property
+    def final(self) -> bool:
+        """Legacy data sets are final as imported; live ones once their report is run."""
+        return self.source != LIVE or self.report_run_at is not None
 
     @property
     def order(self) -> tuple[int, int]:
@@ -263,7 +276,9 @@ class RoundInfo:
 
 def _info(r) -> RoundInfo:
     return RoundInfo(r.id, r.season, r.round_key, r.label, r.division, r.status, r.source, _from_db(r.sampled_at),
-                     r.revision, r.team_count, tuple(x for x in r.images.split(",") if x), r.notes)
+                     r.revision, r.team_count, tuple(x for x in r.images.split(",") if x), r.notes,
+                     _from_db(r.complete_at) if r.complete_at else None,
+                     _from_db(r.report_run_at) if r.report_run_at else None)
 
 
 class AnalysisStore:
@@ -346,8 +361,10 @@ class AnalysisStore:
     # --- live data sets, a team at a time ---
 
     def save_team(self, season: int, round_key: str, division: str, team: TeamRow, images: list[ImageRow],
-                  timeline: list[tuple[str, datetime, float]], score_key: str, at: datetime) -> RoundInfo:
-        """Add (or replace) one team in the round's live data set, creating the data set if needed."""
+                  timeline: list[tuple[str, datetime, float]], score_key: str, at: datetime) -> RoundInfo | None:
+        """Add (or replace) one team in the round's live data set, creating the data set if needed.
+
+        Returns None (and saves nothing) when that data set's report has been run."""
         r = analysis_rounds.c
         with self.store.lock, self.store.engine.begin() as conn:
             existing = conn.execute(select(analysis_rounds).where(
@@ -359,6 +376,8 @@ class AnalysisStore:
                     status=PRELIMINARY, source=LIVE, sampled_at=_to_db(at), revision=1)).inserted_primary_key[0]
                 names: set[str] = set()
             else:
+                if existing.report_run_at is not None:
+                    return None
                 round_id = existing.id
                 names = {x for x in existing.images.split(",") if x}
             for t in (analysis_teams, analysis_images, analysis_timeline, analysis_collected):
@@ -379,18 +398,47 @@ class AnalysisStore:
                 team_count=count, images=",".join(sorted(names)), sampled_at=_to_db(at)))
         return self.get(round_id)
 
-    def collected(self, division: str) -> dict[str, tuple[int, str]]:
-        """team -> (data set id, score key) of its latest collection in this division's live data sets."""
-        c, r = analysis_collected.c, analysis_rounds.c
-        q = (select(c.team_number, c.round_id, c.score_key, c.collected_at)
-             .join(analysis_rounds, r.id == c.round_id).where(r.division == division, r.source == LIVE)
+    def collected(self, division: str) -> dict[str, tuple[int, str, int | None]]:
+        """team -> (data set id, score key, play time) of its latest collection in this division's live data sets."""
+        c, r, t = analysis_collected.c, analysis_rounds.c, analysis_teams.c
+        q = (select(c.team_number, c.round_id, c.score_key, c.collected_at, t.play_time)
+             .join(analysis_rounds, r.id == c.round_id)
+             .join(analysis_teams, (t.round_id == c.round_id) & (t.team_number == c.team_number))
+             .where(r.division == division, r.source == LIVE)
              .order_by(c.collected_at))
         with self.store.lock, self.store.engine.connect() as conn:
-            return {row.team_number: (row.round_id, row.score_key) for row in conn.execute(q)}
+            return {row.team_number: (row.round_id, row.score_key, row.play_time) for row in conn.execute(q)}
+
+    def final_rounds(self, division: str) -> set[int]:
+        r = analysis_rounds.c
+        with self.store.lock, self.store.engine.connect() as conn:
+            return {x[0] for x in conn.execute(select(r.id).where(r.division == division, r.source == LIVE,
+                                                                  r.report_run_at.is_not(None)))}
+
+    def mark_complete(self, round_id: int, at: datetime | None) -> None:
+        """Start (or clear, with None) the 24-hour countdown to running the report."""
+        with self.store.lock, self.store.engine.begin() as conn:
+            conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id)
+                         .values(complete_at=_to_db(at) if at else None))
+
+    def run_report(self, round_id: int, at: datetime) -> bool:
+        """Make a live data set final. False if it already was."""
+        r = analysis_rounds.c
+        with self.store.lock, self.store.engine.begin() as conn:
+            done = conn.execute(update(analysis_rounds).where(r.id == round_id, r.report_run_at.is_(None))
+                                .values(report_run_at=_to_db(at),
+                                        complete_at=func.coalesce(r.complete_at, _to_db(at)))).rowcount
+        return bool(done)
+
+    def reopen(self, round_id: int) -> None:
+        """Undo a run: collection into the data set resumes, and the countdown restarts once it's complete."""
+        with self.store.lock, self.store.engine.begin() as conn:
+            conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id)
+                         .values(report_run_at=None, complete_at=None))
 
     def refresh_teams(self, round_id: int, rows: dict[str, dict], at: datetime) -> int:
         """Update collected teams' board fields (places move as other teams finish). Returns rows changed."""
-        if not rows:
+        if not rows or round_id in self.final_rounds_by_id([round_id]):
             return 0
         cols = sorted({k for v in rows.values() for k in v})
         t = analysis_teams.c
@@ -407,6 +455,11 @@ class AnalysisStore:
                 conn.execute(update(analysis_rounds).where(analysis_rounds.c.id == round_id)
                              .values(sampled_at=_to_db(at)))
         return changed
+
+    def final_rounds_by_id(self, ids: list[int]) -> set[int]:
+        r = analysis_rounds.c
+        with self.store.lock, self.store.engine.connect() as conn:
+            return {x[0] for x in conn.execute(select(r.id).where(r.id.in_(ids), r.report_run_at.is_not(None)))}
 
     def update_round(self, round_id: int, **values) -> None:
         """Change a data set's label, notes, status or round (a default label follows a round change)."""

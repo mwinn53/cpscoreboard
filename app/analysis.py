@@ -34,9 +34,8 @@ from datetime import datetime
 from .analysis_legacy import TOTAL
 from .analysis_store import DISTRICT, EMS, AnalysisStore, ImageRow, RoundInfo, TeamRow
 
-ROUND_SECONDS = 6 * 3600
-ROUND_MINUTES = 360
-GRID = list(range(0, ROUND_MINUTES + 1, 10))   # progress: every 10 minutes of a team's 6 hours
+ROUND_MINUTES = 360    # the legacy seasons' limit; CP-19 rounds are 4 hours (see time_limit_minutes)
+STEP = 10              # progress: a point every 10 minutes of a team's time
 FAMILIES = ("Windows", "Windows Server", "Linux", "Other")
 
 
@@ -81,6 +80,17 @@ def percentile(score: float, scores: list[float]) -> float:
     below = sum(1 for s in scores if s < score)
     equal = sum(1 for s in scores if s == score) - 1
     return 100.0 * (below + max(equal, 0) / 2) / max(len(scores) - 1, 1)
+
+
+def time_limit_minutes(teams, season: int) -> int:
+    """A round's time limit: 4 hours (CP-19 on) or 6 (the legacy seasons), from how long teams played.
+
+    Teams play close to the limit, so a median play time of 4 h 10 min or less means a 4-hour round.
+    With too few teams to tell, CP-19 and later are 4 hours."""
+    played = [t.play_time / 60 for t in teams if t.play_time]
+    if len(played) >= 5:
+        return 240 if statistics.median(played) <= 250 else 360
+    return 240 if season >= 19 else 360
 
 
 def correlation(xs: list[float], ys: list[float]) -> float | None:
@@ -178,6 +188,7 @@ class Progress:
     teams: int                          # teams with a timeline
     ours: list[tuple[str, list[float]]]  # (team number, total at each grid minute)
     half: Describe                      # the field's minutes to half its final score
+    limit: int = ROUND_MINUTES          # the round's time limit, minutes
 
 
 @dataclass
@@ -203,6 +214,7 @@ class RoundReport:
     time: TimeStats | None = None
     progress: Progress | None = None
     narrative: dict[str, list[str]] = field(default_factory=dict)
+    limit: int = ROUND_MINUTES          # the round's time limit, minutes (4 or 6 hours)
 
     def completion(self, team: str, image: str) -> float | None:
         row = self.by_team.get(team, {}).get(image)
@@ -259,9 +271,11 @@ def _half_minutes(curve: list[tuple[float, float]]) -> int | None:
     return next(round(m) for m, v in curve if v >= final / 2)
 
 
-def progress(curves: dict[str, list[tuple[float, float]]], ems: list[TeamResult]) -> Progress | None:
+def progress(curves: dict[str, list[tuple[float, float]]], ems: list[TeamResult],
+             limit: int = ROUND_MINUTES) -> Progress | None:
     if len(curves) < 3:
         return None
+    GRID = list(range(0, limit + 1, STEP))  # noqa: N806
     grid = {m: [value_at(c, m) for c in curves.values()] for m in GRID}
     stats = {m: describe(v) for m, v in grid.items()}
     ours = []
@@ -271,9 +285,9 @@ def progress(curves: dict[str, list[tuple[float, float]]], ems: list[TeamResult]
             continue
         ours.append((res.team.team_number, [value_at(c, m) for m in GRID]))
         res.half_minutes = _half_minutes(c)
-        res.hourly = {h: percentile(value_at(c, h * 60), grid[h * 60]) for h in range(1, 7)}
+        res.hourly = {h: percentile(value_at(c, h * 60), grid[h * 60]) for h in range(1, limit // 60 + 1)}
     return Progress(GRID, [stats[m].q1 for m in GRID], [stats[m].median for m in GRID], [stats[m].q3 for m in GRID],
-                    len(curves), ours, describe(_half_minutes(c) for c in curves.values()))
+                    len(curves), ours, describe(_half_minutes(c) for c in curves.values()), limit)
 
 
 # --- the report ---
@@ -367,18 +381,19 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
     state_table = [(t, (in_state[i - 1].score - t.score) if i else 0.0, leader - t.score)
                    for i, t in enumerate(in_state)]
     minutes = [t.play_time / 60 for t in teams if t.play_time]
+    limit = time_limit_minutes(teams, info.season)
     report = RoundReport(
         info=info, state=state, counts={k: len(v) for k, v in groups.items()},
         score={k: describe(t.score for t in v) for k, v in groups.items()},
-        play_time=describe(minutes), over_limit=sum(1 for t in teams if (t.play_time or 0) > ROUND_SECONDS),
+        play_time=describe(minutes), over_limit=sum(1 for t in teams if (t.play_time or 0) > limit * 60),
         images=image_summaries, ems=ems, top=teams[:25], state_table=state_table,
         has_challenge=any(t.cisco for t in teams), teams=teams, by_team=dict(by_team), totals=totals,
-        challenge=describe(challenge), challenge_attempted=sum(1 for c in challenge if c > 0))
+        challenge=describe(challenge), challenge_attempted=sum(1 for c in challenge if c > 0), limit=limit)
     report.density = _density(teams, state)
     report.attempts = _attempts(report)
     report.time = _time(report)
     if timeline:
-        report.progress = progress(team_curves(store.timeline(info.id)), ems)
+        report.progress = progress(team_curves(store.timeline(info.id)), ems, limit)
     from .analysis_narrative import round_narrative
     report.narrative = round_narrative(report)
     return report

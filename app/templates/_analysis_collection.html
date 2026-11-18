@@ -23,6 +23,22 @@
     {% if st.playing %}{{ st.playing }} not finished yet{% endif %}
     {% if st.round_id %}· <a href="/analysis/reports/{{ st.round_id }}">report so far</a>{% endif %}</p>
   {% if st.forced %}<p class="notice">Collecting all teams now, finished or not.</p>{% endif %}
+  {% if st.run_at %}
+  <p class="notice">Report run {{ st.run_at | local }}: the data set is final. <a href="/analysis/reports/{{ st.round_id }}">View the report</a>.</p>
+  {% elif st.complete and st.run_due %}
+  <div class="run-report">
+    <p><strong>The data set is complete.</strong> The report runs automatically in
+      <span class="countdown" data-deadline="{{ st.run_due.isoformat() }}">under a day</span>
+      ({{ st.run_due | local }}), or now:</p>
+    <form method="post" action="/analysis/reports/{{ st.round_id }}/run" class="inline">
+      <button type="submit" class="primary">Run report</button>
+    </form>
+    <p class="muted small">Running makes the data set final: late score changes aren't collected into it and places stop
+      updating.</p>
+  </div>
+  {% elif st.complete_at %}
+  <p class="muted small">Complete since {{ st.complete_at | local }}; the report runs at {{ st.run_due | local }}.</p>
+  {% endif %}
   {% if collector.concurrency() == 0 %}<p class="error">Collection is paused.</p>{% endif %}
 </div>
 {% endif %}

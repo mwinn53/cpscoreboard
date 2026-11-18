@@ -21,13 +21,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from html import escape
 
-from .analysis import ROUND_MINUTES, Describe, RoundReport, describe
+from .analysis import Describe, RoundReport, describe
 from .analysis_store import DISTRICT, EMS, TeamRow
 from .charts import _nice_step, _y_ticks
 
 W = 720
 LEFT, RIGHT, TOP, BOTTOM = 48, 16, 26, 34
-TIME_CAP = ROUND_MINUTES + 120   # play times past 8 hours (bad rows in old files) pile into the last bin
+OVER = 120                        # time axes run 2 hours past the limit; longer (bad rows in old files) piles into the last bin
 HALF = 480                        # charts shown in half-width cards
 
 
@@ -307,10 +307,11 @@ def histogram(r: RoundReport, value: Callable[[TeamRow], float | None], *, bin_s
 
 def heatmap(r: RoundReport, width: int = W, height: int = 260) -> str:
     """Score against play time: shaded cells count teams (15 minutes × a score band); ours as dots."""
-    pts = [(min(t.play_time / 60, TIME_CAP - 1), t.score, t) for t in r.teams if t.play_time]
+    cap = r.limit + OVER
+    pts = [(min(t.play_time / 60, cap - 1), t.score, t) for t in r.teams if t.play_time]
     if len(pts) < 5:
         return ""
-    xmax = TIME_CAP
+    xmax = cap
     sv = ticks(min(0, min(p[1] for p in pts)), max(p[1] for p in pts))
     ybin = (sv[1] - sv[0]) / 4 if len(sv) > 1 else 10
     xbin = 15
@@ -337,7 +338,7 @@ def heatmap(r: RoundReport, width: int = W, height: int = 260) -> str:
                  f'y2="{height - BOTTOM}"/>')
     _x_ticks(parts, list(range(0, int(xmax) + 1, 60)), x, height - BOTTOM, lambda v: f"{v / 60:.0f} h",
              "play time", width)
-    _ref_v(parts, ROUND_MINUTES, x, TOP, height - BOTTOM, "6-hour limit")
+    _ref_v(parts, r.limit, x, TOP, height - BOTTOM, f"{r.limit // 60}-hour limit")
     return _svg(width, height, "Score against play time: teams per 15 minutes and score band", parts)
 
 
@@ -451,7 +452,8 @@ def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
         return ""
     vals = [v for v in p.q3 if v is not None] + [v for _, s in p.ours for v in s]
     yv = ticks(0, max(vals) if vals else 1)
-    x = Scale(0, ROUND_MINUTES, LEFT, width - RIGHT - 70)
+    end = p.limit
+    x = Scale(0, end, LEFT, width - RIGHT - 70)
     y = Scale(0, yv[-1], height - BOTTOM, TOP)
     parts: list[str] = []
     _y_axis(parts, yv, y, LEFT, width - RIGHT - 70, title="score")
@@ -472,11 +474,11 @@ def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
     for k in range(1, len(ends)):
         ends[k][0] = max(ends[k][0], ends[k - 1][0] + 13)
     for ly, slot, team, v in ends:
-        parts.append(f'<circle class="end {slot}" cx="{x(ROUND_MINUTES):.1f}" cy="{y(v):.1f}" r="4"/>')
-        parts.append(f'<text class="end-label" x="{x(ROUND_MINUTES) + 8:.1f}" y="{ly + 4:.1f}">{escape(team)}</text>')
-    parts.append(f'<line class="axis" x1="{LEFT}" x2="{x(ROUND_MINUTES):.1f}" y1="{height - BOTTOM}" '
+        parts.append(f'<circle class="end {slot}" cx="{x(end):.1f}" cy="{y(v):.1f}" r="4"/>')
+        parts.append(f'<text class="end-label" x="{x(end) + 8:.1f}" y="{ly + 4:.1f}">{escape(team)}</text>')
+    parts.append(f'<line class="axis" x1="{LEFT}" x2="{x(end):.1f}" y1="{height - BOTTOM}" '
                  f'y2="{height - BOTTOM}"/>')
-    _x_ticks(parts, list(range(0, ROUND_MINUTES + 1, 60)), x, height - BOTTOM, lambda v: f"{v / 60:.0f} h",
+    _x_ticks(parts, list(range(0, end + 1, 60)), x, height - BOTTOM, lambda v: f"{v / 60:.0f} h",
              "", width)
     hover = []
     for k, m in enumerate(p.minutes):
@@ -486,7 +488,7 @@ def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
     svg = (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Score by time since each '
            f'team started: the field and our teams" preserveAspectRatio="xMidYMid meet">{"".join(parts)}</svg>')
     return (f'<div class="chart-wrap" data-points="{escape(json.dumps(hover))}" '
-            f'data-plot="{LEFT},{x(ROUND_MINUTES):.1f},{TOP},{height - BOTTOM},{width},{height}">{svg}'
+            f'data-plot="{LEFT},{x(end):.1f},{TOP},{height - BOTTOM},{width},{height}">{svg}'
             f'<div class="chart-tip" hidden></div></div>')
 
 
@@ -512,10 +514,10 @@ def round_charts(r: RoundReport) -> dict[str, str]:
         "strips": group_strips(r),
         "score_hist": histogram(r, lambda t: t.score, bin_size=score_bin, label="Score distribution",
                                 x_title="score", refs=refs, width=HALF),
-        "time_hist": histogram(r, lambda t: min(t.play_time / 60, TIME_CAP - 1) if t.play_time else None,
+        "time_hist": histogram(r, lambda t: min(t.play_time / 60, r.limit + OVER - 1) if t.play_time else None,
                                bin_size=15, label="Play time distribution", x_title="play time",
-                               refs=[(ROUND_MINUTES, "6-hour limit")], fmt=_hours, start=0, width=HALF,
-                               x_tick_values=list(range(0, TIME_CAP + 1, 120))),
+                               refs=[(r.limit, f"{r.limit // 60}-hour limit")], fmt=_hours, start=0, width=HALF,
+                               x_tick_values=list(range(0, r.limit + OVER + 1, 60 if r.limit <= 240 else 120))),
         "heatmap": heatmap(r),
         "density": density_scatter(r),
         "attempts": attempts_boxes(r, HALF),

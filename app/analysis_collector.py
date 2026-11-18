@@ -56,6 +56,7 @@ IDLE_TICK = 30
 PAUSE = 1.0                          # seconds after each team, per worker
 RETRY_AFTER = timedelta(minutes=30)  # after a team's fetch failed
 REFRESH_EVERY = timedelta(minutes=10)
+RUN_AFTER = timedelta(hours=24)      # a complete data set's report runs itself after this
 
 
 def score_key(t: TeamScore) -> str:
@@ -73,6 +74,13 @@ class DivisionStatus:
     fetching: int = 0
     round_id: int | None = None   # the data set being filled
     eta_seconds: float | None = None
+    complete_at: datetime | None = None    # when it first reached 100%
+    run_at: datetime | None = None         # when its report was run (final)
+
+    @property
+    def run_due(self) -> datetime | None:
+        """When the report runs itself (24 hours after the data set first reached 100%)."""
+        return self.complete_at + RUN_AFTER if self.complete_at and not self.run_at else None
     forced: bool = False          # Collect all is running
 
     @property
@@ -156,6 +164,7 @@ class AnalysisCollector:
         for division in self.divisions():
             st = DivisionStatus(division)
             collected = self.store.collected(division)
+            final = self.store.final_rounds(division)
             latest = max(collected.values(), key=lambda v: v[0], default=None)
             st.round_id = latest[0] if latest else None
             for t in teams:
@@ -163,7 +172,10 @@ class AnalysisCollector:
                     continue
                 st.played += 1
                 key = score_key(t)
-                if collected.get(t.team_number, (None, None))[1] == key:
+                entry = collected.get(t.team_number)
+                if entry and entry[0] in final and (t.play_time or 0) >= (entry[2] or 0):
+                    st.collected += 1     # its round's report has run: final, whatever changes later
+                elif entry and entry[1] == key:
                     st.collected += 1
                 elif t.team_number in self.inflight:
                     st.fetching += 1
@@ -180,10 +192,29 @@ class AnalysisCollector:
             left = st.waiting + st.fetching
             if left and conc:
                 st.eta_seconds = left * ((self.pace or 4.0) + PAUSE) / conc
+            self._countdown(st, now)
             status[division] = st
         self.status = status
         pending.sort(key=lambda t: self.moved[t.team_number][1])
         return pending
+
+    def _countdown(self, st: DivisionStatus, now: datetime) -> None:
+        """Start the 24-hour countdown when the data set first reaches 100%; run the report when it ends."""
+        if st.round_id is None:
+            return
+        info = self.store.get(st.round_id)
+        if info is None:
+            return
+        st.complete_at, st.run_at = info.complete_at, info.report_run_at
+        if st.run_at:
+            return
+        if st.complete and st.complete_at is None:
+            self.store.mark_complete(info.id, now)
+            st.complete_at = now
+            log.info("Data set %s %s is complete; its report runs in %s", info.title, info.division, RUN_AFTER)
+        if st.run_due and now >= st.run_due and self.store.run_report(info.id, now):
+            st.run_at = now
+            log.info("Ran the report for %s %s (24 hours after the data set was complete)", info.title, info.division)
 
     # --- fetching ---
 
@@ -264,8 +295,13 @@ class AnalysisCollector:
                                  remaining=i.remaining, penalties=i.penalties, score=i.ccs_score,
                                  duration=i.duration, code=i.code))
         timeline = [(parse_image_name(full)[0], at, v) for full, pts in series for at, v in pts]
-        await asyncio.to_thread(self.store.save_team, season, round_key, t.division, team, rows, timeline,
-                                score_key(t), now)
+        saved = await asyncio.to_thread(self.store.save_team, season, round_key, t.division, team, rows, timeline,
+                                        score_key(t), now)
+        if saved is None:
+            self.failed[t.team_number] = (score_key(t), now)
+            self.last_error = (f"{t.team_number}: the CP-{season} {round_key} report has been run, so its data set is "
+                               "final; set Round being collected to the new round (or reopen the data set)")
+            return False
         self.failed.pop(t.team_number, None)
         took = time.monotonic() - started
         self.pace = took if self.pace is None else 0.8 * self.pace + 0.2 * took
@@ -308,7 +344,7 @@ class AnalysisCollector:
         changed = 0
         for division in self.divisions():
             by_round: dict[int, dict[str, dict]] = {}
-            for team, (round_id, key) in self.store.collected(division).items():
+            for team, (round_id, key, _) in self.store.collected(division).items():
                 t = teams.get(team)
                 if t is not None and score_key(t) == key:
                     by_round.setdefault(round_id, {})[team] = {

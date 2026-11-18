@@ -461,3 +461,57 @@ def test_coaches_correct_a_teams_group(site):  # noqa: F811
     r = admin.post(f"/analysis/reports/{info.id}/group", data={"team_number": "99-9999", "grp": ""},
                    follow_redirects=False)
     assert "No team 99-9999" in unquote(r.headers["location"])
+
+
+def _complete(c, box, clock):
+    """Collect every team, then plan: the data set is 100%."""
+    for t in box["teams"]:
+        asyncio.run(c.collect(t))
+    c.plan()
+    return c.status["Middle School"]
+
+
+def test_report_runs_24_hours_after_the_data_set_is_complete_and_then_stays_final():
+    c, store, box, calls, clock = _collector(n=2)
+    st = _complete(c, box, clock)
+    assert st.complete and st.complete_at == T0 and st.run_due == T0 + timedelta(hours=24) and not st.run_at
+    clock.now = T0 + timedelta(hours=23, minutes=59)
+    assert not c.plan() and not c.status["Middle School"].run_at
+    clock.now = T0 + timedelta(hours=24, minutes=1)
+    c.plan()
+    st = c.status["Middle School"]
+    info = c.store.get(st.round_id)
+    assert st.run_at == clock.now and info.report_run_at == clock.now and info.final
+    # final: a later score change isn't collected, and places stop updating
+    t0 = box["teams"][0]
+    box["teams"] = [dataclasses.replace(t0, ccs_score=(t0.ccs_score or 0) + 7, place_division=99)] + box["teams"][1:]
+    assert c.plan() == [] and c.status["Middle School"].complete
+    c._refreshed = None
+    assert c.refresh() == 0
+    assert asyncio.run(c.collect(box["teams"][0])) is False and "report has been run" in c.last_error
+    # reopening resumes collection
+    c.store.reopen(info.id)
+    clock.now += timedelta(minutes=31)                                     # past the retry wait for the refused save
+    assert [t.team_number for t in c.plan()] == [t0.team_number]
+    store.close()
+
+
+def test_run_report_button_and_reopen(site):  # noqa: F811
+    admin = make_admin(site)
+    app = admin.app
+    c, store, box, calls, clock = _collector(n=2)
+    c.store, c.board = app.state.analysis, app.state.board
+    app.state.collector = c
+    st = _complete(c, box, clock)
+    home = admin.get("/analysis?division=Middle+School").text
+    assert "The data set is complete." in home and 'class="countdown"' in home and ">Run report<" in home
+    assert "complete, runs" in home
+    report = admin.get(f"/analysis/reports/{st.round_id}").text
+    assert ">Run report<" in report
+    r = admin.post(f"/analysis/reports/{st.round_id}/run", follow_redirects=False)
+    assert r.status_code == 303 and "data set is final" in unquote(r.headers["location"])
+    assert c.store.get(st.round_id).final and "Report run" in admin.get("/analysis?division=Middle+School").text
+    assert "Reopen" in admin.get(f"/analysis/reports/{st.round_id}").text
+    assert admin.post(f"/analysis/reports/{st.round_id}/reopen").status_code == 303
+    assert not c.store.get(st.round_id).final
+    store.close()

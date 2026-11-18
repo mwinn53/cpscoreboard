@@ -91,8 +91,12 @@
     <label><input type="checkbox" name="kinds" value="{{ k }}" {{ 'checked' if k in post.kinds }}> {{ label }}</label>
     {% endfor %}
   </fieldset>
-  <label for="change_after_hours">Live changes start after <output id="change_after_out" for="change_after_hours">{{ post.change_after_hours | num }}</output> hours of a team's six</label>
-  <input id="change_after_hours" name="change_after_hours" type="range" min="0" max="6" step="0.5" value="{{ post.change_after_hours }}"
+  <label for="round_hours">Round length (hours): "an hour left" and "time is up" follow it</label>
+  <select id="round_hours" name="round_hours">
+    {% for h in (4, 6) %}<option value="{{ h }}" {{ 'selected' if post.round_hours == h }}>{{ h }} hours</option>{% endfor %}
+  </select>
+  <label for="change_after_hours">Live changes start after <output id="change_after_out" for="change_after_hours">{{ post.change_after_hours | num }}</output> hours of a team's {{ post.round_hours | num }}</label>
+  <input id="change_after_hours" name="change_after_hours" type="range" min="0" max="{{ post.round_hours | num }}" step="0.5" value="{{ post.change_after_hours }}"
          oninput="document.getElementById('change_after_out').value = this.value">
   <label for="place_every_minutes">Once a team is done, post its place changes at most every (minutes)</label>
   <input id="place_every_minutes" name="place_every_minutes" type="number" min="5" max="240" step="5" value="{{ post.place_every_minutes }}">

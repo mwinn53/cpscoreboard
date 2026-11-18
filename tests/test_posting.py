@@ -36,7 +36,7 @@ def test_ordinal():
 
 
 def test_planner_follows_a_round():
-    p, s, schools = PostPlanner(ET), PostSettings(), {"19-1001": "EMS"}
+    p, s, schools = PostPlanner(ET), PostSettings(round_hours=6), {"19-1001": "EMS"}
     assert p.observe([team(0, 0)], schools, s, AT) == []          # primes: listed, not playing yet
     on = p.observe([team(60, 5)], schools, s, AT)                  # starts playing
     assert kinds(on) == ["on_board"]
@@ -50,6 +50,15 @@ def test_planner_follows_a_round():
     assert kinds(up) == ["time_up"]  # done now: no more live changes
     assert p.observe([team(6 * H, 90, nat=4, st=2)], schools, s, AT) == []  # nothing new
     assert kinds(p.observe([team(30, 0)], schools, s, AT)) == ["on_board"]  # next round
+
+
+def test_a_4_hour_round_announces_an_hour_left_at_3_hours():
+    p, s, schools = PostPlanner(ET), PostSettings(change_after_hours=2), {"19-1001": "EMS"}
+    assert s.round_hours == 4
+    p.observe([team(0, 0)], schools, s, AT)
+    p.observe([team(60, 5)], schools, s, AT)
+    assert kinds(p.observe([team(3 * H + 60, 60, nat=5)], schools, s, AT)) == ["hour_left", "change"]
+    assert kinds(p.observe([team(4 * H, 70, nat=4)], schools, s, AT)) == ["time_up"]
 
 
 def test_after_a_team_is_done_place_changes_are_periodic():
@@ -86,7 +95,7 @@ def test_disabled_posts_nothing():
 
 
 def test_restart_mid_round_does_not_repeat_posts():
-    p, s = PostPlanner(ET), PostSettings()
+    p, s = PostPlanner(ET), PostSettings(round_hours=6)
     assert p.observe([team(5 * H + 120, 80)], {}, s, AT) == []
     assert p.observe([team(5 * H + 180, 80)], {}, s, AT) == []
     assert "Team 19-1001" in p.observe([team(5 * H + 240, 85)], {}, s, AT)[0].text

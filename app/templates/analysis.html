@@ -35,13 +35,14 @@
 <p class="small"><a href="/analysis/seasons?division={{ division | urlencode }}">Compare seasons →</a></p>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Report</th><th>Scores</th><th class="num">Teams</th><th>Images</th><th>Updated</th><th>Source</th></tr></thead>
+  <thead><tr><th>Report</th><th>Scores</th><th>State</th><th class="num">Teams</th><th>Images</th><th>Updated</th><th>Source</th></tr></thead>
   {% for season, rs in seasons.items() %}
   <tbody>
-  <tr class="season-row"><th colspan="6"><a href="/analysis/seasons/{{ season }}?division={{ division | urlencode }}">CP-{{ season }}</a>
+  <tr class="season-row"><th colspan="7"><a href="/analysis/seasons/{{ season }}?division={{ division | urlencode }}">CP-{{ season }}</a>
     <span class="muted small">· {{ rs | length }} report{{ 's' if rs | length != 1 }}, compare the season's rounds →</span></th></tr>
   {% for r in rs %}
   <tr><td><a href="/analysis/reports/{{ r.id }}">{{ r.title }}</a></td><td>{{ r.status }}</td>
+    <td>{% if r.source != 'live' %}final{% elif r.report_run_at %}<strong>report run</strong> <span class="muted small">{{ r.report_run_at | local }}</span>{% elif r.complete_at %}complete, runs {{ (r.complete_at + run_after) | local }}{% else %}collecting{% endif %}</td>
     <td class="num">{{ r.team_count }}</td><td class="small">{{ r.images | join(', ') }}</td>
     <td>{{ r.sampled_at | local }}{% if r.revision > 1 %} <span class="muted small">(rev. {{ r.revision }})</span>{% endif %}</td>
     <td>{{ 'legacy file' if r.source == 'legacy' else 'live board' }}</td></tr>
@@ -94,4 +95,5 @@
 </details>
 {% endif %}
 <script src="{{ url_for('static', path='info.js') }}" defer></script>
+<script src="{{ url_for('static', path='countdown.js') }}" defer></script>
 {% endblock %}
