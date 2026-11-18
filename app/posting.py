@@ -43,6 +43,7 @@ log = logging.getLogger(__name__)
 
 X_POST_URL = "https://api.x.com/2/tweets"
 X_MAX_CHARS = 280
+ROUND_HOURS = 4.0   # CP-19 rounds are 4 hours: "an hour left" at 3:00, "time is up" at 4:00
 
 posts = Table(
     "posts", metadata,
@@ -78,8 +79,8 @@ class PostSettings:
     enabled: bool = True
     mode: str = "dry_run"
     kinds: set[str] = field(default_factory=lambda: set(KINDS))
-    round_hours: float = 4.0         # the round's time limit (CP-19: 4 hours; earlier seasons 6)
     change_after_hours: float = 4.0  # live changes only once a team has played this long
+    round_hours: float = ROUND_HOURS  # not a setting; tests use 6 for the legacy seasons
     place_every_minutes: int = 30    # after a team is done: at most one place update this often
     per_hour: int = 10
     per_day: int = 40
@@ -92,8 +93,8 @@ class PostSettings:
         s.enabled = board.get_value("post_enabled") != "0"
         if (kinds := board.get_value("post_kinds")) or board.get_value("post_kinds_set"):
             s.kinds = {k for k in kinds.split(",") if k in KINDS}
-        for name, conv in (("round_hours", float), ("change_after_hours", float), ("place_every_minutes", int),
-                           ("per_hour", int), ("per_day", int)):
+        for name, conv in (("change_after_hours", float), ("place_every_minutes", int), ("per_hour", int),
+                           ("per_day", int)):
             raw = board.get_value(f"post_{name}")
             if raw:
                 try:
@@ -109,7 +110,6 @@ class PostSettings:
         board.set_value("post_place_every_minutes", str(self.place_every_minutes))
         board.set_value("post_kinds", ",".join(sorted(self.kinds)))
         board.set_value("post_kinds_set", "1")
-        board.set_value("post_round_hours", f"{self.round_hours:g}")
         board.set_value("post_change_after_hours", f"{self.change_after_hours:g}")
         board.set_value("post_per_hour", str(self.per_hour))
         board.set_value("post_per_day", str(self.per_day))

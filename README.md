@@ -304,8 +304,8 @@ so nothing is repeated.
   `SECRETS_KEY` before they're stored and never shown again. Without `SECRETS_KEY`,
   keys can't be saved.
 - **Test post:** sends one post in the current mode, ignoring the limits.
-- **Round length:** 4 hours by default (CP-19), or 6; "an hour left" and "time is up"
-  follow it, and the live-changes slider runs up to it.
+- **Round length:** CP-19 rounds are 4 hours, so "an hour left" posts at 3:00 and "time is
+  up" at 4:00; the live-changes slider runs up to 4 hours.
 - **Out of credits:** when X answers 402 (API credits used up), real posts are skipped
   (and logged) rather than failing one by one, and /admin/config says so. After adding
   credits, a test post that goes through resumes posting.
