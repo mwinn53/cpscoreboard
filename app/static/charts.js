@@ -6,7 +6,7 @@
 (function () {
   "use strict";
   var NS = "http://www.w3.org/2000/svg";
-  document.querySelectorAll(".chart-wrap[data-points]").forEach(function (wrap) {
+  function crosshair(wrap) {
     var pts = JSON.parse(wrap.dataset.points);
     var plot = wrap.dataset.plot.split(",").map(Number);
     var svg = wrap.querySelector("svg"), tip = wrap.querySelector(".chart-tip");
@@ -39,5 +39,7 @@
     svg.addEventListener("pointermove", function (e) { show(e.clientX); });
     svg.addEventListener("pointerdown", function (e) { show(e.clientX); });
     svg.addEventListener("pointerleave", hide);
-  });
+  }
+  window.chartCrosshair = crosshair;   // for charts redrawn in place (zoom, static/analysis_charts.js)
+  document.querySelectorAll(".chart-wrap[data-points]").forEach(crosshair);
 })();

@@ -11,11 +11,22 @@ with the same numbers. Highlighting is consistent across charts:
 
 Marks carry a ``data-tip`` that static/analysis_charts.js shows on hover or tap; the
 progress chart uses the crosshair from static/charts.js instead.
+
+Interactive charts (#65), all in static/analysis_charts.js over this SVG:
+
+* team marks carry ``data-team``, so a team picked in any chart, table or the search
+  box is highlighted in every chart;
+* legend entries with a ``toggle`` (a CSS selector inside the card) show or hide a
+  series; team-group entries (``group``) show or hide that group's dots page-wide;
+* charts in ``ZOOMABLE`` carry ``data-zoom`` and ``data-x`` (the x domain and its SVG
+  range): a brushed range is re-rendered by the server (``zoomed_chart``) with its own
+  ticks and bins.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import zlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -36,20 +47,32 @@ class Item:
     label: str
     cls: str      # legend class: ours / district / state / other / band / median / s1…
     shape: str = "dot"
+    toggle: str = ""   # CSS selector, inside the chart card, of the marks this entry shows or hides
+    group: str = ""    # a team group whose dots this entry shows or hides on the whole page
 
 
 def legend(items: Sequence[Item]) -> str:
-    li = "".join(f'<li><span class="key {escape(i.shape)} {escape(i.cls)}"></span>{escape(i.label)}</li>'
-                 for i in items)
-    return f'<ul class="legend">{li}</ul>'
+    out = []
+    for i in items:
+        key = f'<span class="key {escape(i.shape)} {escape(i.cls)}"></span>{escape(i.label)}'
+        if i.toggle:
+            out.append(f'<li><button type="button" class="legend-toggle" data-toggle="{escape(i.toggle)}" '
+                       f'aria-pressed="true">{key}</button></li>')
+        elif i.group:
+            out.append(f'<li><button type="button" class="legend-toggle" data-group="{escape(i.group)}" '
+                       f'aria-pressed="true">{key}</button></li>')
+        else:
+            out.append(f"<li>{key}</li>")
+    return f'<ul class="legend">{"".join(out)}</ul>'
 
 
-TEAM_LEGEND = [Item("Our teams", "ours"), Item("District teams", "district"), Item("Other {state} teams", "state"),
-               Item("Everyone else", "other")]
+TEAM_LEGEND = [Item("Our teams", "ours", group="ours"), Item("District teams", "district", group="district"),
+               Item("Other {state} teams", "state", group="state"), Item("Everyone else", "other", group="other")]
 
 
-def team_legend(state: str, *, others: bool = True) -> str:
-    items = [Item(i.label.replace("{state}", state), i.cls) for i in TEAM_LEGEND]
+def team_legend(state: str, *, others: bool = True, toggles: bool = True) -> str:
+    """The team groups; with ``toggles``, each entry shows or hides that group's dots (not bars) on the page."""
+    items = [Item(i.label.replace("{state}", state), i.cls, group=i.group if toggles else "") for i in TEAM_LEGEND]
     return legend(items if others else items[:3])
 
 
@@ -97,8 +120,8 @@ def team_tip(t: TeamRow, extra: str = "") -> str:
 _ORDER = {"other": 0, "state": 1, "district": 2, "ours": 3}
 
 
-def _svg(width: int, height: int, label: str, body: list[str]) -> str:
-    return (f'<div class="chart-wrap" data-tips><svg class="chart" viewBox="0 0 {width} {height}" role="img" '
+def _svg(width: int, height: int, label: str, body: list[str], attrs: str = "") -> str:
+    return (f'<div class="chart-wrap" data-tips{attrs}><svg class="chart" viewBox="0 0 {width} {height}" role="img" '
             f'aria-label="{escape(label)}" preserveAspectRatio="xMidYMid meet">{"".join(body)}</svg>'
             f'<div class="chart-tip" hidden></div></div>')
 
@@ -168,9 +191,10 @@ def _hbox(parts: list[str], cy: float, half: float, d: Describe, values, x: Scal
                  f'y2="{cy + half:.1f}"/>')
 
 
-def _dot(parts: list[str], cx: float, cy: float, cls: str, tip: str | None) -> None:
+def _dot(parts: list[str], cx: float, cy: float, cls: str, tip: str | None, team: str = "") -> None:
     r = 5 if cls == "ours" else 4 if "big" in cls else 3.5 if cls in ("district", "state") else 2.5
     t = f' data-tip="{escape(tip)}"' if tip else ""
+    t += f' data-team="{escape(team)}"' if team else ""
     parts.append(f'<circle class="dot {cls}" cx="{cx:.1f}" cy="{cy:.1f}" r="{r}"{t}/>')
 
 
@@ -256,7 +280,7 @@ def group_strips(r: RoundReport, width: int = W) -> str:
             if k == 0 and cls in ("state",):
                 cls = "other"
             _dot(parts, x(t.score), cy + jitter(t.team_number) * 22, cls,
-                 team_tip(t) if cls != "other" or k else None)
+                 team_tip(t) if cls != "other" or k else None, t.team_number)
     parts.append(f'<line class="axis" x1="{left}" x2="{width - RIGHT}" y1="{h - BOTTOM}" y2="{h - BOTTOM}"/>')
     _x_ticks(parts, tv, x, h - BOTTOM, title="score", width=width)
     return _svg(width, h, f"Scores nationally and in {r.state}, every team a dot", parts)
@@ -265,14 +289,20 @@ def group_strips(r: RoundReport, width: int = W) -> str:
 def histogram(r: RoundReport, value: Callable[[TeamRow], float | None], *, bin_size: float, label: str,
               x_title: str, refs: Sequence[tuple[float, str]] = (), fmt: Callable[[float], str] = num,
               width: int = W, height: int = 220, start: float | None = None,
-              x_tick_values: Sequence[float] | None = None) -> str:
-    """Counts per bin, stacked: our teams, then the state's, then everyone else."""
+              x_tick_values: Sequence[float] | None = None, stop: float | None = None, zoom: str = "") -> str:
+    """Counts per bin, stacked: our teams, then the state's, then everyone else. With ``stop``, only values from
+    ``start`` to ``stop`` (a zoomed range)."""
     vals = [(value(t), team_class(t, r.state)) for t in r.teams]
     vals = [(v, c) for v, c in vals if v is not None]
+    if stop is not None:
+        vals = [(v, c) for v, c in vals if (start is None or v >= start) and v <= stop]
     if not vals:
         return ""
     lo = start if start is not None else (min(v for v, _ in vals) // bin_size) * bin_size
-    n_bins = int((max(v for v, _ in vals) - lo) // bin_size) + 1
+    if stop is not None:
+        n_bins = max(int(math.ceil((stop - lo) / bin_size - 1e-9)), 1)
+    else:
+        n_bins = int((max(v for v, _ in vals) - lo) // bin_size) + 1
     counts = [{"ours": 0, "state": 0, "other": 0} for _ in range(n_bins)]
     for v, c in vals:
         b = min(int((v - lo) // bin_size), n_bins - 1)
@@ -303,7 +333,16 @@ def histogram(r: RoundReport, value: Callable[[TeamRow], float | None], *, bin_s
     for v, text in refs:
         if lo <= v <= lo + n_bins * bin_size:
             _ref_v(parts, v, x, TOP, height - BOTTOM, text)
-    return _svg(width, height, label, parts)
+    attrs = _zoom_attrs(zoom, lo, lo + n_bins * bin_size, LEFT, width - RIGHT, stop is not None)
+    return _svg(width, height, label, parts, attrs)
+
+
+def _zoom_attrs(name: str, d0: float, d1: float, r0: float, r1: float, zoomed: bool) -> str:
+    """Marks a zoomable chart: its name, and its x domain against the SVG range (for the brush)."""
+    if not name:
+        return ""
+    return (f' data-zoom="{escape(name)}" data-x="{d0:g},{d1:g},{r0:.1f},{r1:.1f}"'
+            + (" data-zoomed" if zoomed else ""))
 
 
 def heatmap(r: RoundReport, width: int = W, height: int = 260) -> str:
@@ -334,7 +373,7 @@ def heatmap(r: RoundReport, width: int = W, height: int = 260) -> str:
                      f'data-tip="{escape(tip)}"/>')
     for m, s, t in pts:
         if t.grp == EMS:
-            _dot(parts, x(m), y(s), "ours", team_tip(t, f" · {m:.0f} min"))
+            _dot(parts, x(m), y(s), "ours", team_tip(t, f" · {m:.0f} min"), t.team_number)
     parts.append(f'<line class="axis" x1="{LEFT}" x2="{width - RIGHT}" y1="{height - BOTTOM}" '
                  f'y2="{height - BOTTOM}"/>')
     _x_ticks(parts, list(range(0, int(xmax) + 1, 60)), x, height - BOTTOM, lambda v: f"{v / 60:.0f} h",
@@ -407,7 +446,7 @@ def column_boxes(r: RoundReport, columns: Sequence[tuple[str, list[tuple[TeamRow
             if cls == "other":
                 continue
             _dot(parts, cx + jitter(t.team_number + name) * spread, y(v), cls,
-                 team_tip(t, f" · {name} {(tip_fmt or fmt)(v)}"))
+                 team_tip(t, f" · {name} {(tip_fmt or fmt)(v)}"), t.team_number)
     parts.append(f'<line class="axis" x1="{LEFT}" x2="{width - RIGHT}" y1="{height - BOTTOM}" '
                  f'y2="{height - BOTTOM}"/>')
     return _svg(width, height, label, parts)
@@ -446,73 +485,100 @@ def finds_bars(r: RoundReport, image: str, width: int = 360) -> str:
                      width=width, height=190, start=0)
 
 
-def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
+def _clock(v: float) -> str:
+    v = int(round(v))
+    return f"{v // 60} h" if v % 60 == 0 else f"{v // 60}:{v % 60:02d}"
+
+
+def progress_chart(r: RoundReport, width: int = W, height: int = 260,
+                   window: tuple[float, float] | None = None) -> str:
     """The field's (and the top quarter's) median and middle half by minutes since each team's start, with our
-    teams' lines."""
+    teams' lines; ``window`` (minutes) zooms in."""
     p = r.progress
     if not p:
         return ""
     pc = r.pace
-    vals = [v for v in p.q3 if v is not None] + [v for _, s in p.ours for v in s]
-    if pc:
-        vals += [v for v in pc.q3 if v is not None]
+    lo, hi = window or (0, p.limit)
+    ks = [k for k, m in enumerate(p.minutes) if lo <= m <= hi]
+    if len(ks) < 2:
+        return ""
+
+    def pick(seq):
+        return [seq[k] for k in ks]
+    mins, q1, med, q3 = pick(p.minutes), pick(p.q1), pick(p.median), pick(p.q3)
+    ours = [(team, pick(series)) for team, series in p.ours[:7]]
+    top = (pick(pc.q1), pick(pc.median), pick(pc.q3)) if pc else None
+    vals = [v for v in q3 if v is not None] + [v for _, s in ours for v in s]
+    if top:
+        vals += [v for v in top[2] if v is not None]
     yv = ticks(0, max(vals) if vals else 1)
-    end = p.limit
-    x = Scale(0, end, LEFT, width - RIGHT - 70)
+    first, end = mins[0], mins[-1]
+    x = Scale(first, end, LEFT, width - RIGHT - 70)
     y = Scale(0, yv[-1], height - BOTTOM, TOP)
     parts: list[str] = []
     _y_axis(parts, yv, y, LEFT, width - RIGHT - 70, title="score")
-    band = [(m, a, b) for m, a, b in zip(p.minutes, p.q1, p.q3) if a is not None]
-    if band:
-        d = "M" + " L".join(f"{x(m):.1f},{y(b):.1f}" for m, _, b in band)
-        d += " L" + " L".join(f"{x(m):.1f},{y(a):.1f}" for m, a, _ in reversed(band)) + " Z"
-        parts.append(f'<path class="band" d="{d}"/>')
-        parts.append('<path class="median-line" d="M' + " L".join(
-            f"{x(m):.1f},{y(v):.1f}" for m, v in zip(p.minutes, p.median) if v is not None) + '"/>')
-    if pc:
-        top = [(m, a, b) for m, a, b in zip(pc.minutes, pc.q1, pc.q3) if a is not None]
-        d = "M" + " L".join(f"{x(m):.1f},{y(b):.1f}" for m, _, b in top)
-        d += " L" + " L".join(f"{x(m):.1f},{y(a):.1f}" for m, a, _ in reversed(top)) + " Z"
-        parts.append(f'<path class="band top" d="{d}"/>')
-        parts.append('<path class="top-line" d="M' + " L".join(
-            f"{x(m):.1f},{y(v):.1f}" for m, v in zip(pc.minutes, pc.median) if v is not None) + '"/>')
+
+    def area(lows, highs, cls):
+        band = [(m, a, b) for m, a, b in zip(mins, lows, highs) if a is not None]
+        if band:
+            d = "M" + " L".join(f"{x(m):.1f},{y(b):.1f}" for m, _, b in band)
+            d += " L" + " L".join(f"{x(m):.1f},{y(a):.1f}" for m, a, _ in reversed(band)) + " Z"
+            parts.append(f'<path class="{cls}" d="{d}"/>')
+
+    def line(values, cls, extra=""):
+        pts = [(m, v) for m, v in zip(mins, values) if v is not None]
+        if pts:
+            parts.append(f'<path class="{cls}"{extra} d="M' + " L".join(f"{x(m):.1f},{y(v):.1f}" for m, v in pts)
+                         + '"/>')
+    area(q1, q3, "band")
+    line(med, "median-line")
+    if top:
+        area(top[0], top[2], "band top")
+        line(top[1], "top-line")
     ends = []
-    for i, (team, series) in enumerate(p.ours[:7], start=2):
+    for i, (team, series) in enumerate(ours, start=2):
         slot = f"s{i}"
-        parts.append(f'<path class="series {slot}" d="M' + " L".join(
-            f"{x(m):.1f},{y(v):.1f}" for m, v in zip(p.minutes, series)) + '"/>')
+        line(series, f"series {slot}", f' data-team="{escape(team)}"')
         ends.append([y(series[-1]), slot, team, series[-1]])
     ends.sort()
     for k in range(1, len(ends)):
         ends[k][0] = max(ends[k][0], ends[k - 1][0] + 13)
     for ly, slot, team, v in ends:
-        parts.append(f'<circle class="end {slot}" cx="{x(end):.1f}" cy="{y(v):.1f}" r="4"/>')
-        parts.append(f'<text class="end-label" x="{x(end) + 8:.1f}" y="{ly + 4:.1f}">{escape(team)}</text>')
+        parts.append(f'<circle class="end {slot}" cx="{x(end):.1f}" cy="{y(v):.1f}" r="4" '
+                     f'data-team="{escape(team)}"/>')
+        parts.append(f'<text class="end-label {slot}" x="{x(end) + 8:.1f}" y="{ly + 4:.1f}" '
+                     f'data-team="{escape(team)}">{escape(team)}</text>')
     parts.append(f'<line class="axis" x1="{LEFT}" x2="{x(end):.1f}" y1="{height - BOTTOM}" '
                  f'y2="{height - BOTTOM}"/>')
-    _x_ticks(parts, list(range(0, end + 1, 60)), x, height - BOTTOM, lambda v: f"{v / 60:.0f} h",
-             "", width)
+    span = end - first
+    step = 60 if span > 240 else 30 if span > 90 else 15 if span > 30 else 5
+    _x_ticks(parts, list(range(int(math.ceil(first / step)) * step, int(end) + 1, step)), x, height - BOTTOM,
+             _clock, "", width)
     hover = []
-    for k, m in enumerate(p.minutes):
-        bits = [f"median {num(p.median[k])} (middle half {num(p.q1[k])}–{num(p.q3[k])})"]
-        if pc:
-            bits.append(f"top quarter {num(pc.median[k])} ({num(pc.q1[k])}–{num(pc.q3[k])})")
-        bits += [f"{team} {num(s[k])}" for team, s in p.ours[:7]]
+    for k, m in enumerate(mins):
+        bits = [f"median {num(med[k])} (middle half {num(q1[k])}–{num(q3[k])})"]
+        if top:
+            bits.append(f"top quarter {num(top[1][k])} ({num(top[0][k])}–{num(top[2][k])})")
+        bits += [f"{team} {num(s[k])}" for team, s in ours]
         hover.append([round(x(m), 1), None, f"{m // 60}:{m % 60:02d} · " + " · ".join(bits)])
     svg = (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Score by time since each '
            f'team started: the field and our teams" preserveAspectRatio="xMidYMid meet">{"".join(parts)}</svg>')
+    zoom = _zoom_attrs("progress", first, end, LEFT, x(end), window is not None)
     return (f'<div class="chart-wrap" data-points="{escape(json.dumps(hover))}" '
-            f'data-plot="{LEFT},{x(end):.1f},{TOP},{height - BOTTOM},{width},{height}">{svg}'
+            f'data-plot="{LEFT},{x(end):.1f},{TOP},{height - BOTTOM},{width},{height}"{zoom}>{svg}'
             f'<div class="chart-tip" hidden></div></div>')
 
 
 def progress_legend(r: RoundReport) -> str:
     if not r.progress:
         return ""
-    items = [Item("Field median", "median", "line"), Item("Field middle half", "band", "area")]
+    items = [Item("Field median", "median", "line", ".median-line"),
+             Item("Field middle half", "band", "area", ".band:not(.top)")]
     if r.pace:
-        items += [Item("Top quarter median", "top", "line"), Item("Top quarter middle half", "top-band", "area")]
-    items += [Item(team, f"s{i}", "line") for i, (team, _) in enumerate(r.progress.ours[:7], start=2)]
+        items += [Item("Top quarter median", "top", "line", ".top-line"),
+                  Item("Top quarter middle half", "top-band", "area", ".band.top")]
+    items += [Item(team, f"s{i}", "line", f".series.s{i}, .end.s{i}, .end-label.s{i}")
+              for i, (team, _) in enumerate(r.progress.ours[:7], start=2)]
     return legend(items)
 
 
@@ -543,13 +609,15 @@ def advance_chart(r: RoundReport, width: int = W) -> str:
                              f'{escape(p.team.team_number)}</text>')
             tip = (f"{p.team.team_number}: {n.label} needs ≈ {num(n.median)} State Round points "
                    f"(likely {num(n.lo)}–{num(n.hi)}), {100 * n.chance:.0f}% chance")
+            team = escape(p.team.team_number)
             parts.append(f'<rect class="need {slot}" x="{x(n.lo):.1f}" y="{cy - 5:.1f}" '
-                         f'width="{max(x(n.hi) - x(n.lo), 2):.1f}" height="10" rx="3" data-tip="{escape(tip)}"/>')
+                         f'width="{max(x(n.hi) - x(n.lo), 2):.1f}" height="10" rx="3" data-tip="{escape(tip)}" '
+                         f'data-team="{team}"/>')
             parts.append(f'<line class="need-med {slot}" x1="{x(n.median):.1f}" x2="{x(n.median):.1f}" '
                          f'y1="{cy - 8:.1f}" y2="{cy + 8:.1f}"/>')
             if first:
                 parts.append(f'<circle class="dot expected" cx="{x(p.expected):.1f}" cy="{cy:.1f}" r="4.5" '
-                             f'data-tip="{escape(f"{p.team.team_number}: projected State Round score ≈ {num(p.expected)}")}"/>')
+                             f'data-team="{team}" data-tip="{escape(f"{p.team.team_number}: projected State Round score ≈ {num(p.expected)}")}"/>')
             first = False
             y += row
         y += 8
@@ -563,10 +631,10 @@ def advance_legend(r: RoundReport) -> str:
     a = r.advance
     if not a or a.stage != "projection":
         return ""
-    items = [Item("Needed for the Semifinals", "s1", "area")]
+    items = [Item("Needed for the Semifinals", "s1", "area", ".need.s1, .need-med.s1")]
     if any(p.award for p in a.projections):
-        items.append(Item(f"Needed for a top-3 {r.state} award", "s3", "area"))
-    items.append(Item("Projected State Round score", "expected"))
+        items.append(Item(f"Needed for a top-3 {r.state} award", "s3", "area", ".need.s3, .need-med.s3"))
+    items.append(Item("Projected State Round score", "expected", toggle=".dot.expected"))
     return legend(items)
 
 
@@ -574,20 +642,51 @@ def _hours(v: float) -> str:
     return f"{v / 60:.0f} h" if v % 60 == 0 else f"{v / 60:.2f} h"
 
 
-def round_charts(r: RoundReport) -> dict[str, str]:
+def score_hist(r: RoundReport, window: tuple[float, float] | None = None) -> str:
     nat = r.score["national"]
     refs = [(nat.median, f"national median {num(nat.median)}")] if nat.median is not None else []
-    hi = max((t.score for t in r.teams), default=0)
-    score_bin = _nice_step(hi or 10, 24)
+    if window:
+        lo, hi = window
+        step = _nice_step(hi - lo, 24)
+        return histogram(r, lambda t: t.score, bin_size=step, label="Score distribution (zoomed)", x_title="score",
+                         refs=refs, width=HALF, start=math.floor(lo / step) * step, stop=hi, zoom="score_hist")
+    top = max((t.score for t in r.teams), default=0)
+    return histogram(r, lambda t: t.score, bin_size=_nice_step(top or 10, 24), label="Score distribution",
+                     x_title="score", refs=refs, width=HALF, zoom="score_hist")
+
+
+def time_hist(r: RoundReport, window: tuple[float, float] | None = None) -> str:
+    cap = r.limit + OVER
+
+    def minutes(t: TeamRow) -> float | None:
+        return min(t.play_time / 60, cap - 1) if t.play_time else None
+    refs = [(r.limit, f"{r.limit // 60}-hour limit")]
+    if window:
+        lo, hi = window
+        step = 5 if hi - lo <= 120 else 15
+        lo = math.floor(lo / step) * step
+        tick = 60 if hi - lo > 240 else 30 if hi - lo > 90 else 15
+        return histogram(r, minutes, bin_size=step, label="Play time distribution (zoomed)", x_title="play time",
+                         refs=refs, fmt=_clock, start=lo, stop=hi, width=HALF, zoom="time_hist",
+                         x_tick_values=list(range(int(math.ceil(lo / tick)) * tick, int(hi) + 1, tick)))
+    return histogram(r, minutes, bin_size=15, label="Play time distribution", x_title="play time", refs=refs,
+                     fmt=_hours, start=0, width=HALF, zoom="time_hist",
+                     x_tick_values=list(range(0, cap + 1, 60 if r.limit <= 240 else 120)))
+
+
+def zoomed_chart(r: RoundReport, name: str, lo: float, hi: float) -> str:
+    """One zoomable chart re-rendered for an x range (the brush in static/analysis_charts.js)."""
+    if name not in ZOOMABLE or not hi > lo:
+        return ""
+    return ZOOMABLE[name](r, window=(lo, hi))
+
+
+def round_charts(r: RoundReport) -> dict[str, str]:
     charts = {
         "state_boxes": state_boxes(r),
         "strips": group_strips(r),
-        "score_hist": histogram(r, lambda t: t.score, bin_size=score_bin, label="Score distribution",
-                                x_title="score", refs=refs, width=HALF),
-        "time_hist": histogram(r, lambda t: min(t.play_time / 60, r.limit + OVER - 1) if t.play_time else None,
-                               bin_size=15, label="Play time distribution", x_title="play time",
-                               refs=[(r.limit, f"{r.limit // 60}-hour limit")], fmt=_hours, start=0, width=HALF,
-                               x_tick_values=list(range(0, r.limit + OVER + 1, 60 if r.limit <= 240 else 120))),
+        "score_hist": score_hist(r),
+        "time_hist": time_hist(r),
         "heatmap": heatmap(r),
         "density": density_scatter(r),
         "attempts": attempts_boxes(r, HALF),
@@ -598,6 +697,10 @@ def round_charts(r: RoundReport) -> dict[str, str]:
     for img in r.images:
         charts[f"finds:{img.name}"] = finds_bars(r, img.name)
     return charts
+
+
+ZOOMABLE: dict[str, Callable[..., str]] = {"progress": progress_chart, "score_hist": score_hist,
+                                           "time_hist": time_hist}
 
 
 # --- comparisons ---
@@ -654,8 +757,11 @@ def percentile_lines(categories: Sequence[str], series: Sequence[tuple[str, Sequ
     ends.sort()
     for k in range(1, len(ends)):
         ends[k][0] = max(ends[k][0], ends[k - 1][0] + 15)
-    for ly, name, slot in ends:  # direct labels, each with its line's color key
+    for ly, name, slot in ends:  # direct labels, each with its line's color key; a click shows or hides the line
+        parts.append(f'<g class="label-toggle" data-series="{slot}" role="button" tabindex="0" aria-pressed="true" '
+                     f'aria-label="Show or hide {escape(name)}">')
         parts.append(f'<rect class="key-mark {slot}" x="{width - RIGHT - 86}" y="{ly - 1.5:.1f}" width="10" '
                      'height="3" rx="1.5"/>')
         parts.append(f'<text class="end-label" x="{width - RIGHT - 72}" y="{ly + 4:.1f}">{escape(name[:14])}</text>')
+        parts.append(f'<rect class="hit" x="{width - RIGHT - 88}" y="{ly - 8:.1f}" width="88" height="15"/></g>')
     return _svg(width, height + (40 if many else 0), label, parts)

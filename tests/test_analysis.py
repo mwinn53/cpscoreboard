@@ -187,7 +187,7 @@ def test_narrative_and_charts_for_a_round():
     charts = round_charts(r)
     for key in ("state_boxes", "strips", "score_hist", "time_hist", "heatmap", "density", "attempts", "completion",
                 "finds:Windows10"):
-        assert charts[key].startswith('<div class="chart-wrap" data-tips>') and "data-tip=" in charts[key], key
+        assert charts[key].startswith('<div class="chart-wrap" data-tips') and "data-tip=" in charts[key], key
     assert 'class="dot ours"' in charts["strips"] and 'class="box hl"' in charts["state_boxes"]
     assert "data-points=" in charts["progress"] and "series s2" in charts["progress"]
     assert cached_report(a, info, "GA") is not cached_report(a, info, "TX")

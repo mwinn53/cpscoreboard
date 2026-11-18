@@ -5,7 +5,9 @@
   30 seconds; for admins, the throttle (teams fetched at once), the divisions to
   collect and the legacy import.
 * ``/analysis/reports/{id}``: a round's report (app/analysis.py,
-  app/analysis_narrative.py, app/analysis_charts.py), its name and the coaches' notes.
+  app/analysis_narrative.py, app/analysis_charts.py), its name and the coaches' notes;
+  ``?state=`` reads it for another state (ours stay highlighted);
+  ``/analysis/reports/{id}/charts/{name}?lo=&hi=``: one chart zoomed to an x range.
 * ``/analysis/seasons``: season over season; ``/analysis/seasons/{season}``: a
   season's rounds; ``/analysis/compare?a=&b=``: any two reports side by side
   (app/analysis_compare.py).
@@ -201,19 +203,29 @@ async def old_round_link(round_id: int):
     return RedirectResponse(f"/analysis/reports/{round_id}", status_code=301)
 
 
+def _report_state(request: Request, store, info, state: str) -> str:
+    """The state a report is read for: ``state`` when the data set has teams there, else the home state."""
+    home = _home_state(request)
+    state = state.strip().upper()
+    if state and state != home and any(t.location == state for t in store.teams(info.id)):
+        return state
+    return home
+
+
 @router.get("/reports/{round_id}", response_class=HTMLResponse)
-async def report_page(request: Request, round_id: int, top: int = 25, me: Device = Depends(require_coach)):
+async def report_page(request: Request, round_id: int, top: int = 25, state: str = "",
+                      me: Device = Depends(require_coach)):
     from .analysis import cached_report
     from .analysis_charts import advance_legend, progress_legend, round_charts, team_legend
     from .analysis_compare import round_context
     store, collector = _state(request)
     info = await _get_round(store, round_id)
-    state = _home_state(request)
 
     def build():
-        report = cached_report(store, info, state)
-        return report, round_charts(report), round_context(store, info, state)
-    report, charts, context = await asyncio.to_thread(build)
+        st = _report_state(request, store, info, state)
+        report = cached_report(store, info, st)
+        return st, report, round_charts(report), round_context(store, info, st)
+    state, report, charts, context = await asyncio.to_thread(build)
     status = None
     if collector and info.source == LIVE:
         st = collector.status.get(info.division)
@@ -222,9 +234,27 @@ async def report_page(request: Request, round_id: int, top: int = 25, me: Device
     others = [r for r in await asyncio.to_thread(store.rounds, info.division) if r.id != info.id]
     return _page(request, "analysis_round.html", me=me, info=info, report=report, charts=charts, context=context,
                  round_choices=ROUND_CHOICES,
-                 legend=team_legend(state), progress_legend=progress_legend(report),
+                 legend=team_legend(state), bar_legend=team_legend(state, toggles=False), progress_legend=progress_legend(report),
                  advance_legend=advance_legend(report), status=status, top=top,
-                 top_choices=TOP_CHOICES, others=others, notice=request.query_params.get("notice"))
+                 top_choices=TOP_CHOICES, others=others, notice=request.query_params.get("notice"),
+                 home_state=_home_state(request),
+                 states=sorted({t.location for t in report.teams if t.location}))
+
+
+@router.get("/reports/{round_id}/charts/{name}", response_class=HTMLResponse)
+async def report_chart(request: Request, round_id: int, name: str, lo: float, hi: float, state: str = "",
+                       me: Device = Depends(require_coach)):
+    """One chart zoomed to an x range (the brush in static/analysis_charts.js); 404 for an unknown chart."""
+    from .analysis import cached_report
+    from .analysis_charts import ZOOMABLE, zoomed_chart
+    if name not in ZOOMABLE:
+        return HTMLResponse("", status_code=404)
+    store, _ = _state(request)
+    info = await _get_round(store, round_id)
+
+    def build():
+        return zoomed_chart(cached_report(store, info, _report_state(request, store, info, state)), name, lo, hi)
+    return HTMLResponse(await asyncio.to_thread(build))
 
 
 @router.post("/reports/{round_id}", dependencies=[Depends(same_origin)])
