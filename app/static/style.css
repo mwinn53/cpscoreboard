@@ -292,3 +292,4 @@ svg.chart .key-mark.s4 { fill: var(--s4); } svg.chart .key-mark.s5 { fill: var(-
 svg.chart .key-mark.s7 { fill: var(--s7); } svg.chart .key-mark.s8 { fill: var(--s8); }
 @media (max-width: 700px) { .charts.pair { grid-template-columns: 1fr; } }
 .cisco { color: var(--s1); font-weight: 700; }
+svg.chart .box.few { opacity: 0.45; }

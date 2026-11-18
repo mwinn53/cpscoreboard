@@ -208,7 +208,7 @@ def state_boxes(r: RoundReport, width: int = W) -> str:
     for i, s in enumerate(states):
         cx = LEFT + step * (i + 0.5)
         hl = "hl" if s.state == r.state else ""
-        _vbox(parts, cx, max(min(step * 0.32, 14), 2), s.score, s.values, y, hl)
+        _vbox(parts, cx, max(min(step * 0.32, 14), 2), s.score, s.values, y, hl + (" few" if s.n < 5 else ""))
         label = escape(s.state)
         if many:
             parts.append(f'<text class="tick {hl}" transform="translate({cx + 3:.1f},{h - bottom + 8}) rotate(-60)" '
@@ -217,7 +217,8 @@ def state_boxes(r: RoundReport, width: int = W) -> str:
             parts.append(f'<text class="tick {hl}" x="{cx:.1f}" y="{h - bottom + 16}" text-anchor="middle">'
                          f'{label}</text>')
         tip = (f"{s.state} · {s.n} team{'s' if s.n != 1 else ''} · median {num(s.score.median)}"
-               + (f" · middle half {num(s.score.q1)}–{num(s.score.q3)}" if s.n > 1 else ""))
+               + (f" · middle half {num(s.score.q1)}–{num(s.score.q3)}" if s.n > 1 else "")
+               + (" · few teams: an unreliable median" if s.n < 5 else ""))
         parts.append(f'<rect class="hit" x="{LEFT + step * i:.1f}" y="{TOP}" width="{step:.1f}" '
                      f'height="{h - bottom - TOP}" data-tip="{escape(tip)}"/>')
     parts.append(f'<line class="axis" x1="{LEFT}" x2="{width - RIGHT}" y1="{h - bottom}" y2="{h - bottom}"/>')

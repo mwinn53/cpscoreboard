@@ -58,22 +58,34 @@
 <p class="muted small">Per image: items found · completion (found ÷ the image's items) · score.</p>
 {% endif %}
 
-<h2>Scores</h2>
+<h2>Scores
+  {% call tip("tests-help", "How the tests work") %}
+  Scores are lopsided, with ties and outliers, so the comparisons use ranks rather than averages. <strong>"A random
+  GA team outscored a random team from elsewhere 58% of the time"</strong> is the effect size: 50% would mean no
+  difference. The <strong>95% CI</strong> (confidence interval) is the range the true value plausibly lies in, from
+  resampling the teams (bootstrap). The <strong>p-value</strong> (Mann–Whitney test) is how often chance alone would
+  produce a difference this large; below 0.05 counts as statistically significant. Our own 3–4 teams are too few to
+  test within one round; the season pages test them across rounds (each team-round counted once, so treat those
+  results as a guide). Correlations are rank correlations (ρ) with their
+  p-values.
+  {% endcall %}
+</h2>
 {{ para(n.scores) }}
 <div class="charts">
   {{ card('Score by state, highest median first', charts.state_boxes,
-          '<p class="chart-note">Boxes are the middle half of each state\'s teams, the line is the median and the whiskers reach 1.5× the box. ' ~ r.state ~ ' is highlighted; the dashed line is the national median.</p>', 'wide') }}
+          '<p class="chart-note">Boxes are the middle half of each state\'s teams, the line is the median and the whiskers reach 1.5× the box. ' ~ r.state ~ ' is highlighted; the dashed line is the national median. Faded boxes are states with fewer than 5 teams, whose medians are unreliable.</p>', 'wide') }}
   {{ card('Where teams landed', charts.strips, legend, 'wide') }}
 </div>
 <details class="table-view"><summary>Scores by group (table)</summary>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th>
-    <th class="num">Mean</th><th class="num">Best</th></tr></thead>
+  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num" title="95% bootstrap confidence interval of the median">95% CI</th>
+    <th class="num">Middle half</th><th class="num">Mean</th><th class="num">Best</th></tr></thead>
   <tbody>
   {% for key, label in [('national', 'Nationally'), ('state', r.state), ('district', 'District (incl. ours)'), ('ems', 'Our teams')] %}
   {% set d = r.score[key] %}
   <tr><td>{{ label }}</td><td class="num">{{ d.n }}</td><td class="num">{{ d.median | num }}</td>
+    <td class="num">{% set ci = r.median_ci.get(key) %}{% if ci %}{{ ci[0] | num }}–{{ ci[1] | num }}{% endif %}</td>
     <td class="num">{% if d.n > 1 %}{{ d.q1 | num }}–{{ d.q3 | num }}{% endif %}</td>
     <td class="num">{{ d.mean | num }}</td><td class="num">{{ d.max | num }}</td></tr>
   {% endfor %}

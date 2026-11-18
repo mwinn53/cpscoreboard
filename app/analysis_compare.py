@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import analysis_stats as stats
 from .analysis import FAMILIES, OurTeam, RoundSummary, cached_report, round_summary
 from .analysis_charts import percentile_lines
-from .analysis_narrative import history_narrative, pair_narrative, participation_context, season_narrative
+from .analysis_narrative import (history_narrative, pair_narrative, participation_context, program_narrative,
+                                 season_narrative)
 from .analysis_store import FINAL, AnalysisStore, RoundInfo
 
 SHORT = {"r1": "R1", "r2": "R2", "r3": "R3", "state": "State", "st": "State", "sf": "SF", "semi": "SF",
@@ -38,6 +40,29 @@ def pick(rounds: list[RoundInfo]) -> list[RoundInfo]:
     return sorted(best.values(), key=lambda r: r.order)
 
 
+@dataclass
+class ProgramStats:
+    """Our teams as a program over several rounds (each team in each round counts once)."""
+    n: int                                    # team-rounds
+    above: int                                # how many outscored at least half the division
+    median_pct: float | None
+    ci: tuple[float, float] | None            # 95% bootstrap interval of the median percentile
+    test: stats.SignedRank | None             # percentiles against 50 (the median team)
+    trend: stats.Correlation | None           # our median team's percentile over the rounds (Kendall)
+    state_test: stats.SignedRank | None       # the state's median team against 50, round by round
+
+
+def program_stats(sums: list[RoundSummary]) -> ProgramStats:
+    pcts = [o.percentile for s in sums for o in s.ours]
+    with_ours = [s for s in sums if s.ours]
+    import statistics
+    return ProgramStats(
+        len(pcts), sum(1 for p in pcts if p > 50), statistics.median(pcts) if pcts else None,
+        stats.bootstrap_median(pcts), stats.wilcoxon_signed_rank(pcts, 50),
+        stats.kendall_tau(list(range(len(with_ours))), [s.median_pct for s in with_ours]),
+        stats.wilcoxon_signed_rank([s.state_median_pct for s in sums if s.state_median_pct is not None], 50))
+
+
 def summaries(store: AnalysisStore, rounds: list[RoundInfo], state: str) -> list[RoundSummary]:
     return [round_summary(cached_report(store, r, state, timeline=False)) for r in rounds]
 
@@ -53,6 +78,7 @@ class SeasonView:
     narrative: list[str]
     chart: str
     families: list[str] = field(default_factory=list)
+    program: ProgramStats | None = None
 
 
 def season_view(store: AnalysisStore, division: str, season: int, state: str) -> SeasonView:
@@ -73,7 +99,9 @@ def season_view(store: AnalysisStore, division: str, season: int, state: str) ->
     chart = percentile_lines(cats, series, label=f"CP-{season}: our teams' percentile by round",
                              slots=slots[:8]) if sums else ""
     fams = [f for f in FAMILIES if any(f in s.family_field for s in sums)]
-    return SeasonView(season, division, sums, rows, season_narrative(sums), chart, fams)
+    program = program_stats(sums)
+    return SeasonView(season, division, sums, rows, season_narrative(sums) + program_narrative(program, sums), chart,
+                      fams, program)
 
 
 # --- season over season ---
@@ -88,6 +116,7 @@ class HistoryView:
     families: list[str]
     narrative: list[str]
     chart: str
+    program: ProgramStats | None = None
 
 
 def history_view(store: AnalysisStore, division: str, state: str) -> HistoryView:
@@ -105,7 +134,9 @@ def history_view(store: AnalysisStore, division: str, state: str) -> HistoryView
         label="Our best and median team, and the state's median team, by round", slots=["s2", "s3", "s1"]) \
         if sums else ""
     fams = [f for f in FAMILIES if any(f in s.family_field for s in sums)]
-    return HistoryView(division, sums, seasons, labels, grid, fams, history_narrative(sums), chart)
+    program = program_stats(sums)
+    return HistoryView(division, sums, seasons, labels, grid, fams,
+                       history_narrative(sums) + program_narrative(program, sums), chart, program)
 
 
 # --- two reports ---
