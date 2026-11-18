@@ -25,7 +25,7 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
 | [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🗒 Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
-| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress. Done: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92); the R-report evaluation ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)) became the rigor work in [#81](https://github.com/mwinn53/cpscoreboard/issues/81). Next: pace against the top quarter ([#77](https://github.com/mwinn53/cpscoreboard/issues/77)) in [#93](https://github.com/mwinn53/cpscoreboard/pull/93). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)), image order ([#79](https://github.com/mwinn53/cpscoreboard/issues/79)), what drives the score ([#80](https://github.com/mwinn53/cpscoreboard/issues/80)) | Make the analysis more useful to coaches |
+| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress. Done: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92); the R-report evaluation ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)) became the rigor work in [#81](https://github.com/mwinn53/cpscoreboard/issues/81). Next: pace against the top quarter ([#77](https://github.com/mwinn53/cpscoreboard/issues/77)) in [#93](https://github.com/mwinn53/cpscoreboard/pull/93); what it takes to advance, Middle School ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)) in [#94](https://github.com/mwinn53/cpscoreboard/pull/94). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)), image order ([#79](https://github.com/mwinn53/cpscoreboard/issues/79)), what drives the score ([#80](https://github.com/mwinn53/cpscoreboard/issues/80)) | Make the analysis more useful to coaches |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -54,6 +54,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/analysis.py`, `app/analysis_narrative.py`, `app/analysis_charts.py` | A round's statistics, its written narrative and its SVG charts |
 | `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals, rank correlations and the Holm correction, on SciPy |
 | `app/analysis_focus.py` | Where the points went: points within reach, strengths and weaknesses by image, penalties |
+| `app/analysis_advance.py` | What it takes to advance (Middle School, CP-19 rules): the State Round projection after the Introductory Round, the combined line after the State Round, the National Finals line after the Semifinal |
 | `app/analysis_pace.py` | Pace against the top quarter: where in the round our teams fall behind, and slow starts per image |
 | `app/analysis_compare.py`, `app/analysis_web.py` | Season and round comparisons; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
@@ -80,7 +81,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
 | `/analysis` | Analysis (coaches and admins): reports by division and season, collection progress (refreshed every 30 s), the throttle, Collect all and divisions to collect (admin), legacy import (admin), compare two reports |
-| `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, in-round progress and pace against the top quarter, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
+| `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, what it takes to advance, in-round progress and pace against the top quarter, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
 | `/analysis/seasons`, `/analysis/seasons/{season}` | Season over season (participation, percentiles, image families); one season's rounds |
 | `/analysis/compare?a=&b=` | Any two reports side by side (e.g. preliminary against final, or two rounds) |
 | `/admin/config` | Configuration (admin only): scoreboard address and update interval (fixed or variable), competition start, posting to X and its keys; an (i) help bubble on each section |
@@ -369,6 +370,27 @@ across seasons.
   - score by images attempted, completion per image, and items found per image;
   - in-round progress: our teams' score by time since each team started, against
     the field's median and middle half, and the top quarter's.
+- **What it takes to advance** (Middle School reports from CP-18 on). From the CP-19
+  Rules Book: the top 60% on the Introductory Round and State Round scores combined go
+  to the Semifinals, and the three highest Semifinal scores go to the National Finals,
+  one team per school (our teams share one, so the report says only the best of them
+  can go). From the CP-18 Rules Book (section 4004), not yet checked for CP-19: ties at
+  the line all advance, and the top three in each state on the combined score win AFA
+  State Awards.
+  - **After the Introductory Round, a projection:** for each of our teams, the State Round
+    points it would need for the Semifinals and for a top-3 state award (the median and
+    the middle 80% of 2,000 simulated State Rounds) and its chance at its projected pace.
+    The simulation keeps each team's Introductory Round rank, shuffled as much as past
+    seasons' State Rounds shuffled the round before (Spearman correlation), on the scale
+    and with the share of returning teams those seasons showed. With no past season that
+    has both rounds, it assumes the same scale, a correlation of 0.6 and every team
+    returning, and says so: import past seasons to improve it. A chart shows the ranges
+    (marked to be toggled once charts are interactive, [#65](https://github.com/mwinn53/cpscoreboard/issues/65)).
+  - **With the State Round:** the exact combined line, each team's margin, its place in
+    the state and the gap to a state award.
+  - **With the Semifinal:** the third-highest score (the National Finals line) and each
+    team's margin. Other schools' duplicate teams aren't removed (the data can't see
+    schools).
 - **Pace against the top quarter** (on each report with a 5-minute history). The top
   quarter is the teams with a history whose final score was at or above the field's
   upper quartile. For each of our teams: the points behind the top quarter's median at

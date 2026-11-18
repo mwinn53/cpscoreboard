@@ -234,6 +234,7 @@ class RoundReport:
     median_ci: dict[str, tuple[float, float]] = field(default_factory=dict)  # by group, 95% bootstrap
     focus: Any = None                   # where the points went (app/analysis_focus.py)
     pace: Any = None                    # pace against the top quarter (app/analysis_pace.py)
+    advance: Any = None                 # what it takes to advance (app/analysis_advance.py)
 
     def completion(self, team: str, image: str) -> float | None:
         row = self.by_team.get(team, {}).get(image)
@@ -436,6 +437,8 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
         report.pace = pace(report, curves, rows)
     from .analysis_focus import focus
     report.focus = focus(report)
+    from .analysis_advance import advancement
+    report.advance = advancement(report, store)
     from .analysis_narrative import round_narrative
     report.narrative = round_narrative(report)
     return report
@@ -450,8 +453,10 @@ CACHE_SIZE = 32
 
 def cached_report(store: AnalysisStore, info: RoundInfo, state: str, *, timeline: bool = True) -> RoundReport:
     """A report from the cache when this revision was already computed (the label and notes come from ``info``)."""
-    # SQLite can reuse a deleted data set's id, so the key also has the database and the row's details.
-    full = (id(store.store.engine), info.id, info.revision, info.sampled_at, info.team_count, state, True)
+    # SQLite can reuse a deleted data set's id, so the key also has the database and the row's details. The
+    # advancement section reads the division's other rounds (app/analysis_advance.py), so their revisions count too.
+    others = tuple((i.id, i.revision) for i in store.rounds(info.division)) if info.division == "Middle School" else ()
+    full = (id(store.store.engine), info.id, info.revision, info.sampled_at, info.team_count, state, others, True)
     keys = [full] if timeline else [full, full[:-1] + (False,)]
     with _cache_lock:
         for key in keys:

@@ -233,6 +233,61 @@
 {% endif %}
 {% endif %}
 
+{% if r.advance %}{% set a = r.advance %}
+<h2 id="advance">What it takes to advance
+  {% call tip("advance-help", "The rules, and how the projection works") %}
+  From the CyberPatriot 19 Rules Book, Middle School Division: the top 60% of teams advance to the Semifinals on
+  their Introductory Round and State Round scores combined, and the three highest Semifinal scores go to the National
+  Finals, one team per school, organization or coach. From the CP-18 Rules Book (section 4004; not yet checked for
+  CP-19): teams tied at the line all advance, a team needs more than zero points, and the top three in each state on
+  the combined score win AFA State Awards.
+  {% if a.stage == "projection" %}<br><br>The <strong>projection</strong> simulates the State Round
+  {{ '{:,}'.format(2000) }} times. Each team keeps its Introductory Round rank, shuffled as much as past seasons'
+  State Rounds shuffled the round before ({% if a.model.assumed %}assumed: no past season in the data{% else %}learned from {% for x in a.model.seasons %}CP-{{ x }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}),
+  and gets a score on the State Round's projected scale. The points a team <strong>needs</strong> are what would have
+  reached the line in each simulation: the median, and the middle 80% as the likely range. The
+  <strong>chance</strong> is the share of simulations in which the team's own projected score got there. Teams that
+  skipped the Introductory Round can't be seen yet.{% endif %}
+  {% endcall %}
+</h2>
+{{ para(n.advance) }}
+{% if n.advance_teams %}<ul class="narrative">{% for line in n.advance_teams %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+{% if a.stage == "projection" %}
+<div class="charts">
+  {{ card('State Round points needed (projected)', charts.advance, advance_legend ~ '<p class="chart-note">Bars: the likely range (middle 80% of simulations); line: the median.</p>', 'wide') }}
+</div>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th class="num">Introductory Round</th><th class="num">Projected State Round</th>
+    <th class="num">Needed: Semifinals</th><th class="num">Chance</th>
+    <th class="num">Needed: top 3 in {{ r.state }}</th><th class="num">Chance</th></tr></thead>
+  <tbody>{% for p in a.projections %}
+  <tr><td>{{ p.label }}</td><td class="num">{{ p.intro | num }}</td><td class="num">≈ {{ '%.0f' % p.expected }}</td>
+    {% for q in (p.semis, p.award) if q %}<td class="num">{% if q.hi <= 0 %}past the line{% else %}≈ {{ '%.0f' % q.median }} <span class="small">({{ '%.0f' % q.lo }}–{{ '%.0f' % q.hi }})</span>{% endif %}</td>
+    <td class="num">{{ q.chance | chance }}</td>{% endfor %}
+    {% if not p.award %}<td class="num">–</td><td class="num">–</td>{% endif %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% else %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th>{% if a.stage == "state" %}<th class="num">{{ a.intro_label or 'Introductory Round' }}</th>
+    <th class="num">State Round</th><th class="num">Combined</th>{% else %}<th class="num">Semifinal</th>{% endif %}
+    <th class="num">To the line ({{ a.cut | num }})</th>{% if a.stage == "state" %}<th class="num">Place in {{ r.state }}</th>
+    <th class="num">To a state award</th>{% endif %}</tr></thead>
+  <tbody>{% for s in a.standings %}
+  <tr><td>{{ s.label }}</td>{% if a.stage == "state" %}<td class="num">{{ s.intro | num }}</td><td class="num">{{ s.state | num }}</td>{% endif %}
+    <td class="num">{{ s.total | num }}</td>
+    <td class="num {{ 'rel-up' if s.margin >= 0 else 'rel-down' }}">{{ '0' if s.margin == 0 else s.margin | signed }}</td>
+    {% if a.stage == "state" %}<td class="num">{{ s.state_place or '–' }}</td>
+    <td class="num">{% if s.award_margin is not none %}{{ '0' if s.award_margin == 0 else s.award_margin | signed }}{% else %}–{% endif %}</td>{% endif %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+{% endif %}
+
 {% if n.challenge %}
 <h2>Cisco Networking Challenge</h2>
 {{ para(n.challenge) }}
