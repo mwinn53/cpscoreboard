@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from .static_files import CachedStaticFiles
 
 from . import (admin_archive, admin_board, admin_config, admin_server, analysis_web, auth, branding, scoreboard_url,
                team_view, templating, web)
@@ -132,7 +132,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
     app.state.settings = settings
     app.state.mailer = mailer or build_mailer(settings)
     app.add_exception_handler(auth.NotAllowed, auth.not_allowed_handler)
-    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+    app.mount("/static", CachedStaticFiles(directory=Path(__file__).parent / "static"), name="static")
     app.include_router(web.public_router)
     app.include_router(branding.router)
     app.include_router(auth.router)

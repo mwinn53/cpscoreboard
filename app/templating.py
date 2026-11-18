@@ -109,6 +109,9 @@ def _context(request: Request) -> dict[str, Any]:
 
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates", context_processors=[_context])
+from .static_files import static_url  # noqa: E402
+
+templates.env.globals["static_url"] = static_url
 templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed, date=_date, local=_local,
                              browser=describe_ua)
 templates.env.tests.update(recent=_recent)

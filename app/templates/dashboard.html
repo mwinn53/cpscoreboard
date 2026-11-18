@@ -30,7 +30,7 @@
 <div id="board" hx-get="/partials/board" hx-trigger="refresh, every {{ refresh }}s" hx-include="#filters">
   {% include "_board.html" %}
 </div>
-<script src="{{ url_for('static', path='board.js') }}" defer></script>
+<script src="{{ static_url('board.js') }}" defer></script>
 
 <script>
   // Refresh the board as soon as the server says it changed. The browser reconnects

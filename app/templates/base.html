@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_title }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
-  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  <script src="{{ static_url('htmx.min.js') }}" defer></script>
 </head>
 <body>
   <header class="topbar">

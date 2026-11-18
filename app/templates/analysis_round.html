@@ -253,7 +253,7 @@
   <button type="submit" class="danger">Delete this data set</button>
 </form>
 {% endif %}
-<script src="{{ url_for('static', path='charts.js') }}" defer></script>
-<script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
-<script src="{{ url_for('static', path='countdown.js') }}" defer></script>
+<script src="{{ static_url('charts.js') }}" defer></script>
+<script src="{{ static_url('analysis_charts.js') }}" defer></script>
+<script src="{{ static_url('countdown.js') }}" defer></script>
 {% endblock %}
