@@ -103,7 +103,8 @@ def _place_fmt(v: float) -> str:
 
 def _round(snapshots: list[Snapshot], round: int, as_of: datetime | None):
     """(runs newest first, chosen index, its snapshots, end time) for a team's history."""
-    runs = list(reversed(split_rounds([s.observed_at for s in snapshots])))
+    runs = list(reversed(split_rounds([s.observed_at for s in snapshots],
+                                      play_times=[s.team.play_time for s in snapshots])))
     if not runs:
         return runs, 0, [], None
     round = max(0, min(round, len(runs) - 1))

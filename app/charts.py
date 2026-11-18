@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, tzinfo
 from html import escape
 
 ROUND_GAP = timedelta(hours=12)
+LONG_GAP = timedelta(days=7)   # rounds are weeks apart
 
 W, H = 720, 220
 LEFT, RIGHT, TOP, BOTTOM = 52, 16, 14, 30
@@ -30,11 +31,25 @@ class Chart:
     svg: str
 
 
-def split_rounds(times: Sequence[datetime], gap: timedelta = ROUND_GAP) -> list[tuple[int, int]]:
-    """Index ranges [start, end) of runs of times with no gap longer than ``gap``."""
+def split_rounds(times: Sequence[datetime], gap: timedelta = ROUND_GAP,
+                 play_times: Sequence[int | None] | None = None) -> list[tuple[int, int]]:
+    """Index ranges [start, end) of a team's rounds.
+
+    With ``play_times``, a round starts where the team's play time resets (it only
+    grows within a round, then holds until the next one), or after a gap of more than
+    ``LONG_GAP`` (a team that didn't play a round). Quiet stretches inside a round
+    don't split it: history is change-only, so a team whose places stop moving after
+    it finishes can go a day or more without a row. Without play times (old callers),
+    any gap longer than ``gap`` starts a new run.
+    """
     runs, start = [], 0
     for i in range(1, len(times)):
-        if times[i] - times[i - 1] > gap:
+        if play_times is not None:
+            prev, cur = play_times[i - 1] or 0, play_times[i] or 0
+            new = (prev > 0 and cur < prev) or times[i] - times[i - 1] > LONG_GAP
+        else:
+            new = times[i] - times[i - 1] > gap
+        if new:
             runs.append((start, i))
             start = i
     if times:
