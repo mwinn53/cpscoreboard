@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
+import ssl
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 from pathlib import Path
@@ -34,6 +36,13 @@ from .team_detail import DetailPoller, DetailStore, OfficialDetailClient, build_
 log = logging.getLogger(__name__)
 
 
+@functools.cache
+def tls_context() -> ssl.SSLContext:
+    """The outbound HTTPS context, built once per process: loading the CA bundle takes ~0.4 s."""
+    import certifi
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 WARM_AFTER, WARM_ROUNDS = 90, 6   # seconds after startup; the newest data sets per division
 
 
@@ -57,7 +66,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        client = httpx.AsyncClient(timeout=30.0, follow_redirects=True,
+        client = httpx.AsyncClient(timeout=30.0, follow_redirects=True, verify=tls_context(),
                                    headers={"User-Agent": settings.user_agent})
         source = build_source(settings, client)
         store = SnapshotStore(settings.effective_database_url)

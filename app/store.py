@@ -135,6 +135,11 @@ def add_missing_columns(engine: Engine, only: tuple[str, ...] | None = None) -> 
     return added
 
 
+# Applied to every file-backed SQLite connection: WAL so readers don't block the poller's writes,
+# NORMAL so a commit doesn't wait on a full disk flush (WAL keeps the database consistent anyway).
+SQLITE_PRAGMAS = ("journal_mode=WAL", "synchronous=NORMAL")
+
+
 class SnapshotStore:
     def __init__(self, url: str):
         self.url = url
@@ -159,8 +164,8 @@ class SnapshotStore:
             @event.listens_for(engine, "connect")
             def _pragmas(dbapi_conn, _record):
                 cur = dbapi_conn.cursor()
-                cur.execute("PRAGMA journal_mode=WAL")    # readers don't block the poller's writes
-                cur.execute("PRAGMA synchronous=NORMAL")
+                for pragma in SQLITE_PRAGMAS:
+                    cur.execute(f"PRAGMA {pragma}")
                 cur.close()
         return engine
 

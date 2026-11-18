@@ -54,6 +54,7 @@ GIVE_UP_AFTER = timedelta(hours=4)   # or idle this long, whatever it played
 TICK = 5                             # seconds between scheduling passes while there's work
 IDLE_TICK = 30
 PAUSE = 1.0                          # seconds after each team, per worker
+FETCH_RETRY_DELAY = 2.0              # seconds before retrying a failed subpage fetch
 RETRY_AFTER = timedelta(minutes=30)  # after a team's fetch failed
 REFRESH_EVERY = timedelta(minutes=10)
 RUN_AFTER = timedelta(hours=24)      # a complete data set's report runs itself after this
@@ -235,7 +236,7 @@ class AnalysisCollector:
                 if attempt:
                     log.info("Analysis fetch %s for %s failed: %s", url, team, e)
                     self.last_error = f"{team}: {e}"
-                await asyncio.sleep(2)
+                await asyncio.sleep(FETCH_RETRY_DELAY)
         return None
 
     async def collect(self, t: TeamScore) -> bool:
