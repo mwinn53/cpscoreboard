@@ -80,3 +80,17 @@ def test_cisco_scores_flag_the_board_and_show_on_the_team_page():
         assert "C</span> = Cisco Points Scored" in client.get("/").text
         page = client.get(f"/teams/{team.team_number}").text
         assert "Cisco Quiz" in page and "Cisco Packet Tracer" in page
+
+
+def test_static_files_are_versioned_and_cached_for_a_year():
+    import re
+    with make_client() as client:
+        page = client.get("/").text
+        assert "unpkg.com" not in page
+        css = re.search(r'href="(/static/style\.css\?v=[0-9a-f]{10})"', page).group(1)
+        js = re.search(r'src="(/static/htmx\.min\.js\?v=[0-9a-f]{10})"', page).group(1)
+        for url in (css, js):
+            r = client.get(url)
+            assert r.status_code == 200 and r.headers["cache-control"] == "public, max-age=31536000, immutable"
+        assert "immutable" not in client.get("/static/style.css").headers.get("cache-control", "")  # unversioned
+        assert client.get("/brand/left").headers["cache-control"] == "public, max-age=86400"       # placeholder

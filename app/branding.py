@@ -111,7 +111,7 @@ def brand_image(request: Request, slot: str) -> Response:
     img = request.app.state.branding.get(slot)
     if img is None:
         return Response(_placeholder(SLOTS[slot]), media_type="image/svg+xml",
-                        headers={"Cache-Control": "no-cache"})
+                        headers={"Cache-Control": "public, max-age=86400"})
     # The page links to /brand/<slot>?v=<version>, so a new upload gets a new URL.
     return Response(img.data, media_type=img.content_type,
                     headers={"Cache-Control": "public, max-age=31536000, immutable"})

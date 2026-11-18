@@ -41,6 +41,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/events.py` | Server-sent events (`/events`) that tell open dashboards to refresh |
 | `app/collection.py` | Collection filter: which teams are kept (locations, divisions, watched teams) |
 | `app/web.py`, `app/templates/` | Dashboard (htmx) and the HTTP endpoints below |
+| `app/static_files.py`, `app/static/` | Stylesheet and scripts (htmx 2.0.4 is served from here, not a CDN); pages link them with a content hash (`?v=…`), and those URLs are cached for a year |
 | `app/auth.py`, `app/devices.py` | Registration (email code), device approval, admin page, access checks |
 | `app/posting.py`, `app/secret_box.py` | Posting about watched teams: planner, limits, X client (OAuth 1.0a), encrypted keys |
 | `app/admin_config.py` | Configuration page: competition start, per-image detail status, posting to X |

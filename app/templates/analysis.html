@@ -94,6 +94,6 @@
   </form>
 </details>
 {% endif %}
-<script src="{{ url_for('static', path='info.js') }}" defer></script>
-<script src="{{ url_for('static', path='countdown.js') }}" defer></script>
+<script src="{{ static_url('info.js') }}" defer></script>
+<script src="{{ static_url('countdown.js') }}" defer></script>
 {% endblock %}
