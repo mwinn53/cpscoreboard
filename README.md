@@ -304,6 +304,8 @@ so nothing is repeated.
   `SECRETS_KEY` before they're stored and never shown again. Without `SECRETS_KEY`,
   keys can't be saved.
 - **Test post:** sends one post in the current mode, ignoring the limits.
+- **Round length:** CP-19 rounds are 4 hours, so "an hour left" posts at 3:00 and "time is
+  up" at 4:00; the live-changes slider runs up to 4 hours.
 - **Out of credits:** when X answers 402 (API credits used up), real posts are skipped
   (and logged) rather than failing one by one, and /admin/config says so. After adding
   credits, a test post that goes through resumes posting.
@@ -333,6 +335,11 @@ across seasons.
   them (CP-19 Round 1 used `…_intro_r2_…` images), so the admin sets **Round being collected**
   on the Analysis page; setting it also moves the data set being filled. A report's round
   can be corrected with its name and notes.
+- **Run report:** once every team that played is collected (100%), the Analysis page
+  shows a **Run report** button and a countdown; the report runs itself 24 hours after the
+  data set first reached 100%. Running makes the data set final: nothing more is collected
+  into it and places stop updating (an admin can **Reopen** it from the report). Reports
+  are marked collecting, complete (with the run time) or report run.
 - **Groups:** national (the division), the state (the board's default state), the
   district (district schools plus ours) and our teams (the watchlist).
 - **Report:** "In brief" conclusions, then sections that each pair a narrative with
@@ -347,6 +354,8 @@ across seasons.
   - score by images attempted, completion per image, and items found per image;
   - in-round progress: our teams' score by time since each team started, against
     the field's median and middle half.
+  Time axes, limit lines and the narrative follow the round's time limit: 4 hours
+  (CP-19 on) or 6 (the legacy seasons), told apart by how long teams played.
   Plus the top N teams (10–100), the state table and coaches' notes. A report also notes
   participation against the season's previous round and the same round last season.
   Coaches can correct a team's group (ours / district / neither) in a data set from the

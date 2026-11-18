@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 
 X_POST_URL = "https://api.x.com/2/tweets"
 X_MAX_CHARS = 280
-ROUND_SECONDS = 6 * 3600
+ROUND_HOURS = 4.0   # CP-19 rounds are 4 hours: "an hour left" at 3:00, "time is up" at 4:00
 
 posts = Table(
     "posts", metadata,
@@ -80,6 +80,7 @@ class PostSettings:
     mode: str = "dry_run"
     kinds: set[str] = field(default_factory=lambda: set(KINDS))
     change_after_hours: float = 4.0  # live changes only once a team has played this long
+    round_hours: float = ROUND_HOURS  # not a setting; tests use 6 for the legacy seasons
     place_every_minutes: int = 30    # after a team is done: at most one place update this often
     per_hour: int = 10
     per_day: int = 40
@@ -263,6 +264,7 @@ class PostPlanner:
         """
         out: list[Post] = []
         primed, self._primed = self._primed, True
+        ROUND_SECONDS = settings.round_hours * 3600  # noqa: N806
         for t in watched:
             pt = t.play_time or 0
             prev = self._seen.get(t.team_number)

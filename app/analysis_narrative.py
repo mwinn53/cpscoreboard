@@ -60,6 +60,13 @@ def corr(r: float) -> str:
     return f"{r + 0.0:.2f}".replace("-0.00", "0.00")
 
 
+HOURS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+
+def hours(n: int) -> str:
+    return HOURS.get(n, str(n))
+
+
 def strength(r: float | None) -> str:
     """How strong a correlation is, in words."""
     if r is None:
@@ -179,13 +186,13 @@ def _time(r) -> list[str]:
     pt, tm = r.play_time, r.time
     if pt.n:
         out.append(f"The median play time was {minutes(pt.median)}"
-                   + (f"; {plural(r.over_limit, 'team')} went past the 6-hour limit." if r.over_limit
-                      else ", and no team went past the 6-hour limit."))
+                   + (f"; {plural(r.over_limit, 'team')} went past the {r.limit // 60}-hour limit." if r.over_limit
+                      else f", and no team went past the {r.limit // 60}-hour limit."))
     if tm and tm.above_median.n and tm.below_median.n:
         s = (f"Teams above the national median score played a median of {minutes(tm.above_median.median)}, "
              f"against {minutes(tm.below_median.median)} for the rest")
-        if (tm.above_median.median or 0) >= 330:
-            s += ": the stronger teams use nearly all of their six hours"
+        if (tm.above_median.median or 0) >= r.limit - 30:
+            s += f": the stronger teams use nearly all of their {hours(r.limit // 60)} hours"
         out.append(s + ".")
     if tm and tm.r is not None:
         out.append(f"Among teams that attempted every image, play time had {strength(tm.r)} relationship with "
@@ -333,14 +340,16 @@ def _progress(r) -> list[str]:
         if not res.hourly:
             continue
         h = res.hourly
-        s = (f"{res.label} outscored {share(h.get(1))} of the field after the first hour, {share(h.get(3))} at "
-             f"three hours and {share(h.get(6))} at six")
+        last = max(h)
+        mid = max(2, last // 2)
+        s = (f"{res.label} outscored {share(h.get(1))} of the field after the first hour, {share(h.get(mid))} at "
+             f"{hours(mid)} hours and {share(h.get(last))} at {hours(last)}")
         ahead = [k for k in sorted(h) if h[k] > 50]
         if len(ahead) == len(h):
             s += ", ahead of the median throughout"
         elif not ahead:
             s += ", behind the median throughout"
-        elif ahead == list(range(ahead[0], 7)):
+        elif ahead == list(range(ahead[0], last + 1)):
             s += f", passing the median by hour {ahead[0]}"
         if res.half_minutes is not None:
             s += f"; half of its final score came in {minutes(res.half_minutes)}"
@@ -376,7 +385,7 @@ def _summary(r) -> list[str]:
                    f"{ordinal(a.fewer_places[0])}); attempting every image doesn't guarantee a high place, but it's "
                    "the price of entry.")
     if r.time and r.time.r is not None and abs(r.time.r) < 0.3:
-        out.append("Finishing early brought no clear advantage; going past 6 hours costs points.")
+        out.append(f"Finishing early brought no clear advantage; going past {r.limit // 60} hours costs points.")
     if r.density and r.density.r is not None and abs(r.density.r) < 0.3:
         out.append(f"The number of teams in a state had little to do with its scores (r = {corr(r.density.r)}).")
     if r.has_challenge and r.challenge.n:

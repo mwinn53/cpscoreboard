@@ -14,8 +14,19 @@
   updated {{ info.sampled_at | local }}{% if info.revision > 1 %} (revision {{ info.revision }}){% endif %} ·
   images: {{ info.images | join(', ') }}</p>
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
-{% if status %}<p class="notice">This data set is still filling: {{ status.collected }} of {{ status.played }} teams so far
-  ({{ status.playing }} still playing). The report covers the teams collected so far.</p>{% endif %}
+{% if info.report_run_at %}
+<p class="muted small">Report run {{ info.report_run_at | local }}; the data set is final.
+  {% if me.is_admin %}<form method="post" action="/analysis/reports/{{ info.id }}/reopen" class="inline"
+    onsubmit="return confirm('Reopen this data set? Collection into it resumes, and the report runs again once it is complete.')"><button type="submit" class="link">Reopen</button></form>{% endif %}</p>
+{% elif status and not status.complete %}
+<p class="notice">Preliminary: the data set is still filling ({{ status.collected }} of {{ status.played }} teams so far,
+  {{ status.playing }} not finished). The report covers the teams collected so far and is run once every team is in.</p>
+{% elif status and status.complete and status.run_due %}
+<div class="notice run-report">The data set is complete. The report runs automatically in
+  <span class="countdown" data-deadline="{{ status.run_due.isoformat() }}">about a day</span>, or
+  <form method="post" action="/analysis/reports/{{ info.id }}/run" class="inline"><button type="submit" class="primary">Run report</button></form>
+  now.</div>
+{% endif %}
 
 <h2>In brief</h2>
 <ul class="findings">{% for f in n.summary %}<li>{{ f }}</li>{% endfor %}</ul>
@@ -232,4 +243,5 @@
 {% endif %}
 <script src="{{ url_for('static', path='charts.js') }}" defer></script>
 <script src="{{ url_for('static', path='analysis_charts.js') }}" defer></script>
+<script src="{{ url_for('static', path='countdown.js') }}" defer></script>
 {% endblock %}

@@ -21,7 +21,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from .analysis_collector import MAX_CONCURRENCY
+from .analysis_collector import MAX_CONCURRENCY, RUN_AFTER
 from .analysis_legacy import import_files
 from .analysis_store import FINAL, LIVE, PRELIMINARY, ROUND_CHOICES
 from .auth import NotAllowed, _page, require_coach, same_origin
@@ -78,7 +78,7 @@ def _collection(request: Request, collector, division: str) -> dict:
     return {"collector": collector, "division": division,
             "configured": collector.divisions() if collector else [],
             "status": collector.status.get(division) if collector else None,
-            "max_concurrency": MAX_CONCURRENCY, "round_choices": ROUND_CHOICES}
+            "max_concurrency": MAX_CONCURRENCY, "round_choices": ROUND_CHOICES, "run_after": RUN_AFTER}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -217,7 +217,7 @@ async def report_page(request: Request, round_id: int, top: int = 25, me: Device
     status = None
     if collector and info.source == LIVE:
         st = collector.status.get(info.division)
-        status = st if st and st.round_id == info.id and not st.complete else None
+        status = st if st and st.round_id == info.id else None
     top = top if top in TOP_CHOICES else 25
     others = [r for r in await asyncio.to_thread(store.rounds, info.division) if r.id != info.id]
     return _page(request, "analysis_round.html", me=me, info=info, report=report, charts=charts, context=context,
@@ -242,6 +242,36 @@ async def report_update(request: Request, round_id: int, me: Device = Depends(re
     except Exception:
         raise NotAllowed(400, "There's already a data set of that round with that status.") from None
     return _done(f"/analysis/reports/{round_id}", "Saved.")
+
+
+@router.post("/reports/{round_id}/run", dependencies=[Depends(same_origin)])
+async def report_run(request: Request, round_id: int, me: Device = Depends(require_coach)):
+    """Run the report now: the data set is final (nothing more is collected into it)."""
+    from datetime import UTC, datetime
+    store, collector = _state(request)
+    info = await _get_round(store, round_id)
+    if info.source != LIVE:
+        raise NotAllowed(400, "Imported data sets are already final.")
+    ran = await asyncio.to_thread(store.run_report, round_id, datetime.now(UTC))
+    if collector:
+        await asyncio.to_thread(collector.plan)
+    log.info("Device %d ran the report for %s %s", me.id, info.title, info.division)
+    back = request.headers.get("HX-Request") and f"/analysis?division={quote(info.division)}"
+    return _done(back or f"/analysis/reports/{round_id}",
+                 f"Ran the report for {info.title}; its data set is final." if ran else "That report had already run.")
+
+
+@router.post("/reports/{round_id}/reopen", dependencies=[Depends(same_origin)])
+async def report_reopen(request: Request, round_id: int, me: Device = Depends(require_coach)):
+    """Undo a run (admin): collection into the data set resumes."""
+    _admin(me)
+    store, collector = _state(request)
+    info = await _get_round(store, round_id)
+    await asyncio.to_thread(store.reopen, round_id)
+    if collector:
+        await asyncio.to_thread(collector.plan)
+    log.warning("Device %d reopened the data set %s %s", me.id, info.title, info.division)
+    return _done(f"/analysis/reports/{round_id}", f"Reopened {info.title}: collection into it resumes.")
 
 
 @router.post("/reports/{round_id}/group", dependencies=[Depends(same_origin)])

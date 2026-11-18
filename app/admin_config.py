@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from . import scoreboard_url
 from .auth import _page, require_admin, same_origin
 from .devices import Device
-from .posting import CREDENTIAL_LABELS, CREDENTIALS, KINDS, MODES, Post, PostSettings
+from .posting import ROUND_HOURS, CREDENTIAL_LABELS, CREDENTIALS, KINDS, MODES, Post, PostSettings
 
 log = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ async def posting(request: Request, admin: Device = Depends(require_admin),
         return _render(request, admin, 400, error="Choose dry run or X.")
     try:
         s = PostSettings(enabled=bool(enabled), mode=mode, kinds={k for k in (kinds or []) if k in KINDS},
-                         change_after_hours=max(0.0, min(float(change_after_hours), 6.0)),
+                         change_after_hours=max(0.0, min(float(change_after_hours), ROUND_HOURS)),
                          place_every_minutes=max(5, min(int(place_every_minutes), 240)),
                          per_hour=max(0, int(per_hour)), per_day=max(0, int(per_day)), footer=footer.strip()[:100])
     except ValueError:
