@@ -437,6 +437,12 @@ def test_step_chart_and_round_splitting():
     t = datetime(2026, 11, 14, 15, tzinfo=UTC)
     times = [t, t + timedelta(hours=1), t + timedelta(hours=3), t + timedelta(days=7), t + timedelta(days=7, hours=2)]
     assert split_rounds(times) == [(0, 3), (3, 5)]
+    # by play time: a quiet day after the round doesn't split it; a reset does
+    t0 = times[0]
+    quiet = [t0, t0 + timedelta(hours=2), t0 + timedelta(hours=35),
+             t0 + timedelta(days=14), t0 + timedelta(days=14, hours=1)]
+    assert split_rounds(quiet, play_times=[3600, 14000, 14000, 600, 4000]) == [(0, 3), (3, 5)]
+    assert split_rounds(quiet, play_times=[3600, 14000, 14000, 14000, 14000]) == [(0, 3), (3, 5)]  # a 7-day gap
     chart = step_chart([(t, 10), (t + timedelta(hours=1), 3), (t + timedelta(hours=2), 1)], t + timedelta(hours=3),
                        tz=ZoneInfo("America/New_York"), label="National", invert=True, integer=True)
     assert 'class="series" d="M' in chart.svg and "H" in chart.svg and "V" in chart.svg  # a step line
