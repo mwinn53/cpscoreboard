@@ -123,6 +123,7 @@ def round_narrative(r) -> dict[str, list[str]]:
     sections = {
         "overview": _overview(r), "scores": _scores(r), "time": _time(r), "density": _density(r),
         "attempts": _attempts(r), "images": _images(r), "challenge": _challenge(r), "progress": _progress(r),
+        "pace": _pace(r),
         "reach": _reach(r), "relative": _relative(r), "penalties": _penalties(r),
     }
     sections["summary"] = _summary(r)
@@ -488,6 +489,72 @@ def _progress(r) -> list[str]:
     return out
 
 
+SLOW = 15        # minutes behind the top quarter's start on an image worth a sentence
+EARLY = 0.5      # share of the final gap opened in the first hour that makes it the story
+
+
+def _pace(r) -> list[str]:
+    """Pace against the top quarter (#77): where the gap opened, and slow starts on an image."""
+    pc = r.pace
+    if not pc:
+        return []
+    out = [f"The top quarter here is the {pc.top_n} teams with a 5-minute history that finished on "
+           f"{num(pc.cut)} points or more."]
+    early: list[str] = []
+    for t in pc.teams:
+        g = t.final_gap
+        if g <= 0:
+            out.append(f"{t.label} finished {'level with' if g == 0 else _pts(-g) + ' ahead of'} the top quarter's "
+                       "median.")
+            continue
+        s = f"{t.label} finished {_pts(g)} behind the top quarter's median"
+        share_1 = t.first_hour_share
+        if share_1 is not None and share_1 >= 1:
+            s += f"; the gap was already {_pts(t.gap[1] - t.gap[0])} after the first hour"
+            early.append(t.team)
+        elif share_1 is not None and share_1 >= EARLY:
+            s += f"; most of that gap ({pct(share_1)}) opened in the first hour"
+            early.append(t.team)
+        elif t.worst_hour is not None:
+            s += f"; the gap grew most in hour {t.worst_hour} (by {_pts(t.worst_growth)})"
+        out.append(s + ".")
+    if early:
+        out.append(f"For {listing(early)}, the opening checklist is worth practicing: that's where the ground was "
+                   "lost.")
+    slow = []
+    for img in pc.images:
+        ours, top = img.our_median(0), img.top_first
+        if ours is not None and top is not None and ours - top >= SLOW:
+            half, top_half = img.our_median(1), img.top_half
+            s = (f"On {img.image}, our teams' first points came after a median {minutes(ours)}, against "
+                 f"{minutes(top)} for the top quarter")
+            if half is not None and top_half is not None:
+                s += f" (half of the image's final score: {minutes(half)} against {minutes(top_half)})"
+            slow.append(s + ".")
+    if slow:
+        out += slow
+    elif pc.images and pc.teams:
+        out.append(f"On every image, our teams started scoring within {SLOW} minutes of the top quarter.")
+    return out
+
+
+def _pace_summary(r) -> str | None:
+    pc = r.pace
+    behind = [t for t in (pc.teams if pc else []) if t.final_gap > 0]
+    if not behind:
+        return None
+    early = [t for t in behind if (t.first_hour_share or 0) >= EARLY]
+    if len(early) * 2 > len(behind):
+        return (f"Against the top quarter, most of the gap opened in the first hour for "
+                f"{listing([t.team for t in early])}: practice the opening checklist.")
+    hours_ = [t.worst_hour for t in behind if t.worst_hour]
+    if not hours_:
+        return None
+    h = max(sorted(set(hours_)), key=hours_.count)   # ties: the earliest
+    who = [t.team for t in behind if t.worst_hour == h]
+    return f"Most ground lost to the top quarter: hour {h} ({listing(who)})."
+
+
 def _summary(r) -> list[str]:
     """The report's "In brief": the conclusions, as the R report's closing bullets."""
     out = []
@@ -518,6 +585,8 @@ def _summary(r) -> list[str]:
     if pen:
         out.append(f"Watch the penalties on {listing([x.image for x in pen])}: our teams took them more often than "
                    "the field.")
+    if line := _pace_summary(r):
+        out.append(line)
     a = r.attempts
     if a and a.fewer and a.fewer_places and a.most > 1:
         out.append(f"Teams that skipped an image weren't competitive (the best of them placed "

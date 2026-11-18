@@ -263,6 +263,8 @@ svg.chart .cell { fill: var(--s1); }
 svg.chart .cell.hover { stroke: var(--text); stroke-width: 1.5; }
 svg.chart .band { fill: var(--muted); fill-opacity: 0.18; stroke: none; }
 svg.chart .median-line { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 3; }
+svg.chart .band.top { fill: var(--s1); fill-opacity: 0.12; }
+svg.chart .top-line { fill: none; stroke: var(--s1); stroke-width: 2; }
 .legend .key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .legend .key.line { width: 14px; height: 3px; border-radius: 2px; }
 .legend .key.area { width: 14px; height: 10px; border-radius: 2px; }
@@ -272,6 +274,8 @@ svg.chart .median-line { fill: none; stroke: var(--muted); stroke-width: 2; stro
 .legend .key.other { background: var(--muted); opacity: 0.45; }
 .legend .key.median { background: var(--muted); }
 .legend .key.band { background: var(--muted); opacity: 0.25; }
+.legend .key.top { background: var(--s1); }
+.legend .key.top-band { background: var(--s1); opacity: 0.2; }
 .legend .key.s1 { background: var(--s1); } .legend .key.s2 { background: var(--s2); } .legend .key.s3 { background: var(--s3); }
 .legend .key.s4 { background: var(--s4); } .legend .key.s5 { background: var(--s5); } .legend .key.s6 { background: var(--s6); }
 .legend .key.s7 { background: var(--s7); } .legend .key.s8 { background: var(--s8); }

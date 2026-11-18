@@ -25,7 +25,7 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
 | [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🗒 Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
-| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), evaluate against the R reports ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)) | Make the analysis more useful to coaches |
+| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress. Done: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92); the R-report evaluation ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)) became the rigor work in [#81](https://github.com/mwinn53/cpscoreboard/issues/81). Next: pace against the top quarter ([#77](https://github.com/mwinn53/cpscoreboard/issues/77)) in [#93](https://github.com/mwinn53/cpscoreboard/pull/93). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)), image order ([#79](https://github.com/mwinn53/cpscoreboard/issues/79)), what drives the score ([#80](https://github.com/mwinn53/cpscoreboard/issues/80)) | Make the analysis more useful to coaches |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -54,6 +54,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/analysis.py`, `app/analysis_narrative.py`, `app/analysis_charts.py` | A round's statistics, its written narrative and its SVG charts |
 | `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals, rank correlations and the Holm correction, on SciPy |
 | `app/analysis_focus.py` | Where the points went: points within reach, strengths and weaknesses by image, penalties |
+| `app/analysis_pace.py` | Pace against the top quarter: where in the round our teams fall behind, and slow starts per image |
 | `app/analysis_compare.py`, `app/analysis_web.py` | Season and round comparisons; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
@@ -79,7 +80,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/admin`, `/admin/claim` | Device approval (admin only); claiming admin with the bootstrap token |
 | `/admin/board` | Board settings (admin only): default view, watchlist, district schools, collection filter, bulk import, logos |
 | `/analysis` | Analysis (coaches and admins): reports by division and season, collection progress (refreshed every 30 s), the throttle, Collect all and divisions to collect (admin), legacy import (admin), compare two reports |
-| `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, in-round progress, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
+| `/analysis/reports/{id}` | A round's report: in brief, narrative, charts, our teams, images, in-round progress and pace against the top quarter, top teams, the state table, coaches' notes (`/analysis/rounds/{id}` redirects here) |
 | `/analysis/seasons`, `/analysis/seasons/{season}` | Season over season (participation, percentiles, image families); one season's rounds |
 | `/analysis/compare?a=&b=` | Any two reports side by side (e.g. preliminary against final, or two rounds) |
 | `/admin/config` | Configuration (admin only): scoreboard address and update interval (fixed or variable), competition start, posting to X and its keys; an (i) help bubble on each section |
@@ -367,7 +368,16 @@ across seasons.
   - teams per state against the state median (correlation);
   - score by images attempted, completion per image, and items found per image;
   - in-round progress: our teams' score by time since each team started, against
-    the field's median and middle half.
+    the field's median and middle half, and the top quarter's.
+- **Pace against the top quarter** (on each report with a 5-minute history). The top
+  quarter is the teams with a history whose final score was at or above the field's
+  upper quartile. For each of our teams: the points behind the top quarter's median at
+  each hour and the hour the gap grew the most; when half or more of the final gap
+  opened in the first hour, the report points at the opening checklist. Per image: our
+  median minutes to the first points and to half of the final score, against the top
+  quarter's (a start 15 or more minutes slower is called out). "In brief" names the hour
+  where most ground was lost. Season pages don't include it yet: they skip the 5-minute
+  history to load quickly.
 - **Where the points went** (on each report), to guide practice. Estimates, and the
   page says so:
   - **Points within reach:** for each of our teams, the items the field's top quarter
