@@ -59,6 +59,10 @@ def test_dashboard_renders_watchlist_and_filters():
 
         none = client.get("/partials/board", params={"q": "no-such-team"}).text
         assert "No teams match" in none
+        everything = client.get("/partials/board", params={"division": "all", "state": "all"}).text
+        assert "showing 100 of" in everything                  # unfiltered: the top 100 unless asked
+        assert "showing 100 of" not in client.get("/partials/board", params={"division": "all", "state": "all",
+                                                                           "limit": 0}).text
 
 
 def test_cisco_scores_flag_the_board_and_show_on_the_team_page():

@@ -507,7 +507,7 @@ def program_narrative(p, sums: list) -> list[str]:
     out.append(s)
     if p.trend:
         direction = "upward" if p.trend.r > 0 else "downward"
-        out.append(f"Round to round, our median team's percentile shows "
+        out.append("Round to round, our median team's percentile shows "
                    + (f"a significant {direction} trend" if p.trend.significant else "no significant trend")
                    + f" (Kendall's τ = {corr(p.trend.r)}, {p_text(p.trend.p)}, {plural(p.trend.n, 'round')})"
                    + ("; later rounds have smaller, qualified fields, which pulls percentiles down." if p.trend.significant

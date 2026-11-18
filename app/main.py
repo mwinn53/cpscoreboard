@@ -34,6 +34,21 @@ from .team_detail import DetailPoller, DetailStore, OfficialDetailClient, build_
 log = logging.getLogger(__name__)
 
 
+WARM_AFTER, WARM_ROUNDS = 90, 6   # seconds after startup; the newest data sets per division
+
+
+async def _warm_reports(state, board) -> None:
+    """Reports are cached in memory: after a restart, compute the newest ones so the first view is quick."""
+    from .analysis import cached_report
+    await asyncio.sleep(WARM_AFTER)
+    store = state.analysis
+    try:
+        for division in await asyncio.to_thread(store.divisions):
+            for info in (await asyncio.to_thread(store.rounds, division))[:WARM_ROUNDS]:
+                await asyncio.to_thread(cached_report, store, info, board.default_state or "GA")
+    except Exception:
+        log.exception("Couldn't pre-compute the analysis reports")
+
 def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -> FastAPI:
     settings = settings or Settings()
     templating.set_timezone(settings.display_timezone)
@@ -105,6 +120,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
                                           lambda: scoreboard_url.effective(board, settings.scoreboard_url))
             collector_task = asyncio.create_task(collector.run(), name="analysis-collector")
         app.state.collector = collector
+        warm_task = asyncio.create_task(_warm_reports(app.state, board), name="warm-reports")
         log.info("Started in %s mode (%s); collecting %s; database %s; email via %s; access control %s",
                  settings.app_env, source.description, poller.collect.describe(),
                  store.engine.url.render_as_string(), app.state.mailer.description,
@@ -114,7 +130,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         try:
             yield
         finally:
-            for t in (task, detail_task, geo_task, collector_task):
+            for t in (task, detail_task, geo_task, collector_task, warm_task):
                 if t is not None:
                     t.cancel()
                     with suppress(asyncio.CancelledError):

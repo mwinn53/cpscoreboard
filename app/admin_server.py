@@ -15,7 +15,7 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from starlette.background import BackgroundTask
 
 from .auth import NotAllowed, _page, require_admin, same_origin

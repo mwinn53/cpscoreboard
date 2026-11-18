@@ -6,7 +6,6 @@ Everything except /healthz requires an approved device (see app/auth.py).
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -105,7 +104,10 @@ def placement_counts(board: list[TeamScore], shown: list[TeamScore], district: s
     return counts
 
 
-def _board(request: Request, q: str, division: str | None, state: str | None, limit: int) -> dict[str, Any]:
+UNFILTERED_ROWS = 100  # every division in every state is thousands of rows: show the top 100 unless asked for all
+
+
+def _board(request: Request, q: str, division: str | None, state: str | None, limit: int | None) -> dict[str, Any]:
     poller, board = _poller(request), request.app.state.board
     st = poller.state
     # Show the whole live board; the collection filter only limits what's stored as history.
@@ -118,6 +120,8 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
     division = _default(board.default_division, board.divisions, divisions) if division is None else (division or ALL)
     state = _default(board.default_state, board.locations, states) if state is None else (state or ALL)
 
+    if limit is None:  # the viewer hasn't picked a number of rows
+        limit = UNFILTERED_ROWS if division == ALL and state == ALL and not q else 0
     rows = teams
     if division != ALL:
         rows = [t for t in rows if t.division.casefold() == division.casefold()]
@@ -169,13 +173,13 @@ def _board(request: Request, q: str, division: str | None, state: str | None, li
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, q: str = "", division: str | None = None, state: str | None = None,
-              limit: int = 0):
+              limit: int | None = None):
     return templates.TemplateResponse(request, "dashboard.html", _board(request, q, division, state, limit))
 
 
 @router.get("/partials/board", response_class=HTMLResponse)
 def board_partial(request: Request, q: str = "", division: str | None = None, state: str | None = None,
-                  limit: int = 0):
+                  limit: int | None = None):
     return templates.TemplateResponse(request, "_board.html", _board(request, q, division, state, limit))
 
 
@@ -187,9 +191,10 @@ async def events(request: Request) -> StreamingResponse:
     if device is not None:
         devices = request.app.state.devices
 
-        async def still_allowed() -> bool:  # a revoked device's open stream ends at the next heartbeat
+        async def _still_allowed() -> bool:  # a revoked device's open stream ends at the next heartbeat
             current = await asyncio.to_thread(devices.get, device.id)
             return current is not None and current.approved
+        still_allowed = _still_allowed
 
     stream = event_stream(_poller(request).notifier, request.is_disconnected, still_allowed=still_allowed)
     return StreamingResponse(stream, media_type="text/event-stream",
