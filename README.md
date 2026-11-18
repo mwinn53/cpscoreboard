@@ -95,7 +95,8 @@ approved device (see [Access control](#access-control)).
 
 - **Filters** in the header: search, division, state and rows. The page opens on the
   default view set on `/admin/board`, and the address bar follows the filters, so a
-  reload or a shared link keeps the view.
+  reload or a shared link keeps the view. With every division in every state (thousands
+  of teams), the board shows the top 100 rows unless you pick "All rows".
 - **Columns:** School, score first, then a **Placement** group in the order:
   - **District**: place among the district schools' teams plus the watched teams, within the division.
   - **State**: place in the state, within the division.
@@ -372,6 +373,8 @@ across seasons.
   participation against the season's previous round and the same round last season.
   Coaches can correct a team's group (ours / district / neither) in a data set from the
   report page.
+  Reports are cached in memory per data set revision; after a restart the newest ones
+  are computed in the background, so the first view is quick.
 - **Statistical tests.** Scores are skewed, with ties and outliers, so the tests are
   rank-based and effect sizes come first:
   - the state against the rest of the division, and district teams against the rest of

@@ -271,7 +271,7 @@ def test_dashboard_columns_school_key_and_label(site):  # noqa: F811
     assert order == sorted(order)
     assert '<td class="school">Evans MS</td>' in page
     assert "Flags:" in page and "Clock Skew" in page
-    assert re.search(r'<option value="0"\s+selected>All rows</option>', page)
+    assert re.search(r'<option value="100"\s+selected>100 rows</option>', page)  # unfiltered: top 100 by default
     assert page.index('value="0"') < page.index('value="50"')
 
 
