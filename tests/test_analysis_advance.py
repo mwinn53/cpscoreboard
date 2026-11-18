@@ -1,4 +1,4 @@
-"""What it takes to advance (app/analysis_advance.py): Middle School, CP-18 rules."""
+"""What it takes to advance (app/analysis_advance.py): Middle School, CP-19 rules."""
 
 from datetime import UTC, datetime
 
@@ -65,7 +65,7 @@ def test_the_projection_after_the_introductory_round(analysis):
     assert high.semis.lo <= high.semis.median <= high.semis.hi
     assert high.award and high.award.median > high.semis.median      # top 3 in GA is the harder line
     n = r.narrative["advance"]
-    assert n[0].startswith("Under the CP-18 Rules Book, the top 60% of Middle School teams advance")
+    assert n[0].startswith("Under the CP-19 Rules Book, the top 60% of Middle School teams advance")
     assert n[1].startswith("The projection learns from CP-17 (90 teams in both rounds)")
     assert any(s.startswith(f"{HIGH}, 260 points. The Semifinals: ") and "A top-3 GA award: about" in s
                for s in r.narrative["advance_teams"])
@@ -107,3 +107,4 @@ def test_the_national_finals_line_after_the_semifinal(analysis):
     assert a.stage == "semifinal" and a.line_rank == 3 and a.cut == 296
     assert {s.team.team_number: s.margin for s in a.standings} == {HIGH: 260 - 296, LOW: 140 - 296}
     assert r.narrative["advance"][0].endswith("the third-highest score was 296.")
+    assert r.narrative["advance"][1].startswith("Our teams share a school, so only the best of them can advance")

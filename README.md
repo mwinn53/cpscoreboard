@@ -54,7 +54,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/analysis.py`, `app/analysis_narrative.py`, `app/analysis_charts.py` | A round's statistics, its written narrative and its SVG charts |
 | `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals, rank correlations and the Holm correction, on SciPy |
 | `app/analysis_focus.py` | Where the points went: points within reach, strengths and weaknesses by image, penalties |
-| `app/analysis_advance.py` | What it takes to advance (Middle School, CP-18 rules): the State Round projection after the Introductory Round, the combined line after the State Round, the National Finals line after the Semifinal |
+| `app/analysis_advance.py` | What it takes to advance (Middle School, CP-19 rules): the State Round projection after the Introductory Round, the combined line after the State Round, the National Finals line after the Semifinal |
 | `app/analysis_pace.py` | Pace against the top quarter: where in the round our teams fall behind, and slow starts per image |
 | `app/analysis_compare.py`, `app/analysis_web.py` | Season and round comparisons; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
@@ -370,11 +370,13 @@ across seasons.
   - score by images attempted, completion per image, and items found per image;
   - in-round progress: our teams' score by time since each team started, against
     the field's median and middle half, and the top quarter's.
-- **What it takes to advance** (Middle School reports from CP-18 on), under the CP-18
-  Rules Book (section 4004): the top 60% on the Introductory Round and State Round scores
-  combined go to the Semifinals (ties at the line all advance), the top three in each
-  state on that total win AFA State Awards, and the three highest Semifinal scores go to
-  the National Finals.
+- **What it takes to advance** (Middle School reports from CP-18 on). From the CP-19
+  Rules Book: the top 60% on the Introductory Round and State Round scores combined go
+  to the Semifinals, and the three highest Semifinal scores go to the National Finals,
+  one team per school (our teams share one, so the report says only the best of them
+  can go). From the CP-18 Rules Book (section 4004), not yet checked for CP-19: ties at
+  the line all advance, and the top three in each state on the combined score win AFA
+  State Awards.
   - **After the Introductory Round, a projection:** for each of our teams, the State Round
     points it would need for the Semifinals and for a top-3 state award (the median and
     the middle 80% of 2,000 simulated State Rounds) and its chance at its projected pace.
@@ -387,7 +389,8 @@ across seasons.
   - **With the State Round:** the exact combined line, each team's margin, its place in
     the state and the gap to a state award.
   - **With the Semifinal:** the third-highest score (the National Finals line) and each
-    team's margin. The one-team-per-school rule isn't applied (the data can't see schools).
+    team's margin. Other schools' duplicate teams aren't removed (the data can't see
+    schools).
 - **Pace against the top quarter** (on each report with a 5-minute history). The top
   quarter is the teams with a history whose final score was at or above the field's
   upper quartile. For each of our teams: the points behind the top quarter's median at

@@ -1,13 +1,17 @@
 """Advancement (#68): what it takes to advance, for the Middle School Division.
 
-The rules are the CyberPatriot 18 Rules Book's (section 4004; CP-19 keeps the 60% line):
+The advancement rules are the CyberPatriot 19 Rules Book's (Middle School, the same
+as CP-18's); the award and tie rules are CP-18's (section 4004), not yet checked
+against CP-19:
 
-* **Semifinals:** the top 60% of teams on the **Introductory Round and State Round
-  scores combined**; teams tied at the line all advance, and a team needs more than
-  zero points;
-* **AFA State Awards:** the top three teams in each state on the same combined score;
-* **National Finals:** the three highest **Semifinal** scores (one team per school,
-  organization or coach, which the data can't see).
+* **Semifinals (CP-19):** the top 60% of teams on the **Introductory Round and State
+  Round scores combined**; teams tied at the line all advance, and a team needs more
+  than zero points (CP-18);
+* **AFA State Awards (CP-18):** the top three teams in each state on the same combined
+  score;
+* **National Finals (CP-19):** the three highest **Semifinal** scores, one team per
+  school, organization or coach. The data can't see schools, but our teams share one,
+  so only our best can go.
 
 Three stages, by the report's round:
 
@@ -40,7 +44,7 @@ from scipy import stats as sps
 from .analysis_store import AnalysisStore, TeamRow
 
 DIVISION = "Middle School"
-RULES_FROM = 18          # the season whose Rules Book these rules come from
+RULES_FROM = 18          # the first season with these rules (CP-18; CP-19 kept them)
 SEMI_SHARE = 0.6         # the top 60% advance to the Semifinals
 AWARDS = 3               # AFA State Awards: the top three in each state
 FINALS = 3               # the National Finals: the top three Semifinal scores

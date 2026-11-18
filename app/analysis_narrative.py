@@ -567,11 +567,16 @@ def _advance(r) -> list[str]:
     if not a:
         return []
     if a.stage == "semifinal":
-        return [f"The three highest Semifinal scores advance to the National Finals (one team per school, "
-                f"organization or coach); the third-highest score was {num(a.cut)}."]
-    out = [f"Under the CP-18 Rules Book, the top 60% of Middle School teams advance to the Semifinals on their "
-           f"Introductory Round and State Round scores combined (ties at the line all advance), and the top "
-           f"three teams in each state on the same total win AFA State Awards."]
+        out = [f"Under the CP-19 Rules Book, the three highest Semifinal scores advance to the National Finals, "
+               f"one team per school, organization or coach; the third-highest score was {num(a.cut)}."]
+        if len(a.standings) > 1:
+            out.append("Our teams share a school, so only the best of them can advance; the next-highest team from "
+                       "another school takes the place of any other.")
+        return out
+    out = ["Under the CP-19 Rules Book, the top 60% of Middle School teams advance to the Semifinals on their "
+           "Introductory Round and State Round scores combined. Under the CP-18 Rules Book (not yet checked for "
+           "CP-19), teams tied at the line all advance, and the top three teams in each state on the same total win "
+           "AFA State Awards."]
     if a.stage == "state":
         out.append(f"With the State Round in, the line is {num(a.cut)} combined points ({ordinal(a.line_rank)} of "
                    f"{a.n} teams)" + (f"; third in {r.state} had {num(a.award_cut)}." if a.award_cut is not None
