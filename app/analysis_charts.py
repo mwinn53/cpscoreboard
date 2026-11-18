@@ -447,11 +447,15 @@ def finds_bars(r: RoundReport, image: str, width: int = 360) -> str:
 
 
 def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
-    """The field's median and middle half by minutes since each team's start, with our teams' lines."""
+    """The field's (and the top quarter's) median and middle half by minutes since each team's start, with our
+    teams' lines."""
     p = r.progress
     if not p:
         return ""
+    pc = r.pace
     vals = [v for v in p.q3 if v is not None] + [v for _, s in p.ours for v in s]
+    if pc:
+        vals += [v for v in pc.q3 if v is not None]
     yv = ticks(0, max(vals) if vals else 1)
     end = p.limit
     x = Scale(0, end, LEFT, width - RIGHT - 70)
@@ -465,6 +469,13 @@ def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
         parts.append(f'<path class="band" d="{d}"/>')
         parts.append('<path class="median-line" d="M' + " L".join(
             f"{x(m):.1f},{y(v):.1f}" for m, v in zip(p.minutes, p.median) if v is not None) + '"/>')
+    if pc:
+        top = [(m, a, b) for m, a, b in zip(pc.minutes, pc.q1, pc.q3) if a is not None]
+        d = "M" + " L".join(f"{x(m):.1f},{y(b):.1f}" for m, _, b in top)
+        d += " L" + " L".join(f"{x(m):.1f},{y(a):.1f}" for m, a, _ in reversed(top)) + " Z"
+        parts.append(f'<path class="band top" d="{d}"/>')
+        parts.append('<path class="top-line" d="M' + " L".join(
+            f"{x(m):.1f},{y(v):.1f}" for m, v in zip(pc.minutes, pc.median) if v is not None) + '"/>')
     ends = []
     for i, (team, series) in enumerate(p.ours[:7], start=2):
         slot = f"s{i}"
@@ -484,6 +495,8 @@ def progress_chart(r: RoundReport, width: int = W, height: int = 260) -> str:
     hover = []
     for k, m in enumerate(p.minutes):
         bits = [f"median {num(p.median[k])} (middle half {num(p.q1[k])}–{num(p.q3[k])})"]
+        if pc:
+            bits.append(f"top quarter {num(pc.median[k])} ({num(pc.q1[k])}–{num(pc.q3[k])})")
         bits += [f"{team} {num(s[k])}" for team, s in p.ours[:7]]
         hover.append([round(x(m), 1), None, f"{m // 60}:{m % 60:02d} · " + " · ".join(bits)])
     svg = (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Score by time since each '
@@ -497,6 +510,8 @@ def progress_legend(r: RoundReport) -> str:
     if not r.progress:
         return ""
     items = [Item("Field median", "median", "line"), Item("Field middle half", "band", "area")]
+    if r.pace:
+        items += [Item("Top quarter median", "top", "line"), Item("Top quarter middle half", "top-band", "area")]
     items += [Item(team, f"s{i}", "line") for i, (team, _) in enumerate(r.progress.ours[:7], start=2)]
     return legend(items)
 

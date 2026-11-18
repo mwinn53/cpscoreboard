@@ -14,7 +14,8 @@ division it outscored, which puts rounds of different difficulty on one scale.
 
 Beyond the R report, a round also gets **in-round progress**: each team's total
 score by minutes since its own start (teams start at different times across the
-weekend), with the field's median and middle half at each point.
+weekend), with the field's median and middle half at each point, and the pace of
+the top quarter (app/analysis_pace.py).
 
 The narrative is written from these numbers (app/analysis_narrative.py), and
 ``round_summary`` boils a report down to what the season and round comparisons
@@ -232,6 +233,7 @@ class RoundReport:
     tests: dict[str, GroupTest] = field(default_factory=dict)      # "state" (vs the rest), "district" (vs the rest of the state)
     median_ci: dict[str, tuple[float, float]] = field(default_factory=dict)  # by group, 95% bootstrap
     focus: Any = None                   # where the points went (app/analysis_focus.py)
+    pace: Any = None                    # pace against the top quarter (app/analysis_pace.py)
 
     def completion(self, team: str, image: str) -> float | None:
         row = self.by_team.get(team, {}).get(image)
@@ -427,7 +429,11 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
     report.attempts = _attempts(report)
     report.time = _time(report)
     if timeline:
-        report.progress = progress(team_curves(store.timeline(info.id)), ems, limit)
+        rows = store.timeline(info.id)
+        curves = team_curves(rows)
+        report.progress = progress(curves, ems, limit)
+        from .analysis_pace import pace
+        report.pace = pace(report, curves, rows)
     from .analysis_focus import focus
     report.focus = focus(report)
     from .analysis_narrative import round_narrative

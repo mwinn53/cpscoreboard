@@ -256,6 +256,46 @@
 </table>
 </div>
 </details>
+{% if r.pace %}{% set pc = r.pace %}
+<h3 id="pace">Pace against the top quarter
+  {% call tip("pace-help", "How this is measured") %}
+  The <strong>top quarter</strong> is the teams with a 5-minute history whose final score was in the field's top
+  quarter ({{ pc.cut | num }} points or more). The chart draws their median and middle half in blue. A team's
+  <strong>gap</strong> is the top quarter's median minus its score at the same time since its start; the hour where
+  the gap grew the most is where it lost the most ground. Per image, <strong>first points</strong> and
+  <strong>half</strong> are the minutes from a team's first check to its first points on that image and to half of
+  its final score there.
+  {% endcall %}
+</h3>
+{{ para(n.pace) }}
+{% if pc.teams %}{% set hrs = pc.teams[0].gap | length %}
+<div class="table-wrap">
+<table class="board">
+  <caption class="small">Points behind the top quarter's median at each hour (− is ahead); the hour the gap grew most is marked.</caption>
+  <thead><tr><th>Team</th>{% for h in range(1, hrs) %}<th class="num">{{ h }} h</th>{% endfor %}</tr></thead>
+  <tbody>{% for t in pc.teams %}
+  <tr><td>{{ t.label }}</td>{% for h in range(1, hrs) %}{% set worst = h == t.worst_hour %}
+    <td class="num{{ ' rel-down' if worst else '' }}">{{ (t.gap[h] | round | int) | string | replace('-', '−') }}{% if worst %} <span class="small">(+{{ '%.0f' % t.worst_growth }}) ▼</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+{% if pc.images %}
+<div class="table-wrap" style="margin-top: 1rem">
+<table class="board">
+  <caption class="small">Minutes from each team's first check, our median against the top quarter's.</caption>
+  <thead><tr><th>Image</th><th class="num">First points: ours</th><th class="num">Top quarter</th>
+    <th class="num">Half: ours</th><th class="num">Top quarter</th></tr></thead>
+  <tbody>{% for img in pc.images %}{% set a = img.our_median(0) %}
+  <tr><td>{{ img.image }}</td>
+    <td class="num{{ ' rel-down' if a is not none and img.top_first is not none and a - img.top_first >= 15 else '' }}">{{ a | mins }}</td>
+    <td class="num">{{ img.top_first | mins }}</td><td class="num">{{ img.our_median(1) | mins }}</td>
+    <td class="num">{{ img.top_half | mins }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+{% endif %}
 {% else %}
 <p class="empty">No 5-minute history in this data set.</p>
 {% endif %}
