@@ -72,6 +72,15 @@ def apply_polling(board, poller, default: float) -> None:
     poller.configure(*polling(board, default))
 
 
+@router.post("/polling/reset", dependencies=[Depends(same_origin)])
+async def reset_polling(request: Request, admin: Device = Depends(require_admin)):
+    """Snap a grown variable interval back to the set one and check the scoreboard now."""
+    poller = request.app.state.poller
+    poller.reset()
+    log.info("Admin device %d reset the update interval", admin.id)
+    return _done(f"Checking the scoreboard now; back to every {poller.interval:g} seconds.", "#scoreboard")
+
+
 @router.post("/polling", dependencies=[Depends(same_origin)])
 async def set_polling(request: Request, admin: Device = Depends(require_admin),
                       interval: Annotated[str, Form()] = "60", variable: Annotated[str, Form()] = ""):

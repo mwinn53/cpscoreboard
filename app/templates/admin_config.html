@@ -44,6 +44,12 @@
     ({{ poller.quiet }} check{{ 's' if poller.quiet != 1 }} in a row without a change).</p>{% endif %}
   <button type="submit">Save</button>
 </form>
+{% if poller.variable %}
+<form method="post" action="/admin/config/polling/reset" class="inline">
+  <button type="submit" {{ 'disabled' if poller.current_interval() <= poller.interval }}>Reset to {{ poller.interval | int }} seconds and check now</button>
+  <span class="muted small">for when a round is about to start and the wait has grown</span>
+</form>
+{% endif %}
 
 <h2 id="competition-start">Competition start
   {% call info("competition-help", "About the competition start") %}

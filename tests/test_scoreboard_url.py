@@ -143,3 +143,42 @@ def test_variable_interval_grows_to_30_minutes_after_6_quiet_hours():
     assert p.current_interval() == 1800                      # between rounds
     p.quiet = 100000
     assert p.current_interval() == 1800                      # no overflow however long it stays quiet
+
+
+def test_reset_snaps_back_and_checks_now(site):  # noqa: F811
+    from datetime import timedelta
+
+    from app.sources import utcnow
+    admin = make_admin(site)
+    poller = admin.app.state.poller
+    admin.post("/admin/config/polling", data={"interval": "60", "variable": "1"})
+    poller.quiet, poller.quiet_since = 40, utcnow() - timedelta(hours=8)
+    assert poller.current_interval() == 1800
+    assert "Reset to 60 seconds and check now" in admin.get("/admin/config").text
+    assert admin.post("/admin/config/polling/reset").status_code == 303
+    assert poller.quiet == 0 and poller.current_interval() == 60 and poller._wake.is_set()
+
+
+def test_poller_wakes_early_on_reset():
+    from app.poller import Poller
+    from app.sources import Source
+
+    calls = []
+
+    class Counting(Source):
+        description = "counting"
+
+        async def fetch(self):
+            calls.append(1)
+            raise RuntimeError("offline")   # a failed fetch: the poller backs off (60 s here)
+
+    async def go():
+        p = Poller(Counting(), 60)
+        task = asyncio.create_task(p.run())
+        await asyncio.sleep(0.1)
+        assert len(calls) == 1
+        p.reset()
+        await asyncio.sleep(0.1)
+        assert len(calls) == 2                     # woke at once instead of waiting a minute
+        task.cancel()
+    asyncio.run(go())

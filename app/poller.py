@@ -67,6 +67,7 @@ class Poller:
         self.variable = False   # set from /admin/config (app/admin_config.py)
         self.quiet = 0          # successful polls in a row without a change
         self.quiet_since = utcnow()  # when the board last changed (or polling started)
+        self._wake = asyncio.Event()  # set by reset(): cut the current wait short
         self.collect = collect or CollectionFilter()
         self.store = store
         self.archive = archive
@@ -250,6 +251,11 @@ class Poller:
             return min(self.interval * 2 ** self._failures, self.MAX_BACKOFF)
         return self.source.next_delay(self.current_interval())
 
+    def reset(self) -> None:
+        """Back to the set interval, and check the scoreboard now (the admin's reset button)."""
+        self.quiet, self.quiet_since = 0, utcnow()
+        self._wake.set()
+
     def configure(self, interval: float, variable: bool) -> None:
         if (interval, variable) != (self.interval, self.variable):
             log.info("Polling every %gs%s", interval, " (variable)" if variable else "")
@@ -268,4 +274,8 @@ class Poller:
             if self.state.finished:
                 log.info("Replay finished; keeping the last board")
                 return
-            await asyncio.sleep(self.next_delay())
+            self._wake.clear()
+            try:
+                await asyncio.wait_for(self._wake.wait(), timeout=self.next_delay())
+            except TimeoutError:
+                pass

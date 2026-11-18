@@ -127,7 +127,8 @@ approved device (see [Access control](#access-control)).
   compressed and can't be asked "has anything changed?"). With the variable interval on
   (/admin/config), the wait doubles after 3 checks without a change, up to 10 minutes, and
   up to 30 minutes after 6 hours without a change (between rounds); the first change
-  resets it.
+  resets it. **Reset to 60 seconds and check now** on /admin/config snaps it back by hand (e.g.
+  just before a round starts).
 - **Live updates:** the board refreshes on every change (via `/events`) and every polling
   interval. Times are shown in `DISPLAY_TIMEZONE`.
 - **Logos:** a square logo sits at each end of the header. Each can link somewhere:
