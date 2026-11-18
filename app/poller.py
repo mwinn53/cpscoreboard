@@ -7,7 +7,7 @@ import hashlib
 import logging
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .archive import Archive
 from .collection import CollectionFilter
@@ -56,6 +56,8 @@ class Poller:
     MAX_BACKOFF = 600.0
     QUIET_POLLS = 3          # variable interval: after this many polls without a change, double the wait...
     MAX_VARIABLE = 600.0     # ...up to this; the first change goes back to the set interval
+    LONG_QUIET = timedelta(hours=6)  # once nothing has changed this long (between rounds)...
+    MAX_LONG_QUIET = 1800.0          # ...the wait can grow to this
 
     def __init__(self, source: Source, interval: float, collect: CollectionFilter | None = None,
                  store: SnapshotStore | None = None, notifier: BoardNotifier | None = None,
@@ -64,6 +66,7 @@ class Poller:
         self.interval = interval
         self.variable = False   # set from /admin/config (app/admin_config.py)
         self.quiet = 0          # successful polls in a row without a change
+        self.quiet_since = utcnow()  # when the board last changed (or polling started)
         self.collect = collect or CollectionFilter()
         self.store = store
         self.archive = archive
@@ -239,7 +242,8 @@ class Poller:
         """The wait between polls now: the set interval, or longer while a variable interval sees no changes."""
         if not self.variable or self.quiet < self.QUIET_POLLS:
             return self.interval
-        return min(self.interval * 2 ** (self.quiet // self.QUIET_POLLS), max(self.MAX_VARIABLE, self.interval))
+        cap = self.MAX_LONG_QUIET if utcnow() - self.quiet_since >= self.LONG_QUIET else self.MAX_VARIABLE
+        return min(self.interval * 2 ** min(self.quiet // self.QUIET_POLLS, 20), max(cap, self.interval))
 
     def next_delay(self) -> float:
         if self._failures:
@@ -250,6 +254,7 @@ class Poller:
         if (interval, variable) != (self.interval, self.variable):
             log.info("Polling every %gs%s", interval, " (variable)" if variable else "")
         self.interval, self.variable, self.quiet = interval, variable, 0
+        self.quiet_since = utcnow()
 
     async def run(self) -> None:
         log.info("Poller started (%s)", self.source.description)
@@ -257,6 +262,7 @@ class Poller:
             changed = await self.poll_once()
             if changed:
                 self.quiet = 0
+                self.quiet_since = utcnow()
             elif not self._failures:
                 self.quiet += 1
             if self.state.finished:

@@ -122,3 +122,24 @@ def test_update_interval_on_the_config_page(site):  # noqa: F811
     assert admin.app.state.board.get_value("poll_interval") == "90"
     assert admin.post("/admin/config/polling", data={"interval": "5"}).status_code == 303
     assert (poller.interval, poller.variable) == (15, False)      # clamped; unchecked = fixed
+
+
+def test_variable_interval_grows_to_30_minutes_after_6_quiet_hours():
+    from datetime import timedelta
+
+    from app.poller import Poller
+    from app.sources import Source, utcnow
+
+    class Fixed(Source):
+        description = "fixed"
+
+        async def fetch(self):
+            return None
+    p = Poller(Fixed(), 60)
+    p.configure(60, True)
+    p.quiet = 30
+    assert p.current_interval() == 600                       # quiet, but not for long
+    p.quiet_since = utcnow() - timedelta(hours=6, minutes=1)
+    assert p.current_interval() == 1800                      # between rounds
+    p.quiet = 100000
+    assert p.current_interval() == 1800                      # no overflow however long it stays quiet

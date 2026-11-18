@@ -120,7 +120,14 @@ approved device (see [Access control](#access-control)).
   schools' and watched teams. Scoring shows the total score and, like the official team page,
   the per-image table (with Cisco Quiz and Cisco Packet Tracer rows for the current round)
   and one chart of every image's score: live from the public scoreboard for the current
-  round (any team), or from stored detail for watched teams.
+  round (any team), or from stored detail for watched teams. Once the Analysis collector
+  has stored a team and its score hasn't changed since, the page uses that copy instead
+  of asking the public scoreboard again.
+- **Polling:** each check downloads the whole public scoreboard (about 750 KB; it isn't
+  compressed and can't be asked "has anything changed?"). With the variable interval on
+  (/admin/config), the wait doubles after 3 checks without a change, up to 10 minutes, and
+  up to 30 minutes after 6 hours without a change (between rounds); the first change
+  resets it.
 - **Live updates:** the board refreshes on every change (via `/events`) and every polling
   interval. Times are shown in `DISPLAY_TIMEZONE`.
 - **Logos:** a square logo sits at each end of the header. Each can link somewhere:

@@ -520,3 +520,22 @@ def test_run_report_button_and_reopen(site):  # noqa: F811
     assert admin.post(f"/analysis/reports/{st.round_id}/reopen").status_code == 303
     assert not c.store.get(st.round_id).final
     store.close()
+
+
+def test_team_page_uses_the_stored_copy_while_the_score_is_unchanged(site):  # noqa: F811
+    from app.team_view import stored_official
+    admin = make_admin(site)
+    app = admin.app
+    c, store, box, calls, clock = _collector(n=1)
+    c.store, c.board = app.state.analysis, app.state.board
+    t = box["teams"][0]
+    asyncio.run(c.collect(t))
+
+    class Poller:
+        full_board = [t]
+    state = type("S", (), {"analysis": app.state.analysis, "poller": Poller})()
+    stored = stored_official(state, t.team_number)
+    assert stored is not None and len(stored.images) == 3 and stored.history and stored.images[0].image.endswith("hsms")
+    Poller.full_board = [dataclasses.replace(t, ccs_score=(t.ccs_score or 0) + 1)]   # the score moved: fetch live
+    assert stored_official(state, t.team_number) is None
+    store.close()

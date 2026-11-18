@@ -35,8 +35,9 @@
     {% call info("variable-help", "About the variable interval") %}
     Between rounds the scoreboard can go hours without changing. With a variable interval, after
     {{ poller.QUIET_POLLS }} checks in a row with no change the wait doubles (60 s, then 120 s, 240 s… up to
-    {{ (poller.MAX_VARIABLE / 60) | int }} minutes), and the first change puts it straight back to the interval set
-    above. It saves requests when nothing is happening, at the cost of noticing the start of a round a few minutes
+    {{ (poller.MAX_VARIABLE / 60) | int }} minutes; after {{ (poller.LONG_QUIET.total_seconds() / 3600) | int }} hours
+    without a change, up to {{ (poller.MAX_LONG_QUIET / 60) | int }} minutes), and the first change puts it straight
+    back to the interval set above. Each check downloads the whole scoreboard (about 750 KB). It saves requests when nothing is happening, at the cost of noticing the start of a round a few minutes
     later. Failed fetches back off on their own either way.
     {% endcall %}</label>
   {% if poller.variable %}<p class="muted small">Now waiting {{ poller.current_interval() | int }} seconds between checks
