@@ -213,9 +213,11 @@ an approved device; detailed status is at `/api/status`. In dev you can set
 
 Each time the board changes, the app records one `board_updates` row with the time
 and board size. It then writes a `team_snapshots` row for each **collected** team
-whose score, images, warnings, score time or any place changed. Play time alone
-doesn't trigger a row. With the filter limited to one state and division, that
-means tens of rows per round, not thousands. On restart, the dashboard reloads the
+whose score, images, warnings, score time, or place in its division or its state's
+division changed. Play time alone doesn't trigger a row, and neither do the overall
+and statewide all-division places, which shift whenever any team anywhere scores
+(they caused 76% of the rows until #82). The scoreboard's trend rows are built once
+per board change and shared by every viewer. On restart, the dashboard reloads the
 last known board from the database instead of starting empty.
 
 For **watched** teams, the app also fetches the scoreboard's per-image detail

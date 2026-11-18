@@ -53,5 +53,23 @@ def migrate(engine: Engine) -> None:
             cfg.attributes["connection"] = conn
             command.stamp(cfg, BASELINE)
     with engine.begin() as conn:
+        before = _revision(conn)
         cfg.attributes["connection"] = conn
         command.upgrade(cfg, "head")
+        after = _revision(conn)
+    if before is not None and before < VACUUM_AFTER <= (after or "") and engine.url.get_backend_name() == "sqlite" \
+            and engine.url.database not in (None, "", ":memory:"):
+        log.info("Compacted history; vacuuming the database to give the space back")
+        with engine.connect() as conn:
+            conn.exec_driver_sql("VACUUM")
+
+
+VACUUM_AFTER = "0005"  # the revision that deletes most of team_snapshots
+
+
+def _revision(conn) -> str | None:
+    from sqlalchemy import text
+    try:
+        return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    except Exception:
+        return None

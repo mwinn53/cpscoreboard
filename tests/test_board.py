@@ -417,6 +417,11 @@ def test_scoreboard_rows_expand_to_sparklines(site):  # noqa: F811
     assert spark.index("Total score") < spark.index("District") < spark.index("State") < spark.index("National")
     assert f'href="/teams/{number}"' in spark
     assert "No history" in admin.get("/partials/spark/99-0000").text
+    cache = admin.app.state.board_cache                       # built once per board change, shared by viewers
+    assert ("spark", number) in cache._data and admin.get(f"/partials/spark/{number}").text == spark
+    admin.app.state.poller.state.changes_seen += 1           # the board changed: rebuilt on the next request
+    admin.get(f"/partials/spark/{number}")
+    assert list(cache._data) == [("spark", number)] or ("spark", number) in cache._data
 
 
 def test_history_pages_need_an_approved_device(site):  # noqa: F811

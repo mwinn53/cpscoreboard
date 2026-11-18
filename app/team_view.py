@@ -17,6 +17,7 @@ its division, so its history is rebuilt from those teams' stored snapshots.
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any
@@ -35,6 +36,35 @@ router = APIRouter(dependencies=[Depends(require_viewer)])
 
 CURRENT_GAP = timedelta(hours=12)  # data this recent still belongs to the current round
 PLACE_WIDTH, SCORE_WIDTH = 420, 620    # SVG widths near how wide each chart shows (3 and 2 per row)
+
+
+class BoardCache:
+    """Results that only change when the board does (keyed by the poller's change count), shared by all viewers."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._version: object = None
+        self._data: dict = {}
+
+    def get(self, version: object, key, build):
+        with self._lock:
+            if version != self._version:
+                self._version, self._data = version, {}
+            if key in self._data:
+                return self._data[key]
+        value = build()
+        with self._lock:
+            if version == self._version:
+                self._data[key] = value
+        return value
+
+
+def _cache(request: Request) -> tuple[BoardCache, object]:
+    state = request.app.state
+    if getattr(state, "board_cache", None) is None:
+        state.board_cache = BoardCache()
+    poller = state.poller
+    return state.board_cache, (id(state.store), poller.state.changes_seen, poller.state.data_as_of)
 
 
 def district_history(store: SnapshotStore, team: str, district: Iterable[str]) -> list[tuple[datetime, int]]:
@@ -102,7 +132,9 @@ def _context(request: Request, team: str, round: int, official: OfficialDetail |
         start = snaps[0].observed_at
         place_opts = {"invert": True, "integer": True, "fmt": _place_fmt, "width": PLACE_WIDTH}
         if team in district:
-            dh = _window([(t, float(p)) for t, p in district_history(store, team, district)], start, until)
+            cache, version = _cache(request)
+            dh = _window([(t, float(p)) for t, p in cache.get(
+                version, ("district", team), lambda: district_history(store, team, district))], start, until)
             if dh:
                 placement.append(("District", step_chart(dh, until, tz=tz, label=f"District place for {team}",
                                                          **place_opts)))
@@ -169,7 +201,9 @@ def _spark_context(request: Request, team: str) -> dict[str, Any]:
         sparks.append(("Total score", _num(last.score),
                        sparkline([(s.observed_at, s.team.score) for s in snaps], until, label=f"Total score for {team}")))
         if team in district:
-            dh = _window([(t, float(p)) for t, p in district_history(store, team, district)], start, until)
+            cache, version = _cache(request)
+            dh = _window([(t, float(p)) for t, p in cache.get(
+                version, ("district", team), lambda: district_history(store, team, district))], start, until)
             if dh:
                 sparks.append(("District", f"{dh[-1][1]:.0f}",
                                sparkline(dh, until, invert=True, label=f"District place for {team}")))
@@ -182,6 +216,8 @@ def _spark_context(request: Request, team: str) -> dict[str, Any]:
 
 @router.get("/partials/spark/{team_number}", response_class=HTMLResponse)
 async def spark_partial(request: Request, team_number: str):
-    """The expanded row under a team on the scoreboard: this round's sparklines."""
-    ctx = await asyncio.to_thread(_spark_context, request, team_number)
-    return templates.TemplateResponse(request, "_spark.html", ctx)
+    """The expanded row under a team on the scoreboard: this round's sparklines (built once per board change)."""
+    cache, version = _cache(request)
+    html = await asyncio.to_thread(cache.get, version, ("spark", team_number), lambda: templates.get_template(
+        "_spark.html").render(_spark_context(request, team_number)))
+    return HTMLResponse(html)

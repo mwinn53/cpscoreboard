@@ -164,3 +164,12 @@ def test_file_database_is_created_in_wal_mode(tmp_path):
         assert conn.exec_driver_sql("PRAGMA journal_mode").scalar() == "wal"
     s.close()
     assert (tmp_path / "sub" / "db.sqlite").exists()
+
+
+def test_cross_division_places_alone_dont_make_a_row():
+    from dataclasses import replace
+
+    from app.store import change_key
+    t = parse_scores(load(S19))[0]
+    assert change_key(replace(t, place_overall=t.place_overall + 5, place_state=t.place_state + 2)) == change_key(t)
+    assert change_key(replace(t, place_division=t.place_division + 1)) != change_key(t)

@@ -6,8 +6,11 @@ Two tables:
   board), with the board size and how many teams were collected. This gives
   history its time axis even when none of *our* teams moved.
 * ``team_snapshots`` — one row per collected team **only when something we track
-  changed** (score, images, warnings, score time, or any place). Play time ticks
-  every minute for active teams, so it's stored but doesn't trigger a row.
+  changed** (score, images, warnings, score time, or its place in the division or
+  in its state's division). Play time ticks every minute for active teams, and the
+  overall and statewide all-division places shift whenever any team anywhere
+  scores, so those are stored with a row but don't trigger one (migration 0005
+  removed the rows they had caused: 76% of the table).
 
 SQLAlchemy Core keeps this portable to Postgres. The schema (these tables and the
 other modules') is managed by Alembic: see app/schema.py.
@@ -70,10 +73,9 @@ _TEAM_FIELDS = [c.name for c in team_snapshots.columns if c.name not in ("id", "
 
 
 def change_key(t: TeamScore) -> tuple[Any, ...]:
-    """What has to differ for a team to get a new snapshot row (not play_time)."""
+    """What has to differ for a team to get a new snapshot row (not play time, nor the cross-division places)."""
     return (t.ccs_score, t.total, t.adjustment, t.images, t.code, t.score_time,
-            t.place_overall, t.place_division, t.place_state, t.place_state_division,
-            t.location, t.division, t.tier)
+            t.place_division, t.place_state_division, t.location, t.division, t.tier)
 
 
 def _to_db(dt: datetime) -> datetime:
