@@ -35,14 +35,21 @@
     {% call info("variable-help", "About the variable interval") %}
     Between rounds the scoreboard can go hours without changing. With a variable interval, after
     {{ poller.QUIET_POLLS }} checks in a row with no change the wait doubles (60 s, then 120 s, 240 s… up to
-    {{ (poller.MAX_VARIABLE / 60) | int }} minutes), and the first change puts it straight back to the interval set
-    above. It saves requests when nothing is happening, at the cost of noticing the start of a round a few minutes
+    {{ (poller.MAX_VARIABLE / 60) | int }} minutes; after {{ (poller.LONG_QUIET.total_seconds() / 3600) | int }} hours
+    without a change, up to {{ (poller.MAX_LONG_QUIET / 60) | int }} minutes), and the first change puts it straight
+    back to the interval set above. Each check downloads the whole scoreboard (about 750 KB). It saves requests when nothing is happening, at the cost of noticing the start of a round a few minutes
     later. Failed fetches back off on their own either way.
     {% endcall %}</label>
   {% if poller.variable %}<p class="muted small">Now waiting {{ poller.current_interval() | int }} seconds between checks
     ({{ poller.quiet }} check{{ 's' if poller.quiet != 1 }} in a row without a change).</p>{% endif %}
   <button type="submit">Save</button>
 </form>
+{% if poller.variable %}
+<form method="post" action="/admin/config/polling/reset" class="inline">
+  <button type="submit" {{ 'disabled' if poller.current_interval() <= poller.interval }}>Reset to {{ poller.interval | int }} seconds and check now</button>
+  <span class="muted small">for when a round is about to start and the wait has grown</span>
+</form>
+{% endif %}
 
 <h2 id="competition-start">Competition start
   {% call info("competition-help", "About the competition start") %}

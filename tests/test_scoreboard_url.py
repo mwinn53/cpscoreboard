@@ -122,3 +122,63 @@ def test_update_interval_on_the_config_page(site):  # noqa: F811
     assert admin.app.state.board.get_value("poll_interval") == "90"
     assert admin.post("/admin/config/polling", data={"interval": "5"}).status_code == 303
     assert (poller.interval, poller.variable) == (15, False)      # clamped; unchecked = fixed
+
+
+def test_variable_interval_grows_to_30_minutes_after_6_quiet_hours():
+    from datetime import timedelta
+
+    from app.poller import Poller
+    from app.sources import Source, utcnow
+
+    class Fixed(Source):
+        description = "fixed"
+
+        async def fetch(self):
+            return None
+    p = Poller(Fixed(), 60)
+    p.configure(60, True)
+    p.quiet = 30
+    assert p.current_interval() == 600                       # quiet, but not for long
+    p.quiet_since = utcnow() - timedelta(hours=6, minutes=1)
+    assert p.current_interval() == 1800                      # between rounds
+    p.quiet = 100000
+    assert p.current_interval() == 1800                      # no overflow however long it stays quiet
+
+
+def test_reset_snaps_back_and_checks_now(site):  # noqa: F811
+    from datetime import timedelta
+
+    from app.sources import utcnow
+    admin = make_admin(site)
+    poller = admin.app.state.poller
+    admin.post("/admin/config/polling", data={"interval": "60", "variable": "1"})
+    poller.quiet, poller.quiet_since = 40, utcnow() - timedelta(hours=8)
+    assert poller.current_interval() == 1800
+    assert "Reset to 60 seconds and check now" in admin.get("/admin/config").text
+    assert admin.post("/admin/config/polling/reset").status_code == 303
+    assert poller.quiet <= 1 and poller.current_interval() == 60  # (the woken poller may already have checked once)
+
+
+def test_poller_wakes_early_on_reset():
+    from app.poller import Poller
+    from app.sources import Source
+
+    calls = []
+
+    class Counting(Source):
+        description = "counting"
+
+        async def fetch(self):
+            calls.append(1)
+            raise RuntimeError("offline")   # a failed fetch: the poller backs off (60 s here)
+
+    async def go():
+        p = Poller(Counting(), 60)
+        task = asyncio.create_task(p.run())
+        await asyncio.sleep(0.1)
+        assert len(calls) == 1
+        p.reset()
+        await asyncio.sleep(0.1)
+        assert len(calls) == 2                     # woke at once instead of waiting a minute
+        task.cancel()
+    asyncio.run(go())

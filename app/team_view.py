@@ -180,11 +180,39 @@ def _context(request: Request, team: str, round: int, official: OfficialDetail |
             "image_legend": [short_image_name(n) for n, _ in (series if snaps and series else [])]}
 
 
+def stored_official(state, team: str):
+    """The team's per-image detail as the collector stored it, while its score is still what it was then.
+
+    Saves two requests to the public scoreboard per team-page view once a team has finished; teams still
+    playing (or changed since) are fetched live."""
+    from .analysis_collector import score_key
+    from .team_detail import ImageScore, OfficialDetail
+    analysis, poller = getattr(state, "analysis", None), getattr(state, "poller", None)
+    if analysis is None or poller is None:
+        return None
+    current = next((t for t in poller.full_board if t.team_number == team), None)
+    entry = analysis.latest_collection(team) if current is not None else None
+    if entry is None or entry[1] != score_key(current):
+        return None
+    images, timeline = analysis.team_detail(entry[0], team)
+    if not images:
+        return None
+    history: dict[str, list[tuple[datetime, float]]] = {}
+    for image, at, score in timeline:
+        history.setdefault(image, []).append((at, score))
+    return OfficialDetail([ImageScore(i.image_full or i.image, i.duration, i.found, i.remaining, i.penalties, i.code,
+                                      i.score) for i in images], sorted(history.items()), entry[2])
+
+
 @router.get("/teams/{team_number}", response_class=HTMLResponse)
 async def team_page(request: Request, team_number: str, round: int = 0):
     """A team's placement and scoring over time, one round at a time (newest first)."""
     client = getattr(request.app.state, "official", None)
-    official = await client.get(team_number) if client is not None and round == 0 else None
+    official = None
+    if round == 0:
+        official = await asyncio.to_thread(stored_official, request.app.state, team_number)
+        if official is None and client is not None:
+            official = await client.get(team_number)
     ctx = await asyncio.to_thread(_context, request, team_number, round, official)
     return templates.TemplateResponse(request, "team.html", ctx)
 

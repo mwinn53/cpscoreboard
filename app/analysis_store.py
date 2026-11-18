@@ -409,6 +409,25 @@ class AnalysisStore:
         with self.store.lock, self.store.engine.connect() as conn:
             return {row.team_number: (row.round_id, row.score_key, row.play_time) for row in conn.execute(q)}
 
+    def latest_collection(self, team_number: str) -> tuple[int, str, datetime] | None:
+        """(data set id, score key, when) of the team's latest collection into a live data set."""
+        c = analysis_collected.c
+        with self.store.lock, self.store.engine.connect() as conn:
+            row = conn.execute(select(c.round_id, c.score_key, c.collected_at).where(c.team_number == team_number)
+                               .order_by(c.collected_at.desc()).limit(1)).first()
+        return (row.round_id, row.score_key, _from_db(row.collected_at)) if row else None
+
+    def team_detail(self, round_id: int, team_number: str) -> tuple[list[ImageRow], list[tuple[str, datetime, float]]]:
+        """One team's image rows and 5-minute history in a data set."""
+        i, t = analysis_images.c, analysis_timeline.c
+        cols = [c.name for c in analysis_images.columns if c.name not in ("id", "round_id")]
+        with self.store.lock, self.store.engine.connect() as conn:
+            imgs = conn.execute(select(analysis_images).where(i.round_id == round_id, i.team_number == team_number)).all()
+            pts = conn.execute(select(t.image, t.at, t.score).where(t.round_id == round_id, t.team_number == team_number)
+                               .order_by(t.at)).all()
+        return ([ImageRow(**{c: getattr(r, c) for c in cols}) for r in imgs],
+                [(r.image, _from_db(r.at), r.score) for r in pts])
+
     def final_rounds(self, division: str) -> set[int]:
         r = analysis_rounds.c
         with self.store.lock, self.store.engine.connect() as conn:
