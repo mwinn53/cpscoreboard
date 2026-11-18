@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from .analysis import describe
+from .analysis_stats import p_text
 from .posting import ordinal
 
 
@@ -54,6 +55,31 @@ def listing(items: Sequence[str]) -> str:
 
 def plural(k: int, word: str, many: str | None = None) -> str:
     return f"{k} {word if k == 1 else (many or word + 's')}"
+
+
+def possessive(name: str) -> str:
+    return f"{name}'" if name.endswith("s") else f"{name}'s"
+
+
+def signed(v: float) -> str:
+    return f"{'+' if v > 0 else '−' if v < 0 else ''}{num(abs(v))}"
+
+
+def group_sentence(t, who_a: str, who_b: str) -> str:
+    """Two groups in words: the medians, the chance one beats the other, the interval, and whether it's significant."""
+    rel = "higher than" if t.median_a > t.median_b else "lower than" if t.median_a < t.median_b else "the same as"
+    s = f"{possessive(t.a)} median ({num(t.median_a)}) was {rel} {possessive(t.b)} ({num(t.median_b)})."
+    if t.mw is None:
+        return s
+    lo, hi = t.mw.prob_sup_ci
+    s += (f" A random {who_a} outscored a random {who_b} {pct(t.mw.prob_sup)} of the time (95% CI "
+          f"{pct(lo)}–{pct(hi)})")
+    if t.diff:
+        d, dlo, dhi = t.diff
+        s += f", and the difference in medians was {signed(d)} points (95% CI {signed(dlo)} to {signed(dhi)})"
+    s += (f". That's a statistically significant difference (Mann–Whitney, {p_text(t.mw.p)})." if t.mw.significant
+          else f". That's within what chance alone produces ({p_text(t.mw.p)}), so it isn't a significant difference.")
+    return s
 
 
 def corr(r: float) -> str:
@@ -153,15 +179,16 @@ def _scores(r) -> list[str]:
     if nat.n:
         out.append(f"The national median was {num(nat.median)}, and the middle half of teams scored "
                    f"{num(nat.q1)}–{num(nat.q3)}.")
-    if st.n and nat.median is not None:
+    t = r.tests.get("state")
+    if t:
+        out.append(group_sentence(t, f"{r.state} team", "team from elsewhere"))
+    elif st.n and nat.median is not None:
         rel = "higher than" if st.median > nat.median else "lower than" if st.median < nat.median else "equal to"
-        s = f"{r.state}'s median ({num(st.median)}) was {rel} the national median"
-        if st.n > 1 and st.median != nat.median:
-            inside = st.q1 <= nat.median <= st.q3
-            s += (f", but the national median falls inside {r.state}'s middle half, so the difference isn't "
-                  "meaningful" if inside else f", and the national median falls outside {r.state}'s middle half, "
-                  "so the difference is meaningful")
-        out.append(s + ".")
+        out.append(f"{r.state}'s median ({num(st.median)}) was {rel} the national median; there are too few "
+                   f"{r.state} teams to test the difference.")
+    t = r.tests.get("district")
+    if t:
+        out.append(group_sentence(t, "district team", f"other {r.state} team"))
     if r.density and r.density.rank:
         out.append(f"{r.state} ranked {ordinal(r.density.rank)} of {len(r.density.states)} states and countries "
                    "by median score.")
@@ -194,10 +221,12 @@ def _time(r) -> list[str]:
         if (tm.above_median.median or 0) >= r.limit - 30:
             s += f": the stronger teams use nearly all of their {hours(r.limit // 60)} hours"
         out.append(s + ".")
-    if tm and tm.r is not None:
-        out.append(f"Among teams that attempted every image, play time had {strength(tm.r)} relationship with "
-                   f"score (r = {corr(tm.r)})"
-                   + (", so finishing early brought no clear advantage." if abs(tm.r) < 0.3 else "."))
+    if tm and tm.test is not None:
+        out.append(f"Among teams that attempted every image, play time had {strength(tm.r)} rank correlation with "
+                   f"score (ρ = {corr(tm.r)}, {p_text(tm.test.p)})"
+                   + (", so finishing early brought no clear advantage." if not tm.test.significant or abs(tm.r) < 0.1
+                      else ": teams that used more of their time tended to score higher." if tm.r > 0
+                      else ": teams that finished sooner tended to score higher."))
     if tm and tm.ours_mean is not None:
         out.append(f"Our teams played a mean of {minutes(tm.ours_mean)}.")
     return out
@@ -215,14 +244,19 @@ def _density(r) -> list[str]:
             out.append(f"{r.state}, with {ours.n} teams, is one of the outliers for size.")
         elif ours.n > d.teams.q3:
             out.append(f"{r.state}, with {ours.n} teams, is larger than most.")
-    if d.r is not None:
-        out.append(f"Teams per state and the state's median score had {strength(d.r)} relationship "
-                   f"(r = {corr(d.r)})" + (", so more teams in a state doesn't by itself mean higher scores."
-                                         if abs(d.r) < 0.3 else "."))
+    if d.test is not None:
+        out.append(f"Teams per state and the state's median score had {strength(d.r)} rank correlation "
+                   f"(ρ = {corr(d.r)}, {p_text(d.test.p)})"
+                   + (", so more teams in a state doesn't by itself mean higher scores." if not d.test.significant
+                      else "."))
     if d.bands:
-        lo, hi, med, k = max(d.bands, key=lambda b: b[2] or 0)
-        out.append(f"States with {lo}–{hi} teams had the highest median of state medians ({num(med)}, "
-                   f"{plural(k, 'state')}).")
+        best = max(d.bands, key=lambda b: b[2] or 0)
+        lo, hi, med, k = best
+        s = (f"States with {lo}–{hi} teams had the highest median of state medians ({num(med)}, "
+             f"{plural(k, 'state')})")
+        if best is d.bands[0]:
+            s += ", but a state with only a few teams has a median that's mostly the luck of who entered, so read it loosely"
+        out.append(s + ".")
     if ours and d.medians.n > 1:
         rel = "above" if ours.score.median > d.medians.median else "below" if ours.score.median < d.medians.median \
             else "equal to"
@@ -365,12 +399,12 @@ def _summary(r) -> list[str]:
         place = (f", {ordinal(best.team.place_state_division)} in {r.state}"
                  if best.team.place_state_division else "")
         out.append(f"Best result: {best.label}{place}, outscoring {share(best.percentile)} of the division.")
-    nat, st = r.score["national"], r.score["state"]
-    if st.n > 1 and nat.median is not None and st.median != nat.median:
-        inside = st.q1 <= nat.median <= st.q3
-        out.append(f"{r.state} scored {'higher' if st.median > nat.median else 'lower'} than the nation "
-                   f"(median {num(st.median)} vs {num(nat.median)})"
-                   + ("; not a meaningful difference." if inside else ", a meaningful difference."))
+    t = r.tests.get("state")
+    if t and t.mw and t.median_a != t.median_b:
+        out.append(f"{r.state} scored {'higher' if t.median_a > t.median_b else 'lower'} than the rest of the division "
+                   f"(median {num(t.median_a)} vs {num(t.median_b)}): "
+                   + (f"a statistically significant difference ({p_text(t.mw.p)})." if t.mw.significant
+                      else f"not a statistically significant difference ({p_text(t.mw.p)})."))
     gaps = _image_gaps(r)
     if gaps:
         strong = [g[0] for g in gaps if g[1] > 0.05]
@@ -384,10 +418,14 @@ def _summary(r) -> list[str]:
         out.append(f"Teams that skipped an image weren't competitive (the best of them placed "
                    f"{ordinal(a.fewer_places[0])}); attempting every image doesn't guarantee a high place, but it's "
                    "the price of entry.")
-    if r.time and r.time.r is not None and abs(r.time.r) < 0.3:
+    if r.time and r.time.test is not None and (not r.time.test.significant or abs(r.time.r) < 0.1):
         out.append(f"Finishing early brought no clear advantage; going past {r.limit // 60} hours costs points.")
-    if r.density and r.density.r is not None and abs(r.density.r) < 0.3:
-        out.append(f"The number of teams in a state had little to do with its scores (r = {corr(r.density.r)}).")
+    elif r.time and r.time.test is not None and r.time.r > 0:
+        out.append(f"Teams that used more of their {r.limit // 60} hours scored higher (ρ = {corr(r.time.r)}, "
+                   f"{p_text(r.time.test.p)}): finishing early leaves points on the table.")
+    if r.density and r.density.test is not None and not r.density.test.significant:
+        out.append(f"The number of teams in a state had no significant relation to its scores "
+                   f"(ρ = {corr(r.density.r)}, {p_text(r.density.test.p)}).")
     if r.has_challenge and r.challenge.n:
         out.append(f"Cisco: median {num(r.challenge.median)} of a best {num(r.challenge.max)}, so "
                    "there's room to gain on it.")
@@ -448,6 +486,38 @@ def season_narrative(summaries: list) -> list[str]:
         out.append(f"{label} {word} from outscoring {share(pcts[0])} of the division in {rows[0][0].info.label} to "
                    f"{share(pcts[-1])} in {rows[-1][0].info.label} (best: {share(best[1].percentile)} in "
                    f"{best[0].info.label}).")
+    return out
+
+
+def program_narrative(p, sums: list) -> list[str]:
+    """Our teams as a program across rounds: are they above the median team, and is it trending?"""
+    out = []
+    if p is None or not p.n:
+        return out
+    s = (f"Across {plural(p.n, 'team-round')}, our teams outscored half the division {p.above} times; the median "
+         f"team-round outscored {share(p.median_pct)} of the division")
+    if p.ci:
+        s += f" (95% CI {share(p.ci[0])}–{share(p.ci[1])})"
+    if p.test:
+        where = "above" if p.median_pct > 50 else "below"
+        s += (f". That's significantly {where} the median team (Wilcoxon signed-rank, {p_text(p.test.p)})."
+              if p.test.significant else f". That's not significantly different from the median team ({p_text(p.test.p)}).")
+    else:
+        s += "; too few team-rounds to test."
+    out.append(s)
+    if p.trend:
+        direction = "upward" if p.trend.r > 0 else "downward"
+        out.append(f"Round to round, our median team's percentile shows "
+                   + (f"a significant {direction} trend" if p.trend.significant else "no significant trend")
+                   + f" (Kendall's τ = {corr(p.trend.r)}, {p_text(p.trend.p)}, {plural(p.trend.n, 'round')})"
+                   + ("; later rounds have smaller, qualified fields, which pulls percentiles down." if p.trend.significant
+                      and p.trend.r < 0 else "."))
+    if p.state_test and sums:
+        state = sums[0].state
+        out.append(f"{state}'s median team was above the national median team in "
+                   f"{sum(1 for s in sums if (s.state_median_pct or 0) > 50)} of {p.state_test.n} rounds; "
+                   + ("a significant pattern" if p.state_test.significant else "not a significant pattern")
+                   + f" ({p_text(p.state_test.p)}).")
     return out
 
 

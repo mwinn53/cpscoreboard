@@ -180,6 +180,10 @@ def test_narrative_and_charts_for_a_round():
     assert any("attempted fewer" in s for s in n["attempts"])
     assert any("ahead of the median throughout" in s for s in n["progress"])
     assert n["summary"][0].startswith("Best result: 19-0001 (Ours)")
+    t = r.tests["state"]
+    assert (t.n_a, t.n_b) == (10, 30) and t.mw is not None and t.diff is not None
+    assert any("of the time (95% CI" in s and "p = " in s for s in n["scores"])
+    assert set(r.median_ci) >= {"national", "state"} and r.density.test is None  # 4 states: too few
     charts = round_charts(r)
     for key in ("state_boxes", "strips", "score_hist", "time_hist", "heatmap", "density", "attempts", "completion",
                 "finds:Windows10"):
@@ -203,6 +207,7 @@ def test_season_history_and_pair_comparisons():
     season = season_view(a, "Middle School", 19, "GA")
     assert [s.info.label for s in season.summaries] == ["Round 1", "Round 2"]
     assert len(season.teams) == 3 and "percentile by round" in season.chart
+    assert season.program.n == 4 and any("team-round" in s for s in season.narrative)
     assert any("19-0000" in s and "rose" in s or "held steady" in s or "fell" in s for s in season.narrative)
     hist = history_view(a, "Middle School", "GA")
     assert hist.seasons == [18, 19] and hist.labels == ["Round 1", "Round 2"]

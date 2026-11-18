@@ -51,6 +51,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/scoreboard_url.py` | The scoreboard address set on `/admin/config`: test fetch, and switching every live fetcher |
 | `app/analysis_store.py`, `app/analysis_collector.py`, `app/analysis_legacy.py` | Data sets for the Analysis tab: storage, the team-at-a-time collector, the legacy CSV import |
 | `app/analysis.py`, `app/analysis_narrative.py`, `app/analysis_charts.py` | A round's statistics, its written narrative and its SVG charts |
+| `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals and rank correlations, on SciPy |
 | `app/analysis_compare.py`, `app/analysis_web.py` | Season and round comparisons; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
@@ -360,6 +361,20 @@ across seasons.
   participation against the season's previous round and the same round last season.
   Coaches can correct a team's group (ours / district / neither) in a data set from the
   report page.
+- **Statistical tests.** Scores are skewed, with ties and outliers, so the tests are
+  rank-based and effect sizes come first:
+  - the state against the rest of the division, and district teams against the rest of
+    the state: the chance a team from one group outscores a team from the other (with a
+    95% interval), the difference in medians with a bootstrap interval, and a
+    Mann–Whitney p-value (significant below 0.05);
+  - 95% bootstrap intervals (BCa) for each group's median; states with fewer than 5 teams are
+    faded on the state chart (their medians are unreliable);
+  - rank correlations (ρ) with p-values for teams per state and for play time;
+  - on the season pages, our program across rounds: a signed-rank test of our
+    team-rounds' percentiles against the median team, a trend test over the rounds
+    (Kendall's τ), and the state's median team against the nation's, round by round.
+  Our own 3–4 teams are too few to test within one round. SciPy computes exact p-values
+  where the samples are small (most season-page tests) and the normal approximation otherwise.
 - **Comparisons.** Scores aren't comparable across rounds, so comparisons use
   percentiles (the share of the division outscored) and completion by image family
   (Windows, Windows Server, Linux). Final scores are used where a round has both.

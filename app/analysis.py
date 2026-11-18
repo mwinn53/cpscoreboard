@@ -31,6 +31,7 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 
+from . import analysis_stats as stats
 from .analysis_legacy import TOTAL
 from .analysis_store import DISTRICT, EMS, AnalysisStore, ImageRow, RoundInfo, TeamRow
 
@@ -93,15 +94,6 @@ def time_limit_minutes(teams, season: int) -> int:
     return 240 if season >= 19 else 360
 
 
-def correlation(xs: list[float], ys: list[float]) -> float | None:
-    if len(xs) < 3:
-        return None
-    try:
-        return statistics.correlation(xs, ys)
-    except statistics.StatisticsError:  # a constant series
-        return None
-
-
 def image_family(name: str) -> str:
     n = name.lower()
     if "server" in n:
@@ -156,9 +148,10 @@ class Density:
     states: list[StateStat]            # highest median first
     teams: Describe                    # teams per state
     medians: Describe                  # the states' median scores
-    r: float | None                    # teams per state vs median score
+    r: float | None                    # teams per state vs median score (rank correlation)
     rank: int | None                   # our state's place by median (1 = highest)
     bands: list[tuple[int, int, float | None, int]]  # (fewest, most teams, median of medians, states) by size
+    test: stats.Correlation | None = None
 
 
 @dataclass
@@ -175,8 +168,28 @@ class Attempts:
 class TimeStats:
     above_median: Describe              # play minutes of teams above the national median score
     below_median: Describe
-    r: float | None                     # play time vs score, teams that attempted every image
+    r: float | None                     # play time vs score, teams that attempted every image (rank correlation)
     ours_mean: float | None
+    test: stats.Correlation | None = None
+
+
+@dataclass
+class GroupTest:
+    """Two groups compared: medians, the chance a team from ``a`` outscores one from ``b``, and a U test."""
+    a: str
+    b: str
+    n_a: int
+    n_b: int
+    median_a: float | None
+    median_b: float | None
+    diff: tuple[float, float, float] | None     # median difference with its 95% bootstrap interval
+    mw: stats.MannWhitney | None
+
+
+def group_test(a_name: str, a: list[float], b_name: str, b: list[float]) -> GroupTest:
+    return GroupTest(a_name, b_name, len(a), len(b), statistics.median(a) if a else None,
+                     statistics.median(b) if b else None, stats.bootstrap_median_diff(a, b),
+                     stats.mann_whitney(a, b))
 
 
 @dataclass
@@ -215,6 +228,8 @@ class RoundReport:
     progress: Progress | None = None
     narrative: dict[str, list[str]] = field(default_factory=dict)
     limit: int = ROUND_MINUTES          # the round's time limit, minutes (4 or 6 hours)
+    tests: dict[str, GroupTest] = field(default_factory=dict)      # "state" (vs the rest), "district" (vs the rest of the state)
+    median_ci: dict[str, tuple[float, float]] = field(default_factory=dict)  # by group, 95% bootstrap
 
     def completion(self, team: str, image: str) -> float | None:
         row = self.by_team.get(team, {}).get(image)
@@ -308,7 +323,22 @@ def _density(teams: list[TeamRow], state: str) -> Density | None:
     if k >= 6:
         for part in (by_size[:k // 3], by_size[k // 3: 2 * k // 3], by_size[2 * k // 3:]):
             bands.append((part[0].n, part[-1].n, describe(s.score.median for s in part).median, len(part)))
-    return Density(states, describe(counts), describe(medians), correlation(counts, medians), rank, bands)
+    test = stats.spearman(counts, medians)
+    return Density(states, describe(counts), describe(medians), test.r if test else None, rank, bands, test)
+
+
+def _tests(teams: list[TeamRow], groups: dict[str, list[TeamRow]], state: str) -> dict[str, GroupTest]:
+    """The state against the rest of the division; district teams against the rest of the state."""
+    out = {}
+    in_state = [t.score for t in groups["state"]]
+    rest = [t.score for t in teams if t.location != state]
+    if len(in_state) >= 5 and len(rest) >= 5:
+        out["state"] = group_test(state, in_state, "the rest of the division", rest)
+    district = [t.score for t in groups["state"] if t.grp in (EMS, DISTRICT)]
+    others = [t.score for t in groups["state"] if t.grp not in (EMS, DISTRICT)]
+    if len(district) >= 5 and len(others) >= 5:
+        out["district"] = group_test("District teams", district, f"the rest of {state}", others)
+    return out
 
 
 def _attempts(r: RoundReport) -> Attempts | None:
@@ -331,10 +361,10 @@ def _time(r: RoundReport) -> TimeStats:
     most = r.attempts.most if r.attempts else 0
     played = [(t.play_time / 60, t.score) for t in r.teams if t.play_time and r.images_attempted(t) >= most]
     ours = [res.team.play_time / 60 for res in r.ems if res.team.play_time]
+    test = stats.spearman([p for p, _ in played], [s for _, s in played])
     return TimeStats(describe(t.play_time / 60 for t in r.teams if t.play_time and t.score > med),
                      describe(t.play_time / 60 for t in r.teams if t.play_time and t.score <= med),
-                     correlation([p for p, _ in played], [s for _, s in played]),
-                     statistics.fmean(ours) if ours else None)
+                     test.r if test else None, statistics.fmean(ours) if ours else None, test)
 
 
 def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, timeline: bool = True) -> RoundReport:
@@ -390,6 +420,8 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
         has_challenge=any(t.cisco for t in teams), teams=teams, by_team=dict(by_team), totals=totals,
         challenge=describe(challenge), challenge_attempted=sum(1 for c in challenge if c > 0), limit=limit)
     report.density = _density(teams, state)
+    report.tests = _tests(teams, groups, state)
+    report.median_ci = {k: ci for k, v in groups.items() if (ci := stats.bootstrap_median([t.score for t in v]))}
     report.attempts = _attempts(report)
     report.time = _time(report)
     if timeline:
