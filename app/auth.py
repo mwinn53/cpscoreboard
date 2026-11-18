@@ -31,6 +31,7 @@ REG_COOKIE = "cpsb_reg"
 
 CLAIM_MAX_FAILURES = 5          # wrong admin tokens per IP...
 CLAIM_WINDOW = 15 * 60          # ...per this many seconds
+CLAIM_DELAY = 1.0               # seconds each wrong token costs, to slow down guessing
 
 router = APIRouter()
 
@@ -336,7 +337,7 @@ async def claim_submit(request: Request, token: str = Form("")):
     if not expected or not hmac.compare_digest(token.strip().encode(), expected.encode()):
         failures.append(time.monotonic())
         log.warning("Failed admin claim from %s (%d recent)", client_ip(request), len(failures))
-        await asyncio.sleep(1)  # slow down guessing
+        await asyncio.sleep(CLAIM_DELAY)
         return _page(request, "claim.html", 403, device=device, error="That token isn't right.")
     await asyncio.to_thread(_devices(request).make_admin, device.id)
     log.info("Device %d (%s) claimed admin", device.id, device.email)

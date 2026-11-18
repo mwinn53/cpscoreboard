@@ -449,6 +449,13 @@ pip install -e ".[dev]"
 uvicorn --factory app.main:create_app --reload --port 8080
 ```
 
+**Tests** (`pytest -q`, under a minute). `tests/conftest.py` keeps them quick: a new test
+database is created straight from the table definitions and stamped at the latest
+migration (`tests/test_schema.py` still runs the real migrations), commits skip the disk
+flush, each fixture scoreboard is parsed once per run, and deliberate waits (the
+wrong-admin-token penalty, the collector's pause between teams and its retry delay) are
+zero.
+
 ### Capturing and replaying the live scoreboard
 
 During a competition round, record the scoreboard:

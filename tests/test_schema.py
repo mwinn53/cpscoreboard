@@ -1,5 +1,6 @@
 """Alembic migrations (app/schema.py): fresh databases, pre-Alembic databases, restarts."""
 
+import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, text
@@ -10,6 +11,11 @@ from app.schema import MIGRATIONS, metadata
 
 HEAD = ScriptDirectory(str(MIGRATIONS)).get_current_head()
 from app.store import SnapshotStore
+
+
+@pytest.fixture(autouse=True)
+def _fast_new_databases():
+    """Overrides conftest's shortcut: these tests are the ones that check the real migrations."""
 
 
 def _diff(engine):
