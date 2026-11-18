@@ -1,4 +1,4 @@
-"""The Analysis tab's statistics (app/analysis_stats.py), checked against SciPy's results for the same data."""
+"""The Analysis tab's statistics (app/analysis_stats.py, on SciPy): exact p-values for small samples, BCa intervals."""
 
 from pytest import approx
 
@@ -21,23 +21,28 @@ def test_mann_whitney_matches_scipy():
     assert S.mann_whitney(A[:4], B) is None          # too few to test
 
 
-def test_wilcoxon_signed_rank_matches_scipy():
+def test_wilcoxon_signed_rank_is_exact_for_small_samples():
     w = S.wilcoxon_signed_rank([74, 62, 88, 45, 91, 57, 50, 68, 33, 79, 66, 71], 50)
-    assert w.p == approx(0.01846608649691215, rel=1e-9) and (w.n, w.above) == (11, 9)
+    assert w.p == approx(0.013671875) and (w.n, w.above, w.w) == (11, 9, 60.0)   # the normal approximation: 0.018
 
 
 def test_rank_correlations_match_scipy():
     sp = S.spearman([1, 2, 2, 3, 5, 8, 12, 15, 20, 26, 40, 61], [64, 52, 70, 48, 55, 61, 50, 57, 49, 53, 51, 50])
     assert sp.r == approx(-0.45964912280701764) and sp.p == approx(0.13273946871827977, rel=1e-6)
-    kt = S.kendall_tau(list(range(11)), [85, 87, 95, 87, 94, 80, 93, 75, 89, 91, 68])
+    kt = S.kendall_tau(list(range(11)), [85, 87, 95, 87, 94, 80, 93, 75, 89, 91, 68])   # a tie: approximate
     assert kt.r == approx(-0.18349396085439343) and kt.p == approx(0.43487965849578336, rel=1e-9)
+    exact = S.kendall_tau(list(range(8)), [55, 61, 49, 70, 66, 72, 80, 77])             # no ties: exact
+    assert exact.r == approx(0.7142857142857142) and exact.p == approx(0.014136904761904762) and exact.significant
+    assert S.kendall_tau([1, 2, 3, 4, 5], [7, 7, 7, 7, 7]) is None
 
 
-def test_bootstrap_intervals_are_stable_and_contain_the_estimate():
+def test_bca_intervals_are_stable_and_contain_the_estimate():
     lo, hi = S.bootstrap_median(A)
     assert lo <= 62.5 <= hi and S.bootstrap_median(A) == (lo, hi)    # seeded: same every time
     d, dlo, dhi = S.bootstrap_median_diff(A, B)
     assert d == 62.5 - 49 and dlo <= d <= dhi and dlo > 0
+    assert S.bootstrap_median([5, 5, 5, 5]) == (5, 5)                  # no spread: no interval to compute
+    assert S.bootstrap_median([1, 2]) is None
 
 
 def test_p_text():

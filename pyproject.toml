@@ -20,7 +20,9 @@ dependencies = [
     "tzdata>=2024.1",           # time zones for display (Windows and slim images have none)
     "cryptography>=42",
     "alembic>=1.13",
-    "maxminddb>=2.5",           # reads the offline IP geolocation database (app/geo.py)            # schema migrations (app/schema.py, app/migrations/)         # encrypts the X credentials at rest (app/secret_box.py)
+    "maxminddb>=2.5",           # reads the offline IP geolocation database (app/geo.py)
+    "numpy>=2.0",               # the Analysis tab's statistics (app/analysis_stats.py)
+    "scipy>=1.14",              # rank tests, exact p-values, BCa bootstrap intervals
 ]
 
 [project.optional-dependencies]
