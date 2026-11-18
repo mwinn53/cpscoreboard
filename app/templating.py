@@ -68,6 +68,11 @@ def _signed(value: float) -> str:
     return ("+" if value > 0 else "−") + _num(abs(value))
 
 
+def _ptext(p: float | None) -> str:
+    from .analysis_stats import p_text
+    return "" if p is None else p_text(p)
+
+
 def _recent(when: datetime | None) -> bool:
     return when is not None and (utcnow() - when).total_seconds() <= RECENT_SECONDS
 
@@ -113,5 +118,5 @@ from .static_files import static_url  # noqa: E402
 
 templates.env.globals["static_url"] = static_url
 templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed, date=_date, local=_local,
-                             browser=describe_ua)
+                             browser=describe_ua, ptext=_ptext)
 templates.env.tests.update(recent=_recent)

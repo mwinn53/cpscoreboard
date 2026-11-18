@@ -19,7 +19,7 @@ from . import analysis_stats as stats
 from .analysis import FAMILIES, OurTeam, RoundSummary, cached_report, round_summary
 from .analysis_charts import percentile_lines
 from .analysis_narrative import (history_narrative, pair_narrative, participation_context, program_narrative,
-                                 season_narrative)
+                                 season_narrative, strength_narrative)
 from .analysis_store import FINAL, AnalysisStore, RoundInfo
 
 SHORT = {"r1": "R1", "r2": "R2", "r3": "R3", "state": "State", "st": "State", "sf": "SF", "semi": "SF",
@@ -63,6 +63,37 @@ def program_stats(sums: list[RoundSummary]) -> ProgramStats:
         stats.wilcoxon_signed_rank([s.state_median_pct for s in sums if s.state_median_pct is not None], 50))
 
 
+@dataclass
+class FamilyStrength:
+    """An image family against our overall results, over several rounds (#75): exploratory."""
+    family: str
+    n: int                                    # team-rounds
+    median: float                             # median gap, percentile points (negative: weaker there)
+    below: int                                # team-rounds weaker there than overall
+    rounds: int                               # rounds with our teams on it
+    rounds_below: int                         # rounds where our median team-gap was negative
+    test: stats.SignedRank | None             # the gaps against 0
+    p_holm: float | None = None               # the test's p, Holm-adjusted across the families tested
+
+
+def family_strength(sums: list[RoundSummary]) -> list[FamilyStrength]:
+    import statistics
+    out = []
+    for fam in (*FAMILIES, "Cisco"):
+        per_round = [[o.relative[fam] for o in s.ours if fam in o.relative] for s in sums]
+        per_round = [v for v in per_round if v]
+        gaps = [g for v in per_round for g in v]
+        if not gaps:
+            continue
+        out.append(FamilyStrength(fam, len(gaps), statistics.median(gaps), sum(1 for g in gaps if g < 0),
+                                  len(per_round), sum(1 for v in per_round if statistics.median(v) < 0),
+                                  stats.wilcoxon_signed_rank(gaps, 0)))
+    tested = [f for f in out if f.test]
+    for f, p in zip(tested, stats.holm([f.test.p for f in tested])):
+        f.p_holm = p
+    return sorted(out, key=lambda f: f.median)
+
+
 def summaries(store: AnalysisStore, rounds: list[RoundInfo], state: str) -> list[RoundSummary]:
     return [round_summary(cached_report(store, r, state, timeline=False)) for r in rounds]
 
@@ -79,6 +110,7 @@ class SeasonView:
     chart: str
     families: list[str] = field(default_factory=list)
     program: ProgramStats | None = None
+    strength: list[FamilyStrength] = field(default_factory=list)
 
 
 def season_view(store: AnalysisStore, division: str, season: int, state: str) -> SeasonView:
@@ -100,8 +132,10 @@ def season_view(store: AnalysisStore, division: str, season: int, state: str) ->
                              slots=slots[:8]) if sums else ""
     fams = [f for f in FAMILIES if any(f in s.family_field for s in sums)]
     program = program_stats(sums)
-    return SeasonView(season, division, sums, rows, season_narrative(sums) + program_narrative(program, sums), chart,
-                      fams, program)
+    strength = family_strength(sums)
+    return SeasonView(season, division, sums, rows,
+                      season_narrative(sums) + program_narrative(program, sums) + strength_narrative(strength),
+                      chart, fams, program, strength)
 
 
 # --- season over season ---
@@ -117,6 +151,7 @@ class HistoryView:
     narrative: list[str]
     chart: str
     program: ProgramStats | None = None
+    strength: list[FamilyStrength] = field(default_factory=list)
 
 
 def history_view(store: AnalysisStore, division: str, state: str) -> HistoryView:
@@ -135,8 +170,10 @@ def history_view(store: AnalysisStore, division: str, state: str) -> HistoryView
         if sums else ""
     fams = [f for f in FAMILIES if any(f in s.family_field for s in sums)]
     program = program_stats(sums)
+    strength = family_strength(sums)
     return HistoryView(division, sums, seasons, labels, grid, fams,
-                       history_narrative(sums) + program_narrative(program, sums), chart, program)
+                       history_narrative(sums) + program_narrative(program, sums) + strength_narrative(strength),
+                       chart, program, strength)
 
 
 # --- two reports ---

@@ -17,6 +17,8 @@ small samples.
 * ``wilcoxon_signed_rank``: are values centred above a reference (e.g. our teams'
   percentiles against 50)?
 * ``spearman`` and ``kendall_tau``: rank correlations with p-values.
+* ``holm``: Holm's step-down correction when several tests are read together
+  (e.g. one per image family).
 """
 
 from __future__ import annotations
@@ -146,6 +148,17 @@ def kendall_tau(x: list[float], y: list[float]) -> Correlation | None:
         return None
     res = st.kendalltau(x, y, method="auto")
     return Correlation(n, float(res.statistic), float(res.pvalue))
+
+
+def holm(ps: list[float]) -> list[float]:
+    """Holm-adjusted p-values, in the order given: controls the chance of any false positive across the tests."""
+    m = len(ps)
+    order = sorted(range(m), key=lambda i: ps[i])
+    out, running = [0.0] * m, 0.0
+    for k, i in enumerate(order):
+        running = max(running, min(1.0, (m - k) * ps[i]))
+        out[i] = running
+    return out
 
 
 def p_text(p: float) -> str:
