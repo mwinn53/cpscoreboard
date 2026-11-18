@@ -78,6 +78,11 @@ def _mins(v: float | None) -> str:
     return minutes(v)
 
 
+def _chance(v: float) -> str:
+    from .analysis_narrative import chance_number
+    return chance_number(v)
+
+
 def _recent(when: datetime | None) -> bool:
     return when is not None and (utcnow() - when).total_seconds() <= RECENT_SECONDS
 
@@ -123,5 +128,5 @@ from .static_files import static_url  # noqa: E402
 
 templates.env.globals["static_url"] = static_url
 templates.env.filters.update(hms=_hms, ago=_ago, num=_num, signed=_signed, date=_date, local=_local,
-                             browser=describe_ua, ptext=_ptext, mins=_mins)
+                             browser=describe_ua, ptext=_ptext, mins=_mins, chance=_chance)
 templates.env.tests.update(recent=_recent)

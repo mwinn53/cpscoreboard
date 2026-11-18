@@ -204,7 +204,7 @@ async def old_round_link(round_id: int):
 @router.get("/reports/{round_id}", response_class=HTMLResponse)
 async def report_page(request: Request, round_id: int, top: int = 25, me: Device = Depends(require_coach)):
     from .analysis import cached_report
-    from .analysis_charts import progress_legend, round_charts, team_legend
+    from .analysis_charts import advance_legend, progress_legend, round_charts, team_legend
     from .analysis_compare import round_context
     store, collector = _state(request)
     info = await _get_round(store, round_id)
@@ -222,7 +222,8 @@ async def report_page(request: Request, round_id: int, top: int = 25, me: Device
     others = [r for r in await asyncio.to_thread(store.rounds, info.division) if r.id != info.id]
     return _page(request, "analysis_round.html", me=me, info=info, report=report, charts=charts, context=context,
                  round_choices=ROUND_CHOICES,
-                 legend=team_legend(state), progress_legend=progress_legend(report), status=status, top=top,
+                 legend=team_legend(state), progress_legend=progress_legend(report),
+                 advance_legend=advance_legend(report), status=status, top=top,
                  top_choices=TOP_CHOICES, others=others, notice=request.query_params.get("notice"))
 
 

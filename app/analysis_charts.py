@@ -516,6 +516,60 @@ def progress_legend(r: RoundReport) -> str:
     return legend(items)
 
 
+def advance_chart(r: RoundReport, width: int = W) -> str:
+    """The projected State Round points each of our teams needs (median and likely range), per target, with
+    the team's own projected score. Marked ``data-projection`` so interactive charts (#65) can toggle it."""
+    a = r.advance
+    if not a or a.stage != "projection" or not a.projections:
+        return ""
+    rows = [(p, n, slot) for p in a.projections for n, slot in ((p.semis, "s1"), (p.award, "s3")) if n]
+    hi = max([n.hi for _, n, _ in rows] + [p.expected for p in a.projections] + [1.0])
+    xv = ticks(0, hi)
+    left, row = 110, 22
+    height = TOP + row * len(rows) + 8 * len(a.projections) + BOTTOM
+    x = Scale(0, xv[-1], left, width - RIGHT)
+    parts: list[str] = []
+    for v in xv:
+        parts.append(f'<line class="grid" x1="{x(v):.1f}" x2="{x(v):.1f}" y1="{TOP - 6}" y2="{height - BOTTOM}"/>')
+    y = TOP
+    for p in a.projections:
+        first = True
+        for q, n, slot in rows:
+            if q is not p:
+                continue
+            cy = y + row / 2
+            if first:
+                parts.append(f'<text class="tick" x="{left - 8}" y="{cy + 4:.1f}" text-anchor="end">'
+                             f'{escape(p.team.team_number)}</text>')
+            tip = (f"{p.team.team_number}: {n.label} needs ≈ {num(n.median)} State Round points "
+                   f"(likely {num(n.lo)}–{num(n.hi)}), {100 * n.chance:.0f}% chance")
+            parts.append(f'<rect class="need {slot}" x="{x(n.lo):.1f}" y="{cy - 5:.1f}" '
+                         f'width="{max(x(n.hi) - x(n.lo), 2):.1f}" height="10" rx="3" data-tip="{escape(tip)}"/>')
+            parts.append(f'<line class="need-med {slot}" x1="{x(n.median):.1f}" x2="{x(n.median):.1f}" '
+                         f'y1="{cy - 8:.1f}" y2="{cy + 8:.1f}"/>')
+            if first:
+                parts.append(f'<circle class="dot expected" cx="{x(p.expected):.1f}" cy="{cy:.1f}" r="4.5" '
+                             f'data-tip="{escape(f"{p.team.team_number}: projected State Round score ≈ {num(p.expected)}")}"/>')
+            first = False
+            y += row
+        y += 8
+    parts.append(f'<line class="axis" x1="{left}" x2="{width - RIGHT}" y1="{height - BOTTOM}" y2="{height - BOTTOM}"/>')
+    _x_ticks(parts, xv, x, height - BOTTOM, title="State Round points", width=width)
+    svg = _svg(width, height, "State Round points our teams need, projected", parts)
+    return svg.replace('<div class="chart-wrap" data-tips>', '<div class="chart-wrap" data-tips data-projection>', 1)
+
+
+def advance_legend(r: RoundReport) -> str:
+    a = r.advance
+    if not a or a.stage != "projection":
+        return ""
+    items = [Item("Needed for the Semifinals", "s1", "area")]
+    if any(p.award for p in a.projections):
+        items.append(Item(f"Needed for a top-3 {r.state} award", "s3", "area"))
+    items.append(Item("Projected State Round score", "expected"))
+    return legend(items)
+
+
 def _hours(v: float) -> str:
     return f"{v / 60:.0f} h" if v % 60 == 0 else f"{v / 60:.2f} h"
 
@@ -539,6 +593,7 @@ def round_charts(r: RoundReport) -> dict[str, str]:
         "attempts": attempts_boxes(r, HALF),
         "completion": completion_boxes(r, HALF),
         "progress": progress_chart(r),
+        "advance": advance_chart(r),
     }
     for img in r.images:
         charts[f"finds:{img.name}"] = finds_bars(r, img.name)

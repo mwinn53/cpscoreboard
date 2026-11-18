@@ -123,7 +123,8 @@ def round_narrative(r) -> dict[str, list[str]]:
     sections = {
         "overview": _overview(r), "scores": _scores(r), "time": _time(r), "density": _density(r),
         "attempts": _attempts(r), "images": _images(r), "challenge": _challenge(r), "progress": _progress(r),
-        "pace": _pace(r),
+        "pace": _pace(r), "advance": _advance(r),
+        "advance_teams": _advance_teams(r),
         "reach": _reach(r), "relative": _relative(r), "penalties": _penalties(r),
     }
     sections["summary"] = _summary(r)
@@ -538,6 +539,112 @@ def _pace(r) -> list[str]:
     return out
 
 
+def chance_number(v: float) -> str:
+    """A projected probability: never 0% or 100%, it's a model."""
+    return "<1%" if v < 0.005 else ">99%" if v > 0.995 else f"{100 * v:.0f}%"
+
+
+def _chance(v: float) -> str:
+    """A projected probability, in words and a number (never 0% or 100%: it's a model)."""
+    word = ("very likely" if v >= 0.9 else "likely" if v >= 0.67 else "a toss-up" if v >= 0.33
+            else "unlikely" if v >= 0.1 else "very unlikely")
+    return f"{word}, {chance_number(v)}"
+
+
+def _need_text(n) -> str:
+    if n.hi <= 0:
+        return f"{n.label}: already past the projected line on its Introductory Round score"
+    s = f"{n.label}: about {approx(n.median)} State Round points (likely {approx(n.lo)}–{approx(n.hi)}"
+    if n.top_share is not None:
+        s += ("; higher than any projected State Round score" if n.top_share < 0.01
+              else f"; that would outscore {100 * (1 - n.top_share):.0f}% of the projected field")
+    return s + f"), {_chance(n.chance)}"
+
+
+def _advance(r) -> list[str]:
+    """What it takes to advance (#68), Middle School, under the CP-18 Rules Book: the rules and the model."""
+    a = r.advance
+    if not a:
+        return []
+    if a.stage == "semifinal":
+        return [f"The three highest Semifinal scores advance to the National Finals (one team per school, "
+                f"organization or coach); the third-highest score was {num(a.cut)}."]
+    out = [f"Under the CP-18 Rules Book, the top 60% of Middle School teams advance to the Semifinals on their "
+           f"Introductory Round and State Round scores combined (ties at the line all advance), and the top "
+           f"three teams in each state on the same total win AFA State Awards."]
+    if a.stage == "state":
+        out.append(f"With the State Round in, the line is {num(a.cut)} combined points ({ordinal(a.line_rank)} of "
+                   f"{a.n} teams)" + (f"; third in {r.state} had {num(a.award_cut)}." if a.award_cut is not None
+                                      else "."))
+        return out
+    m = a.model
+    if m.assumed:
+        out.append("No past season in the data has both an earlier round and a State Round, so the projection "
+                   "assumes State Round scores on the Introductory Round's scale, a rank correlation of "
+                   f"{m.rho:.1f} between the rounds and every team returning. Import past seasons to replace "
+                   "these assumptions.")
+    else:
+        seasons = listing([f"CP-{s}" for s in m.seasons])
+        out.append(f"The projection learns from {seasons} ({m.pairs} teams in both rounds): State Round scores "
+                   f"ran {m.ratio:.2f}× the earlier round's at the median, the rank correlation between the rounds "
+                   f"was {m.rho:.2f}, and {100 * m.played:.0f}% of teams came back.")
+    out.append(f"Projected line: the top {a.line_rank} of the {a.n} teams with an Introductory Round score. These "
+               "are projections from one round of scores; the likely ranges show how much they could move.")
+    return out
+
+
+def _cap(s: str) -> str:
+    return s[:1].upper() + s[1:]
+
+
+def _advance_teams(r) -> list[str]:
+    """One line per team: what it needs (projection) or where it stands."""
+    a = r.advance
+    if not a:
+        return []
+    if a.stage == "projection":
+        out = []
+        for p in a.projections:
+            s = f"{p.label}, {num(p.intro)} points. {_cap(_need_text(p.semis))}"
+            if p.award:
+                s += f". {_cap(_need_text(p.award))}"
+            out.append(s + ".")
+        return out
+    out = []
+    for s in a.standings:
+        side = "above" if s.margin >= 0 else "below"
+        if a.stage == "semifinal":
+            out.append(f"{s.label}: {num(s.total)}, {_pts(abs(s.margin))} {side} that line.")
+            continue
+        txt = (f"{s.label}: {num(s.total)} combined ({num(s.intro or 0)} + {num(s.state or 0)}), "
+               f"{_pts(abs(s.margin))} {side} the line")
+        if s.state_place is not None:
+            txt += f", {ordinal(s.state_place)} in {r.state}"
+            if s.award_margin is not None and s.state_place > 3:
+                txt += f" ({_pts(abs(s.award_margin))} short of a state award)"
+        out.append(txt + ".")
+    return out
+
+
+def _advance_summary(r) -> str | None:
+    a = r.advance
+    if not a:
+        return None
+    if a.stage == "projection" and a.projections:
+        bits = [f"{p.team.team_number} ≈ {approx(p.semis.median)}" for p in a.projections]
+        return f"State Round points needed for the Semifinals (projected): {listing(bits)}."
+    if a.stage == "state" and a.standings:
+        above = [s.team.team_number for s in a.standings if s.margin >= 0]
+        below = [s.team.team_number for s in a.standings if s.margin < 0]
+        parts = []
+        if above:
+            parts.append(f"{listing(above)} above")
+        if below:
+            parts.append(f"{listing(below)} below")
+        return f"Semifinal line {num(a.cut)} combined points: {'; '.join(parts)}."
+    return None
+
+
 def _pace_summary(r) -> str | None:
     pc = r.pace
     behind = [t for t in (pc.teams if pc else []) if t.final_gap > 0]
@@ -586,6 +693,8 @@ def _summary(r) -> list[str]:
         out.append(f"Watch the penalties on {listing([x.image for x in pen])}: our teams took them more often than "
                    "the field.")
     if line := _pace_summary(r):
+        out.append(line)
+    if line := _advance_summary(r):
         out.append(line)
     a = r.attempts
     if a and a.fewer and a.fewer_places and a.most > 1:
