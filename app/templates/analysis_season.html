@@ -47,6 +47,23 @@
 <p class="muted small">Outscored (bold), then score and place in the state.</p>
 {% endif %}
 
+{% if view.strength %}
+<h2>Image families against our overall results</h2>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Family</th><th class="num">Team-rounds</th><th class="num" title="Median of (family percentile − overall percentile)">Median difference</th>
+    <th class="num">Weaker there</th><th class="num">Rounds below</th><th class="num" title="Wilcoxon signed-rank, Holm-adjusted across the families">p (Holm)</th></tr></thead>
+  <tbody>{% for f in view.strength %}
+  <tr><td>{{ f.family }}</td><td class="num">{{ f.n }}</td><td class="num {{ 'rel-down' if f.median <= -20 else ('rel-up' if f.median >= 20 else '') }}">{{ ('%+.0f' % f.median) | replace('-', '−') }}</td>
+    <td class="num">{{ f.below }} of {{ f.n }}</td><td class="num">{{ f.rounds_below }} of {{ f.rounds }}</td>
+    <td class="num">{{ f.p_holm | ptext if f.p_holm is not none else 'too few' }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">For each of our teams in each round: its percentile on the family's images (Cisco: its Cisco
+  percentile) minus its overall percentile, so negative means weaker there than its overall result. Exploratory: the
+  same teams recur across rounds, so treat the p-values as a guide.</p>
+{% endif %}
+
 {% if view.families %}
 <h2>Completion by image family</h2>
 <div class="table-wrap">

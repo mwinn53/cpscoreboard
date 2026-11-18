@@ -381,6 +381,7 @@ def test_import_and_round_page(site):  # noqa: F811
     rid = admin.app.state.analysis.rounds("Middle School")[0].id
     report = admin.get(f"/analysis/reports/{rid}").text
     assert "In brief" in report and "14-0071" in report and "Server2019" in report and "chart-wrap" in report
+    assert "Where the points went" in report and "Strengths and weaknesses" in report
     old = admin.get(f"/analysis/rounds/{rid}", follow_redirects=False)
     assert old.headers["location"] == f"/analysis/reports/{rid}"
     assert "Season over season" in admin.get("/analysis/seasons?division=Middle+School").text

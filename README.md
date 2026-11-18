@@ -25,7 +25,7 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
 | [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🗒 Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
-| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🗒 Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), evaluate against the R reports ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)) | Make the analysis more useful to coaches |
+| [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)), evaluate against the R reports ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), advancement targets ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)) | Make the analysis more useful to coaches |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
 have a real-world deadline, such as the scoreboard being taken down after the season.
@@ -52,7 +52,8 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `app/scoreboard_url.py` | The scoreboard address set on `/admin/config`: test fetch, and switching every live fetcher |
 | `app/analysis_store.py`, `app/analysis_collector.py`, `app/analysis_legacy.py` | Data sets for the Analysis tab: storage, the team-at-a-time collector, the legacy CSV import |
 | `app/analysis.py`, `app/analysis_narrative.py`, `app/analysis_charts.py` | A round's statistics, its written narrative and its SVG charts |
-| `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals and rank correlations, on SciPy |
+| `app/analysis_stats.py` | Rank-based tests (exact p-values for small samples), BCa bootstrap intervals, rank correlations and the Holm correction, on SciPy |
+| `app/analysis_focus.py` | Where the points went: points within reach, strengths and weaknesses by image, penalties |
 | `app/analysis_compare.py`, `app/analysis_web.py` | Season and round comparisons; the Analysis tab (coaches and admins) |
 | `app/geo.py` | Approximate device locations from DB-IP's free city database, downloaded monthly and read offline |
 | `app/team_view.py`, `app/charts.py` | Team page and the scoreboard's expandable sparkline rows; server-rendered SVG charts |
@@ -367,6 +368,23 @@ across seasons.
   - score by images attempted, completion per image, and items found per image;
   - in-round progress: our teams' score by time since each team started, against
     the field's median and middle half.
+- **Where the points went** (on each report), to guide practice. Estimates, and the
+  page says so:
+  - **Points within reach:** for each of our teams, the items the field's top quarter
+    found on each image and we didn't, what they're worth (an image's points per item
+    is the median score ÷ items found among teams with no penalties there that found
+    more than we did) and the places they'd have gained in the state and nationally;
+    then the points to the next place in the state and to the state's top quarter, with
+    the fewest changes that cover them (dropping penalties first, then the richest
+    items). "In brief" names the image with the most points within reach.
+  - **Strengths and weaknesses:** each team's completion percentile on every image
+    (and its Cisco percentile) against its overall percentile; differences of 20 points
+    or more are marked. On the season pages, the same difference per image family
+    across team-rounds, with a Wilcoxon signed-rank test per family and a Holm
+    correction across the families (exploratory).
+  - **Penalties:** per image, the share of our teams with a penalty against the rest of
+    the field, mean penalties, Fisher's exact test and the points lost (items found ×
+    points per item − score).
   Time axes, limit lines and the narrative follow the round's time limit: 4 hours
   (CP-19 on) or 6 (the legacy seasons), told apart by how long teams played.
   Plus the top N teams (10–100), the state table and coaches' notes. A report also notes

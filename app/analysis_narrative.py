@@ -123,6 +123,7 @@ def round_narrative(r) -> dict[str, list[str]]:
     sections = {
         "overview": _overview(r), "scores": _scores(r), "time": _time(r), "density": _density(r),
         "attempts": _attempts(r), "images": _images(r), "challenge": _challenge(r), "progress": _progress(r),
+        "reach": _reach(r), "relative": _relative(r), "penalties": _penalties(r),
     }
     sections["summary"] = _summary(r)
     return sections
@@ -342,6 +343,102 @@ def _image_gaps(r) -> list[tuple[str, float]]:
     return sorted(gaps, key=lambda g: -g[1])
 
 
+def approx(v: float) -> str:
+    """An estimate, to the whole point."""
+    return f"{v:.0f}"
+
+
+def _items(k: int) -> str:
+    return plural(k, "item")
+
+
+def _diff(v: float) -> str:
+    """A signed difference in percentile points, with a real minus sign."""
+    return f"{v:+.0f}".replace("-", "−")
+
+
+def _pts(v: float) -> str:
+    return f"{num(v)} point{'' if v == 1 else 's'}"
+
+
+NOTABLE = 5   # percentile points: a family's median difference worth a sentence (or a significant test)
+
+
+def _reach(r) -> list[str]:
+    """Points within reach (#76): the cheapest points, and what each team's next step would have taken."""
+    f = r.focus
+    if not f or not f.gaps:
+        return []
+    out = []
+    c = f.cheapest
+    if c:
+        name, items, points, teams = c
+        n = len(f.gaps)
+        who = ("our team" if n == 1 else "both our teams" if teams == n == 2 else f"all {n} of our teams"
+               if teams == n else f"{teams} of our {n} teams")
+        if items:
+            out.append(f"The most points within reach were on {name}: {who} found a median {_items(items)} fewer "
+                       f"than the field's top quarter there (≈ {approx(points)} points).")
+        else:
+            out.append(f"The most points within reach were on {name}, in penalties: ≈ {approx(points)} points for {who}.")
+    for g in f.gaps:
+        t = next((t for t in g.targets if t.plan), None)
+        if t is None:
+            continue
+        steps = listing([f"{what} on {img} (≈ +{approx(pts)})" for img, what, pts in t.plan])
+        if t.reachable:
+            out.append(f"{g.label} was {_pts(t.gap)} from {t.label}: {steps} would have covered it.")
+        else:
+            out.append(f"{g.label} was {_pts(t.gap)} from {t.label}, more than the top quarter's items "
+                       f"would have added ({steps}).")
+    return out
+
+
+def _relative(r) -> list[str]:
+    """Strengths and weaknesses (#75): images far from each team's overall result."""
+    rel = r.focus.relative if r.focus else None
+    if not rel:
+        return []
+    flagged = rel.flagged()
+    if not flagged:
+        return [f"No image was more than {rel.threshold:.0f} percentile points from any of our teams' overall "
+                "results: no clear weak spot this round."]
+    out = []
+    for team in dict.fromkeys(t for t, _, _ in flagged):
+        mine = [(img, gap) for t, img, gap in flagged if t == team]
+        weak = [f"{img} ({_diff(gap)})" for img, gap in mine if gap < 0]
+        strong = [f"{img} ({_diff(gap)})" for img, gap in mine if gap > 0]
+        parts = []
+        if weak:
+            parts.append(f"weaker on {listing(weak)}")
+        if strong:
+            parts.append(f"stronger on {listing(strong)}")
+        out.append(f"Against its overall result, {team} was {' and '.join(parts)}.")
+    return out
+
+
+def _penalties(r) -> list[str]:
+    """Penalties (#78): where our rate was higher than the field's, and the points they cost."""
+    rows = r.focus.penalties if r.focus else []
+    if not rows:
+        return []
+    lost = sum(x.ours_lost for x in rows)
+    higher = [x for x in rows if x.higher]
+    out = []
+    if not any(x.ours_with for x in rows):
+        out.append("None of our teams took a penalty.")
+    elif lost >= 1:
+        out.append(f"Penalties cost our teams about {approx(lost)} points together.")
+    for x in higher:
+        s = (f"On {x.image}, {x.ours_with} of our {x.ours_n} teams took a penalty, against "
+             f"{share(100 * x.field_share)} of the field")
+        if x.p is not None:
+            s += (f": a significant difference (Fisher's exact test, {p_text(x.p)})" if x.p < 0.05
+                  else f" (with so few of our teams, not a significant difference: {p_text(x.p)})")
+        out.append(s + ".")
+    return out
+
+
 def _challenge(r) -> list[str]:
     if not r.has_challenge or not r.challenge.n:
         return []
@@ -413,6 +510,14 @@ def _summary(r) -> list[str]:
             out.append(f"Our teams were most competitive on {listing(strong)}.")
         if weak:
             out.append(f"Room to grow: {listing(weak)}, where our median completion trailed the field.")
+    c = r.focus.cheapest if r.focus else None
+    if c and c[1]:
+        out.append(f"Most points within reach: {c[0]}, where our teams found a median {_items(c[1])} fewer than the "
+                   f"field's top quarter (≈ {approx(c[2])} points).")
+    pen = [x for x in (r.focus.penalties if r.focus else []) if x.higher and x.p is not None and x.p < 0.05]
+    if pen:
+        out.append(f"Watch the penalties on {listing([x.image for x in pen])}: our teams took them more often than "
+                   "the field.")
     a = r.attempts
     if a and a.fewer and a.fewer_places and a.most > 1:
         out.append(f"Teams that skipped an image weren't competitive (the best of them placed "
@@ -518,6 +623,39 @@ def program_narrative(p, sums: list) -> list[str]:
                    f"{sum(1 for s in sums if (s.state_median_pct or 0) > 50)} of {p.state_test.n} rounds; "
                    + ("a significant pattern" if p.state_test.significant else "not a significant pattern")
                    + f" ({p_text(p.state_test.p)}).")
+    return out
+
+
+def strength_narrative(rows: list) -> list[str]:
+    """Image families against our overall results, over the rounds (#75): exploratory, so effects first."""
+    rows = [f for f in rows if f.n >= 2]
+    if not rows:
+        return []
+
+    def sentence(f, word: str) -> str:
+        weak = f.median < 0
+        rounds = f.rounds_below if weak else f.rounds - f.rounds_below
+        s = (f"Relative to our overall results, {f.family} was our {word} image family: "
+             f"{'below' if weak else 'above'} in {rounds} of {plural(f.rounds, 'round')}, a median "
+             f"{_diff(f.median)} percentile points per team-round")
+        if f.test and f.p_holm is not None:
+            s += (f" (Wilcoxon signed-rank, Holm-adjusted {p_text(f.p_holm)}: "
+                  + ("a consistent pattern)" if f.p_holm < 0.05 else "could be chance)"))
+        else:
+            s += " (too few team-rounds to test)"
+        return s + "."
+
+    def notable(f) -> bool:
+        return abs(f.median) >= NOTABLE or (f.p_holm is not None and f.p_holm < 0.05)
+
+    out = []
+    weakest, strongest = rows[0], rows[-1]   # sorted by median gap
+    if weakest.median < 0 and notable(weakest):
+        out.append(sentence(weakest, "weakest"))
+    if strongest is not weakest and strongest.median > 0 and notable(strongest):
+        out.append(sentence(strongest, "strongest"))
+    if not out:
+        out.append("No image family stood out against our overall results across these rounds.")
     return out
 
 

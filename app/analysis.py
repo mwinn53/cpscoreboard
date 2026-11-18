@@ -30,6 +30,7 @@ import threading
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from typing import Any
 
 from . import analysis_stats as stats
 from .analysis_legacy import TOTAL
@@ -230,6 +231,7 @@ class RoundReport:
     limit: int = ROUND_MINUTES          # the round's time limit, minutes (4 or 6 hours)
     tests: dict[str, GroupTest] = field(default_factory=dict)      # "state" (vs the rest), "district" (vs the rest of the state)
     median_ci: dict[str, tuple[float, float]] = field(default_factory=dict)  # by group, 95% bootstrap
+    focus: Any = None                   # where the points went (app/analysis_focus.py)
 
     def completion(self, team: str, image: str) -> float | None:
         row = self.by_team.get(team, {}).get(image)
@@ -426,6 +428,8 @@ def round_report(store: AnalysisStore, info: RoundInfo, state: str = "GA", *, ti
     report.time = _time(report)
     if timeline:
         report.progress = progress(team_curves(store.timeline(info.id)), ems, limit)
+    from .analysis_focus import focus
+    report.focus = focus(report)
     from .analysis_narrative import round_narrative
     report.narrative = round_narrative(report)
     return report
@@ -474,6 +478,7 @@ class OurTeam:
     completion: dict[str, float | None]     # by image
     family: dict[str, float | None]         # by image family
     challenge: float | None
+    relative: dict[str, float] = field(default_factory=dict)   # family (and Cisco) -> its percentile minus overall
 
     @property
     def label(self) -> str:
@@ -516,6 +521,19 @@ def _family_values(completion: dict[str, float | None]) -> dict[str, float]:
     return {f: statistics.fmean(v) for f, v in fam.items()}
 
 
+def _relative(r: RoundReport, res: TeamResult) -> dict[str, float]:
+    """By image family (and Cisco): the team's mean image percentile there, minus its overall percentile."""
+    pcts = r.focus.image_pct if r.focus else {}
+    fam: dict[str, list[float]] = defaultdict(list)
+    for img, by_team in pcts.items():
+        if (p := by_team.get(res.team.team_number)) is not None:
+            fam[image_family(img)].append(p)
+    out = {f: statistics.fmean(v) - res.percentile for f, v in fam.items()}
+    if r.has_challenge and res.challenge_percentile is not None:
+        out["Cisco"] = res.challenge_percentile - res.percentile
+    return out
+
+
 def round_summary(r: RoundReport) -> RoundSummary:
     scores = [t.score for t in r.teams]
     fam_field: dict[str, list[float]] = defaultdict(list)
@@ -525,7 +543,7 @@ def round_summary(r: RoundReport) -> RoundSummary:
             fam_field[f].append(v)
     ours = [OurTeam(res.team.team_number, res.team.name, res.team.score, res.percentile,
                     res.team.place_state_division, res.team.place_division, res.completion,
-                    _family_values(res.completion), res.team.cisco) for res in r.ems]
+                    _family_values(res.completion), res.team.cisco, _relative(r, res)) for res in r.ems]
     fam_ours: dict[str, list[float]] = defaultdict(list)
     for o in ours:
         for f, v in o.family.items():

@@ -147,6 +147,92 @@
   {% for img in r.images %}{{ card(img.name ~ ' (' ~ (img.total_items or '?') ~ ' items)', charts['finds:' ~ img.name]) }}{% endfor %}
 </div>
 
+{% set f = r.focus %}
+{% if f and r.ems %}
+<h2 id="focus">Where the points went
+  {% call tip("focus-help", "How these are estimated") %}
+  <strong>Points per item</strong> on an image is the median of score ÷ items found among teams with no penalties
+  there that found more items than our team did, so it's the value of the items we'd be adding. <strong>Within
+  reach</strong> means the items the field's top quarter found on that image and we didn't. <strong>Penalty
+  points</strong> are what a team's items are worth, less what it scored. <strong>Places</strong> counts the teams
+  those points would have passed. Items on one image aren't all worth the same, so treat these as guides for
+  practice, not exact accounting.
+  {% endcall %}
+</h2>
+
+<h3>Points within reach</h3>
+{{ para(n.reach) }}
+<div class="focus-teams">
+{% for g in f.gaps %}{% set t0 = g.result.team %}{% set here = t0.location == r.state %}
+<section class="focus-team">
+  <h4>{{ g.label }} <span class="muted small">{{ t0.score | num }} points{% if t0.place_state_division %} · {{ t0.place_state_division }} in {{ r.state }}{% endif %}</span></h4>
+  {% if g.sources %}
+  <div class="table-wrap">
+  <table class="board">
+    <thead><tr><th>Image</th><th class="num" title="More items, up to what the field's top quarter found">More items</th>
+      <th class="num" title="Median points per item (teams without penalties that found more)">≈ Per item</th>
+      <th class="num">≈ Points</th><th class="num" title="Points likely lost to penalties">≈ Penalties</th>
+      {% if here %}<th class="num" title="Places in {{ r.state }} these points would have gained">≈ {{ r.state }} places</th>{% endif %}
+      <th class="num" title="Places nationally these points would have gained">≈ National places</th></tr></thead>
+    <tbody>{% for s in g.sources %}
+    <tr><td>{{ s.image }}</td><td class="num">{{ s.items or '' }}</td>
+      <td class="num">{{ '%.1f' % s.per_item if s.per_item and s.items else '' }}</td>
+      <td class="num">{{ '+%.0f' % s.points if s.points >= 0.5 else '' }}</td>
+      <td class="num">{{ '+%.0f' % s.penalty if s.penalty >= 0.5 else '' }}</td>
+      {% if here %}<td class="num">{{ '+%d' % s.places_state if s.places_state else '' }}</td>{% endif %}
+      <td class="num">{{ '+%d' % s.places_national if s.places_national else '' }}</td></tr>{% endfor %}</tbody>
+  </table>
+  </div>
+  {% for t in g.targets %}
+  <p class="small"><strong>To {{ t.label }}:</strong> {{ t.gap | num }} point{{ '' if t.gap == 1 else 's' }}.
+    {% for img, what, pts in t.plan %}{{ what | capitalize if loop.first else what }} on {{ img }} (≈ +{{ '%.0f' % pts }}){{ ', ' if not loop.last }}{% endfor %}{% if t.plan %}{{ '.' if t.reachable else ': not enough on its own.' }}{% endif %}</p>
+  {% endfor %}
+  {% else %}
+  <p class="muted small">At or above the top quarter on every image, with no penalties.</p>
+  {% endif %}
+</section>
+{% endfor %}
+</div>
+
+{% if f.relative %}{% set rel = f.relative %}
+<h3>Strengths and weaknesses</h3>
+{{ para(n.relative) }}
+<div class="table-wrap">
+<table class="board relative">
+  <thead><tr><th>Team</th><th class="num">Overall</th>{% for img in rel.images %}<th class="num">{{ img }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for res, cells in rel.rows %}
+  <tr><td>{{ res.label }}</td><td class="num">{{ '%.0f%%' % res.percentile }}</td>
+    {% for img in rel.images %}{% set c = cells.get(img) %}
+    {% if c %}{% set cls = 'rel-up' if c[1] >= rel.threshold else ('rel-down' if c[1] <= -rel.threshold else '') %}
+    <td class="num {{ cls }}">{{ '%.0f%%' % c[0] }} <span class="small">({{ ('%+.0f' % c[1]) | replace('-', '−') }}){% if cls == 'rel-up' %} ▲{% elif cls == 'rel-down' %} ▼{% endif %}</span></td>
+    {% else %}<td class="num"><span class="muted">–</span></td>{% endif %}{% endfor %}</tr>{% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Each cell: the share of the teams on that image the team out-completed{{ ' (Cisco: outscored)' if 'Cisco' in rel.images }},
+  and in brackets its difference from the team's overall percentile. ▲/▼ mark differences of {{ '%.0f' % rel.threshold }}
+  points or more. Exploratory: one round is a small sample; the season pages test the pattern across rounds.</p>
+{% endif %}
+
+{% if f.penalties %}
+<h3>Penalties</h3>
+{{ para(n.penalties) }}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Image</th><th class="num">Our teams with a penalty</th><th class="num">Rest of the field</th>
+    <th class="num">Our mean penalties</th><th class="num">Field mean</th><th class="num" title="Fisher's exact test, two-sided">p</th>
+    <th class="num">≈ Points we lost</th></tr></thead>
+  <tbody>{% for x in f.penalties %}
+  <tr class="{{ 'watched' if x.higher }}"><td>{{ x.image }}</td><td class="num">{{ x.ours_with }} of {{ x.ours_n }}</td>
+    <td class="num">{{ '%.0f%%' % (100 * x.field_share) }} <span class="muted small">({{ x.field_with }} of {{ x.field_n }})</span></td>
+    <td class="num">{{ '%.2f' % x.ours_mean }}</td><td class="num">{{ '%.2f' % x.field_mean }}</td>
+    <td class="num">{{ x.p | ptext if x.ours_with or x.field_with == 0 else '' }}</td><td class="num">{{ '%.0f' % x.ours_lost if x.ours_lost >= 0.5 else '' }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<p class="muted small">Highlighted: images where a larger share of our teams took a penalty than the rest of the field.
+  With 3–4 of our teams, only a large difference reaches significance.</p>
+{% endif %}
+{% endif %}
+
 {% if n.challenge %}
 <h2>Cisco Networking Challenge</h2>
 {{ para(n.challenge) }}
