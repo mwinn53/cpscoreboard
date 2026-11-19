@@ -8,6 +8,9 @@
   app/analysis_narrative.py, app/analysis_charts.py), its name and the coaches' notes;
   ``?state=`` reads it for another state (ours stay highlighted);
   ``/analysis/reports/{id}/charts/{name}?lo=&hi=``: one chart zoomed to an x range.
+* ``POST /analysis/choices``: the coach's comparisons for a division (teams to follow,
+  another state, the top N; app/analysis_choices.py), used by the reports and the
+  season pages.
 * ``/analysis/seasons``: season over season; ``/analysis/seasons/{season}``: a
   season's rounds; ``/analysis/compare?a=&b=``: any two reports side by side
   (app/analysis_compare.py).
@@ -34,6 +37,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/analysis")
 MAX_UPLOAD = 60 * 1024 * 1024  # all legacy files together are about 16 MB
 TOP_CHOICES = (10, 25, 50, 100)
+COMPARE_TOP = (0, 10, 25, 50, 100)
 
 
 def _state(request: Request):
@@ -216,16 +220,23 @@ def _report_state(request: Request, store, info, state: str) -> str:
 async def report_page(request: Request, round_id: int, top: int = 25, state: str = "",
                       me: Device = Depends(require_coach)):
     from .analysis import cached_report
-    from .analysis_charts import advance_legend, progress_legend, round_charts, team_legend
+    from .analysis_charts import (advance_legend, compare_strips, follow_legend, progress_legend, round_charts,
+                                  team_legend)
+    from .analysis_choices import comparison
     from .analysis_compare import round_context
     store, collector = _state(request)
     info = await _get_round(store, round_id)
+    choices = _choices(request, info.division)
 
     def build():
         st = _report_state(request, store, info, state)
         report = cached_report(store, info, st)
-        return st, report, round_charts(report), round_context(store, info, st)
-    state, report, charts, context = await asyncio.to_thread(build)
+        cmp = comparison(report, choices)
+        charts = round_charts(report)
+        charts["compare"] = compare_strips(report, [(g.label, g.teams, g.key == "state") for g in cmp.groups],
+                                           choices.teams)
+        return st, report, charts, round_context(store, info, st), cmp
+    state, report, charts, context, cmp = await asyncio.to_thread(build)
     status = None
     if collector and info.source == LIVE:
         st = collector.status.get(info.division)
@@ -237,8 +248,37 @@ async def report_page(request: Request, round_id: int, top: int = 25, state: str
                  legend=team_legend(state), bar_legend=team_legend(state, toggles=False), progress_legend=progress_legend(report),
                  advance_legend=advance_legend(report), status=status, top=top,
                  top_choices=TOP_CHOICES, others=others, notice=request.query_params.get("notice"),
-                 home_state=_home_state(request),
+                 home_state=_home_state(request), cmp=cmp, compare_top=COMPARE_TOP, follow_legend=follow_legend(),
                  states=sorted({t.location for t in report.teams if t.location}))
+
+
+def _choices(request: Request, division: str):
+    from .analysis_choices import load
+    return load(request.app.state.board, division)
+
+
+@router.post("/choices", dependencies=[Depends(same_origin)])
+async def save_choices(request: Request, me: Device = Depends(require_coach), division: Annotated[str, Form()] = "",
+                       teams: Annotated[str, Form()] = "", state: Annotated[str, Form()] = "",
+                       top: Annotated[int, Form()] = 25, back: Annotated[str, Form()] = ""):
+    """Save a division's comparisons (any coach), then go back to the page they came from."""
+    from .analysis_choices import MAX_TEAMS, TEAM_RE, Choices, parse_teams, save
+    _state(request)
+    if not division:
+        raise NotAllowed(400, "Pick a division first.")
+    picked = parse_teams(teams)
+    state = state.strip().upper()
+    if state and not (len(state) == 2 and state.isalpha()):
+        raise NotAllowed(400, "A state is two letters, e.g. TX.")
+    ch = Choices(picked, state, top if top in COMPARE_TOP else 25)
+    await asyncio.to_thread(save, request.app.state.board, division, ch)
+    back = back if back.startswith("/analysis") and "//" not in back else f"/analysis?division={quote(division)}"
+    back = back.split("#")[0]
+    over = f" (the first {MAX_TEAMS})" if len(set(TEAM_RE.findall(teams))) > MAX_TEAMS else ""
+    n = len(picked)
+    note = f"Saved the comparisons for {division}: {n} team{'' if n == 1 else 's'} followed{over}."
+    sep = "&" if "?" in back else "?"
+    return RedirectResponse(f"{back}{sep}notice={quote(note)}#compare", status_code=303)
 
 
 @router.get("/reports/{round_id}/charts/{name}", response_class=HTMLResponse)
@@ -350,10 +390,12 @@ async def season_page(request: Request, season: int, division: str = "", me: Dev
     from .analysis_compare import season_view
     store, collector = _state(request)
     division, _ = await asyncio.to_thread(_division, request, store, collector, division)
-    view = await asyncio.to_thread(season_view, store, division, season, _home_state(request))
+    choices = _choices(request, division)
+    view = await asyncio.to_thread(season_view, store, division, season, _home_state(request), choices)
     if not view.summaries:
         raise NotAllowed(404, f"No CP-{season} reports for {division}.")
-    return _page(request, "analysis_season.html", me=me, view=view, division=division)
+    return _page(request, "analysis_season.html", me=me, view=view, division=division, choices=choices,
+                 compare_top=COMPARE_TOP)
 
 
 @router.get("/compare", response_class=HTMLResponse)
