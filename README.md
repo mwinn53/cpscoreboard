@@ -24,7 +24,7 @@ shutdown), M5 (posting to X) and the Analysis tab. Next up is the rest of M7 (an
 | [M5 – X notifier](https://github.com/mwinn53/cpscoreboard/milestone/3) | ✅ Built ([#17](https://github.com/mwinn53/cpscoreboard/issues/17)); dry run until X keys are saved | Posts about watched teams to X (or the log), set up on `/admin/config` |
 | [M6 – History charts](https://github.com/mwinn53/cpscoreboard/milestone/4) | ✅ Live ([#40](https://github.com/mwinn53/cpscoreboard/pull/40), per-image detail [#19](https://github.com/mwinn53/cpscoreboard/issues/19)) | `/teams/{team}`: score, national and state place over time, one round at a time; per-image scores for watched teams |
 | [M7 – Analysis](https://github.com/mwinn53/cpscoreboard/milestone/5) | 🚧 Season-end retention live: archive ([#34](https://github.com/mwinn53/cpscoreboard/pull/34)), outage alert and shutdown ([#39](https://github.com/mwinn53/cpscoreboard/pull/39)); Analysis tab ([#58](https://github.com/mwinn53/cpscoreboard/pull/58)): data sets, legacy import, reports with charts and written narrative, season and round comparisons, trickle collection ([#60](https://github.com/mwinn53/cpscoreboard/pull/60); collect after 3¾ hours played and 60 minutes idle or 4 hours idle, Collect all, Cisco Quiz and Packet Tracer, [#61](https://github.com/mwinn53/cpscoreboard/pull/61)) | Analysis for coaches; season-end data retention |
-| [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🗒 Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
+| [M8 – Season operations & admin polish](https://github.com/mwinn53/cpscoreboard/milestone/9) | 🚧 In progress. Next: archive copy to S3 ([#71](https://github.com/mwinn53/cpscoreboard/issues/71)) in [#97](https://github.com/mwinn53/cpscoreboard/pull/97). Planned: messaging alternative to X ([#53](https://github.com/mwinn53/cpscoreboard/issues/53)), mobile layout ([#70](https://github.com/mwinn53/cpscoreboard/issues/70), parked), X standings images ([#72](https://github.com/mwinn53/cpscoreboard/issues/72)) | Running the season smoothly |
 | [M9 – Analysis evaluation & enhancements](https://github.com/mwinn53/cpscoreboard/milestone/10) | 🚧 In progress. Done: where the points went (points within reach [#76](https://github.com/mwinn53/cpscoreboard/issues/76), strengths and weaknesses [#75](https://github.com/mwinn53/cpscoreboard/issues/75), penalties [#78](https://github.com/mwinn53/cpscoreboard/issues/78)) in [#92](https://github.com/mwinn53/cpscoreboard/pull/92); the R-report evaluation ([#66](https://github.com/mwinn53/cpscoreboard/issues/66)) became the rigor work in [#81](https://github.com/mwinn53/cpscoreboard/issues/81); pace against the top quarter ([#77](https://github.com/mwinn53/cpscoreboard/issues/77)) in [#93](https://github.com/mwinn53/cpscoreboard/pull/93); what it takes to advance, Middle School ([#68](https://github.com/mwinn53/cpscoreboard/issues/68)) in [#94](https://github.com/mwinn53/cpscoreboard/pull/94). Next: interactive charts ([#65](https://github.com/mwinn53/cpscoreboard/issues/65)) in [#95](https://github.com/mwinn53/cpscoreboard/pull/95). Planned: AI-written narratives with a cost estimate first ([#64](https://github.com/mwinn53/cpscoreboard/issues/64)), coach-chosen comparisons ([#67](https://github.com/mwinn53/cpscoreboard/issues/67)), export ([#69](https://github.com/mwinn53/cpscoreboard/issues/69)), image order ([#79](https://github.com/mwinn53/cpscoreboard/issues/79)), what drives the score ([#80](https://github.com/mwinn53/cpscoreboard/issues/80)) | Make the analysis more useful to coaches |
 
 Issues labelled [`time-sensitive`](https://github.com/mwinn53/cpscoreboard/labels/time-sensitive)
@@ -86,7 +86,7 @@ have a real-world deadline, such as the scoreboard being taken down after the se
 | `/analysis/seasons`, `/analysis/seasons/{season}` | Season over season (participation, percentiles, image families); one season's rounds |
 | `/analysis/compare?a=&b=` | Any two reports side by side (e.g. preliminary against final, or two rounds) |
 | `/admin/config` | Configuration (admin only): scoreboard address and update interval (fixed or variable), competition start, posting to X and its keys; an (i) help bubble on each section |
-| `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable |
+| `/admin/archive` | Season archive (admin only): one full scoreboard per day, downloadable, and which days are copied to S3 |
 | `/admin/server` | Snapshot and shut down the server (admin only; exists only while the outage alert's criteria are met) |
 | `/brand/left`, `/brand/right` | Header logos (public); placeholders until uploaded on `/admin/board` |
 | `/healthz` | Public health check for Docker and the deploy; returns only `{"status": "ok"}` |
@@ -159,6 +159,8 @@ All settings are environment variables; see [.env.example](.env.example).
 | `DETAIL_ENABLED` | `true` | Fetch per-image detail for watched teams (replay serves it from `<capture set>/images/` if present) |
 | `GEOIP_ENABLED` | `true` | Approximate device locations on `/admin` (DB-IP city database, monthly download); off in replay |
 | `ARCHIVE_ENABLED` | `true` | Save the full scoreboard once per day (see [Season archive](#season-archive)); always off in replay |
+| `ARCHIVE_BUCKET` | | Also copy the archive to this S3 bucket (set by Terraform in prod; blank = off) |
+| `ARCHIVE_SYNC_MINUTES` | `60` | How often the S3 copy is checked |
 | `CAPTURE_DIR` | `captures` | Where capture mode saves, and where `CAPTURE_SET` names are looked up |
 | `CAPTURE_SET` | — | Replay: folder under `CAPTURE_DIR`, or any folder path |
 | `REPLAY_SPEED` | `1` | e.g. `20` plays an hour of captures in 3 minutes |
@@ -260,6 +262,15 @@ Files are named like dev captures (`YYYYmmddTHHMMSSZ.json.gz`), so a folder of t
 replays with `SCRAPE_MODE=replay CAPTURE_SET=<folder>`. Admins can download them at
 `/admin/archive`. On the server they live on the `/data` volume, which has daily EBS
 snapshots. Set `ARCHIVE_ENABLED=false` to turn this off; it's always off in replay mode.
+
+With `ARCHIVE_BUCKET` set (Terraform sets it in prod, `infra/archive.tf`), the files
+are also copied to S3 under `archive/`: at startup and then every hour, a file the
+bucket doesn't have is uploaded, and a day's older file is deleted once its
+replacement is there, so the bucket mirrors the folder (`aws s3 sync
+s3://<bucket>/archive/ <folder>` gives a folder that replays). The bucket is private,
+encrypted and versioned. Replaced versions are kept for 30 days, and files move to
+Glacier 180 days after upload, which is after the season. `/admin/archive` shows which
+days are in S3, when the copy last ran and any error.
 
 ### End of season: outage alert and shutdown
 
@@ -573,6 +584,6 @@ Outbound email uses SES on the `savannahrivertech.com` domain (`infra/ses.tf`).
 
 | Path | Purpose |
 |---|---|
-| `infra/` | Terraform: EC2, Elastic IP, `/data` volume and snapshots, ECR, IAM/OIDC, logs, SSM settings |
+| `infra/` | Terraform: EC2, Elastic IP, `/data` volume and snapshots, the archive bucket, ECR, IAM/OIDC, logs, SSM settings |
 | `deploy/` | Production compose file, Caddyfile, and the SSM deploy scripts |
 | `.github/workflows/` | `ci.yml` (tests, plus an image build on PRs) and `deploy.yml` (master → AWS) |

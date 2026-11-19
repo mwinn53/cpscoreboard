@@ -95,6 +95,8 @@ locals {
     PUBLIC_URL      = local.site_url
     AWS_INSTANCE_ID = aws_instance.web.id
     DATA_VOLUME_ID  = aws_ebs_volume.data.id
+    # The archive's copy in S3 (app/archive_s3.py, infra/archive.tf).
+    ARCHIVE_BUCKET = aws_s3_bucket.archive.bucket
     }, var.mail_sender == "" ? {} : {
     MAIL_FROM = var.mail_sender
   })
