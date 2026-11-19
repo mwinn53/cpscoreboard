@@ -81,6 +81,13 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         if settings.archive_enabled and settings.scrape_mode.value != "replay":
             archive = Archive(settings.data_dir / "archive", settings.display_timezone)
         app.state.archive = archive
+        archive_copy = copy_task = None
+        if archive is not None and settings.archive_bucket:
+            from .archive_s3 import ArchiveCopy
+            archive_copy = ArchiveCopy(archive, settings.archive_bucket, settings.aws_region,
+                                       interval=settings.archive_sync_minutes * 60)
+            copy_task = asyncio.create_task(archive_copy.run(), name="archive-copy")
+        app.state.archive_copy = archive_copy
         monitor = None
         if settings.scrape_mode.value != "replay":
             monitor = OutageMonitor(board, app.state.mailer, settings.admin_notify_email, settings.site_title,
@@ -139,7 +146,7 @@ def create_app(settings: Settings | None = None, mailer: Mailer | None = None) -
         try:
             yield
         finally:
-            for t in (task, detail_task, geo_task, collector_task, warm_task):
+            for t in (task, detail_task, geo_task, collector_task, warm_task, copy_task):
                 if t is not None:
                     t.cancel()
                     with suppress(asyncio.CancelledError):

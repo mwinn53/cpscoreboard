@@ -8,6 +8,7 @@ which on a competition day is the board as the round closed.
 
 Files use the capture format (``YYYYmmddTHHMMSSZ.json.gz``, UTC), so an archive
 folder can be replayed in dev with ``SCRAPE_MODE=replay CAPTURE_SET=<folder>``.
+With ``ARCHIVE_BUCKET`` set, the files are copied to S3 too (app/archive_s3.py).
 "Day" means the display time zone's calendar day (US Eastern by default).
 """
 
@@ -46,6 +47,10 @@ class Archive:
 
     def _day(self, when: datetime) -> date:
         return when.astimezone(self.tz).date()
+
+    def day_of(self, name: str) -> date:
+        """The local day of an archive file name."""
+        return self._day(datetime.strptime(name.removesuffix(CAPTURE_SUFFIX), CAPTURE_TS_FORMAT).replace(tzinfo=UTC))
 
     def files(self) -> list[ArchiveFile]:
         """Newest first."""

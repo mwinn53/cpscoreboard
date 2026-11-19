@@ -7,6 +7,12 @@
   last board seen that day, so a competition day's file is the board as the round closed. This is what survives
   when the public scoreboard is taken down after the round. Files are gzipped JSON in the same format as the
   API, and a folder of them can be replayed in the dev container.</p>
+{% if copy %}{% set st = copy.status %}
+<p>Copied to S3 (<code>s3://{{ copy.bucket }}/archive/</code>), checked every {{ (copy.interval / 60) | round | int }} minutes:
+  {% if st.checked_at %}{{ st.remote | length }} file{{ 's' if st.remote | length != 1 }} there, last checked {{ st.checked_at | local }}.{% else %}not checked yet.{% endif %}</p>
+{% if st.error %}<p class="notice" role="alert">The last copy failed: {{ st.error }}. It's retried at the next check.</p>{% endif %}
+{% elif enabled %}<p class="muted small">Not copied to S3 here (<code>ARCHIVE_BUCKET</code> isn't set).</p>
+{% endif %}
 
 {% if not enabled %}
 <p class="empty">Archiving is off here (replay mode, or <code>ARCHIVE_ENABLED=false</code>).</p>
@@ -16,13 +22,14 @@
 <p>{{ files | length }} day{{ 's' if files | length != 1 }} · {{ (total / 1024) | round | int }} KB in all.</p>
 <div class="table-wrap">
 <table class="board">
-  <thead><tr><th>Day</th><th>Board as of</th><th class="num">Size</th><th></th></tr></thead>
+  <thead><tr><th>Day</th><th>Board as of</th><th class="num">Size</th>{% if copy %}<th>In S3</th>{% endif %}<th></th></tr></thead>
   <tbody>
   {% for f in files %}
   <tr>
     <td>{{ f.day.strftime('%a %b') }} {{ f.day.day }}, {{ f.day.year }}</td>
     <td>{{ f.saved_at | local }}</td>
     <td class="num">{{ (f.size / 1024) | round(1) }} KB</td>
+    {% if copy %}<td>{% if f.name in copy.status.remote %}✓ yes{% elif copy.status.checked_at %}<span class="muted">not yet</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endif %}
     <td><a href="/admin/archive/{{ f.name }}" download>Download</a></td>
   </tr>
   {% endfor %}

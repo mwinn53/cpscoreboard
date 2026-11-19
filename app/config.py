@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # Keep the full raw scoreboard, one file per day, in <DATA_DIR>/archive (live and capture
     # modes; never in replay). See app/archive.py.
     archive_enabled: bool = True
+    # Also copy the archive to this S3 bucket, checked every ARCHIVE_SYNC_MINUTES (set by
+    # Terraform in prod; blank = off). See app/archive_s3.py.
+    archive_bucket: str = ""
+    archive_sync_minutes: float = 60
     # Per-image detail for watched teams while they play (app/team_detail.py), in seconds.
     detail_interval: float = 300
     detail_enabled: bool = True

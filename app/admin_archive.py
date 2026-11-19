@@ -1,4 +1,4 @@
-"""Admin page for the season archive: list the daily files and download them."""
+"""Admin page for the season archive: list the daily files, which are in S3, and download them."""
 
 from __future__ import annotations
 
@@ -17,8 +17,9 @@ router = APIRouter(prefix="/admin/archive")
 async def archive_page(request: Request, admin: Device = Depends(require_admin)):
     archive = request.app.state.archive
     files = await asyncio.to_thread(archive.files) if archive else []
+    copy = getattr(request.app.state, "archive_copy", None)
     return _page(request, "admin_archive.html", me=admin, enabled=archive is not None, files=files,
-                 total=sum(f.size for f in files))
+                 total=sum(f.size for f in files), copy=copy)
 
 
 @router.get("/{name}")

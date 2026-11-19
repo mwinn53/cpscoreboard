@@ -114,3 +114,15 @@ variable "app_settings" {
     error_message = "app_settings values must be non-empty and must not contain single quotes."
   }
 }
+
+variable "archive_glacier_days" {
+  description = "Days after upload before an archive file moves to S3 Glacier (after the season)."
+  type        = number
+  default     = 180
+}
+
+variable "archive_noncurrent_days" {
+  description = "Days to keep replaced or deleted versions of archive files in S3."
+  type        = number
+  default     = 30
+}
