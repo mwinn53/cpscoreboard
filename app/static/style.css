@@ -340,3 +340,13 @@ svg.chart .brush { fill: var(--s1); fill-opacity: 0.15; stroke: var(--s1); strok
 .zoom-controls form { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin-top: 4px; }
 .zoom-controls input { width: 6em; }
 .projection-toggle { font-size: 13px; }
+
+/* Coach-chosen comparisons (#67) */
+svg.chart .dot.followed { stroke: var(--text); stroke-width: 2; r: 5px; }
+tr.followed > td:first-child::before { content: "★ "; color: var(--accent, currentColor); }
+.legend .key.followed { background: transparent; border: 2px solid var(--text); }
+details.choices { margin: 0.75rem 0 1.5rem; }
+details.choices summary { cursor: pointer; font-weight: 600; }
+details.choices form { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 40rem; }
+details.choices textarea { width: 100%; box-sizing: border-box; font: inherit; height: 4.5em; min-height: 0; }
+details.choices .row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; }

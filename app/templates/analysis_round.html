@@ -28,7 +28,7 @@
   now.</div>
 {% endif %}
 
-<div class="report-tools" data-report="{{ info.id }}" data-state="{{ r.state }}">
+<div class="report-tools" data-report="{{ info.id }}" data-state="{{ r.state }}" data-follow="{{ cmp.choices.teams | join(' ') }}">
   <form method="get" class="inline">
     <label>Read for <select name="state" onchange="this.form.submit()">
       {% for s in states %}<option value="{{ s }}" {{ 'selected' if s == r.state }}>{{ s }}</option>{% endfor %}
@@ -76,6 +76,51 @@
 </div>
 <p class="muted small">Per image: items found · completion (found ÷ the image's items) · score.</p>
 {% endif %}
+
+{% set ch = cmp.choices %}
+<h2 id="compare">Comparisons
+  {% call tip("compare-help", "About the comparisons") %}
+  Choose teams to follow (rivals, last year's state finalists), another state and how many of the top teams
+  nationally to set beside {{ r.state }}. The choices are saved for the division, for every coach: each
+  {{ info.division }} report and the season pages use them. Teams we follow get a ring in every chart and a ★ in
+  every table. "Against {{ r.state }}" is the chance a random team from the group outscored a random {{ r.state }}
+  team, with the Mann–Whitney p-value.
+  {% endcall %}
+</h2>
+{% if cmp.followed %}
+<h3>Teams we follow</h3>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th><th>State</th><th class="num">State place</th><th class="num">National</th>
+    <th class="num">Outscored</th><th class="num">Score</th><th class="num">Play time</th><th class="num">Images</th></tr></thead>
+  <tbody>{% for f in cmp.followed %}{% set t = f.team %}
+  <tr data-team="{{ t.team_number }}"><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
+    <td>{{ t.location }}</td><td class="num">{{ f.state_place or '' }}</td><td class="num">{{ t.place_division or '' }}</td>
+    <td class="num">{{ '%.0f' % f.percentile }}%</td><td class="num strong">{{ t.score | num }}</td>
+    <td class="num mono">{{ t.play_time | hms }}</td><td class="num">{{ r.images_attempted(t) }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+{% if cmp.missing %}<p class="muted small">Not in this data set: {{ cmp.missing | join(', ') }}.</p>{% endif %}
+{% if ch.state and not cmp.other_state %}<p class="muted small">{% if ch.state == r.state %}{{ ch.state }} is the state
+  this report is read for.{% else %}No {{ ch.state }} teams in this data set.{% endif %}</p>{% endif %}
+<div class="charts">
+  {{ card('Comparison groups', charts.compare, '<p class="chart-note">Boxes are the middle half of each group, the line is the median. ' ~ r.state ~ ' is highlighted; teams we follow have a ring.</p>' ~ legend ~ (follow_legend if cmp.followed else ''), 'wide') }}
+</div>
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Group</th><th class="num">Teams</th><th class="num">Median</th><th class="num">Middle half</th>
+    <th class="num">Best</th><th class="num" title="The chance a random team from the group outscored a random {{ r.state }} team">Against {{ r.state }}</th>
+    <th class="num">p</th></tr></thead>
+  <tbody>{% for g in cmp.groups %}{% set d = g.score %}
+  <tr{% if g.key == 'state' %} class="watched"{% endif %}><td>{{ g.label }}</td><td class="num">{{ d.n }}</td><td class="num">{{ d.median | num }}</td>
+    <td class="num">{% if d.n > 1 %}{{ d.q1 | num }}–{{ d.q3 | num }}{% endif %}</td><td class="num">{{ d.max | num }}</td>
+    {% if g.test and g.test.mw %}<td class="num">{{ '%.0f%%' % (100 * g.test.mw.prob_sup) }}</td><td class="num">{{ g.test.mw.p | ptext }}</td>
+    {% else %}<td class="num muted">–</td><td class="num muted">–</td>{% endif %}</tr>{% endfor %}</tbody>
+</table>
+</div>
+{% set back = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+{% with division = info.division %}{% include "_analysis_choices.html" %}{% endwith %}
 
 <h2>Scores
   {% call tip("tests-help", "How the tests work") %}
