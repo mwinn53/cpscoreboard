@@ -4,6 +4,8 @@
 // * Tooltips: any mark with a data-tip inside a .chart-wrap[data-tips] shows its text.
 // * Team highlight: click a mark or table row with a data-team, or type a team number in
 //   the report's search box, to highlight that team in every chart (again, or Esc, clears).
+// * Teams we follow (the report's data-follow, #67) get the "followed" class: a ring on their
+//   dots and a star in table rows.
 // * Legend toggles: .legend-toggle[data-toggle] shows or hides that selector's marks in its
 //   chart card; [data-group] shows or hides a team group's dots on the whole page. The
 //   direct labels on percentile lines (.label-toggle) toggle their line.
@@ -16,6 +18,8 @@
   var tools = document.querySelector("[data-report]");
   var picked = null;
   var original = {};
+  var follow = {};
+  ((tools && tools.getAttribute("data-follow")) || "").split(" ").forEach(function (n) { if (n) follow[n] = true; });
 
   function store(key, value) {
     try {
@@ -63,7 +67,9 @@
 
   function applyPick(root) {
     (root || document).querySelectorAll("[data-team]").forEach(function (el) {
-      el.classList.toggle("picked", el.getAttribute("data-team") === picked);
+      var team = el.getAttribute("data-team");
+      el.classList.toggle("picked", team === picked);
+      el.classList.toggle("followed", follow[team] === true);
     });
     document.body.classList.toggle("has-pick", picked !== null);
   }
@@ -256,5 +262,6 @@
     tips(wrap);
     zoomable(wrap);
   });
+  applyPick();
   document.querySelectorAll(".js-only").forEach(function (el) { el.hidden = false; });
 })();

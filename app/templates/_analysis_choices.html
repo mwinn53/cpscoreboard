@@ -1,0 +1,21 @@
+{# The coach's comparisons for a division (app/analysis_choices.py). Needs: division, ch (Choices), compare_top, back. #}
+<details class="choices"{% if ch.empty %} open{% endif %}>
+  <summary>Choose comparisons for {{ division }}</summary>
+  <form method="post" action="/analysis/choices" class="stack">
+    <input type="hidden" name="division" value="{{ division }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label for="choice-teams">Teams to follow <span class="muted small">(rivals, last year's finalists: team
+      numbers, any separator, up to 40)</span></label>
+    <textarea id="choice-teams" name="teams" rows="2" cols="50" placeholder="19-1234, 19-2345">{{ ch.teams | join(', ') }}</textarea>
+    <span class="row">
+      <label>Compare with state <input name="state" value="{{ ch.state }}" size="3" maxlength="2"
+        pattern="[A-Za-z]{2}" placeholder="TX" autocapitalize="characters"></label>
+      <label>Top teams nationally <select name="top">
+        {% for n in compare_top %}<option value="{{ n }}" {{ 'selected' if n == ch.top }}>{{ n if n else 'off' }}</option>{% endfor %}
+      </select></label>
+      <button type="submit">Save</button>
+    </span>
+    <p class="muted small">Saved for every coach and every {{ division }} report; the season pages use them too.
+      Team numbers change each season, so update the list when a new one starts.</p>
+  </form>
+</details>

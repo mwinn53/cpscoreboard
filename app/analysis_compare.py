@@ -4,7 +4,9 @@ Scores aren't comparable across rounds (different images, different numbers of
 items), so comparisons use **percentiles** (the share of the division a team
 outscored) and **completion** (found ÷ items, by image family: Windows, Windows
 Server, Linux). Team numbers last one season, so our teams are followed by number
-within a season and compared as a program across seasons.
+within a season and compared as a program across seasons. The teams a coach follows
+and another state to compare with (app/analysis_choices.py) get their own lines on a
+season's page.
 
 Where a round has both preliminary and final data sets, the final one is used,
 except on the two-report page, where any two can be picked (e.g. preliminary
@@ -13,10 +15,12 @@ against final).
 
 from __future__ import annotations
 
+import statistics
 from dataclasses import dataclass, field
 
 from . import analysis_stats as stats
-from .analysis import FAMILIES, OurTeam, RoundSummary, cached_report, round_summary
+from .analysis import FAMILIES, OurTeam, RoundSummary, cached_report, percentile, round_summary
+from .analysis_choices import Choices, Followed, comparison
 from .analysis_charts import percentile_lines
 from .analysis_narrative import (history_narrative, pair_narrative, participation_context, program_narrative,
                                  season_narrative, strength_narrative)
@@ -111,9 +115,50 @@ class SeasonView:
     families: list[str] = field(default_factory=list)
     program: ProgramStats | None = None
     strength: list[FamilyStrength] = field(default_factory=list)
+    followed: list[tuple[str, dict[int, Followed]]] = field(default_factory=list)  # team -> round id -> result
+    follow_missing: list[str] = field(default_factory=list)   # followed teams in none of the season's rounds
+    follow_chart: str = ""
+    other_state: str = ""
+    other_median: dict[int, tuple[float, float]] = field(default_factory=dict)  # round id -> (median, percentile)
 
 
-def season_view(store: AnalysisStore, division: str, season: int, state: str) -> SeasonView:
+def _state_median(teams, state: str) -> tuple[float, float] | None:
+    scores = [t.score for t in teams if t.location == state]
+    if not scores:
+        return None
+    m = statistics.median(scores)
+    return m, percentile(m, [t.score for t in teams])
+
+
+def _follow(view: SeasonView, store: AnalysisStore, state: str, choices: Choices) -> None:
+    """The followed teams and the chosen state's median team, round by round, and a chart of their percentiles."""
+    sums = view.summaries
+    found: dict[str, dict[int, Followed]] = {}
+    for s in sums:
+        r = cached_report(store, s.info, state, timeline=False)
+        for f in comparison(r, choices).followed:
+            found.setdefault(f.team.team_number, {})[s.info.id] = f
+        if choices.state and choices.state != state and (m := _state_median(r.teams, choices.state)):
+            view.other_median[s.info.id] = m
+    view.followed = [(n, found[n]) for n in choices.teams if n in found]
+    view.follow_missing = [n for n in choices.teams if n not in found]
+    view.other_state = choices.state if view.other_median else ""
+    if not view.followed and not view.other_state:
+        return
+    series = [(n, [v[s.info.id].percentile if s.info.id in v else None for s in sums]) for n, v in view.followed[:6]]
+    slots = [f"s{i + 2}" for i in range(len(series))]
+    if view.other_state:
+        series.append((f"{view.other_state} median",
+                       [view.other_median[s.info.id][1] if s.info.id in view.other_median else None for s in sums]))
+        slots.append("s8")
+    series.append((f"{state} median", [s.state_median_pct for s in sums]))
+    slots.append("s1")
+    view.follow_chart = percentile_lines([short_label(s.info) for s in sums], series, slots=slots,
+                                         label=f"CP-{view.season}: the teams we follow, percentile by round")
+
+
+def season_view(store: AnalysisStore, division: str, season: int, state: str,
+                choices: Choices | None = None) -> SeasonView:
     rounds = pick([r for r in store.rounds(division) if r.season == season])
     sums = summaries(store, rounds, state)
     teams: dict[str, dict[int, OurTeam]] = {}
@@ -133,9 +178,12 @@ def season_view(store: AnalysisStore, division: str, season: int, state: str) ->
     fams = [f for f in FAMILIES if any(f in s.family_field for s in sums)]
     program = program_stats(sums)
     strength = family_strength(sums)
-    return SeasonView(season, division, sums, rows,
+    view = SeasonView(season, division, sums, rows,
                       season_narrative(sums) + program_narrative(program, sums) + strength_narrative(strength),
                       chart, fams, program, strength)
+    if choices and sums:
+        _follow(view, store, state, choices)
+    return view
 
 
 # --- season over season ---

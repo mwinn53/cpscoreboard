@@ -70,6 +70,11 @@ TEAM_LEGEND = [Item("Our teams", "ours", group="ours"), Item("District teams", "
                Item("Other {state} teams", "state", group="state"), Item("Everyone else", "other", group="other")]
 
 
+def follow_legend() -> str:
+    """The key for the teams a coach follows (the ring app/static/analysis_charts.js puts on their dots)."""
+    return legend([Item("Teams we follow", "followed")])
+
+
 def team_legend(state: str, *, others: bool = True, toggles: bool = True) -> str:
     """The team groups; with ``toggles``, each entry shows or hides that group's dots (not bars) on the page."""
     items = [Item(i.label.replace("{state}", state), i.cls, group=i.group if toggles else "") for i in TEAM_LEGEND]
@@ -255,10 +260,24 @@ def state_boxes(r: RoundReport, width: int = W) -> str:
 def group_strips(r: RoundReport, width: int = W) -> str:
     """Where teams landed: the nation and the state as box plots with every team as a dot."""
     rows = [("Nationally", r.teams), (r.state, [t for t in r.teams if t.location == r.state])]
-    rows = [(name, teams) for name, teams in rows if teams]
+    return _strips(r, [(name, teams, k == 1) for k, (name, teams) in enumerate(rows)],
+                   f"Scores nationally and in {r.state}, every team a dot", width=width)
+
+
+def compare_strips(r: RoundReport, rows: Sequence[tuple[str, list[TeamRow], bool]], follow: Sequence[str] = (),
+                   width: int = W) -> str:
+    """The coach's comparison groups (app/analysis_choices.py) as box plots with every team as a dot."""
+    return _strips(r, rows, "Scores by comparison group, every team a dot", follow=set(follow), width=width)
+
+
+def _strips(r: RoundReport, rows: Sequence[tuple[str, list[TeamRow], bool]], label: str, *,
+            follow: set[str] | None = None, width: int = W) -> str:
+    """Box plots, one row per (name, teams, highlighted), every team a dot; the first row is the nation's."""
+    rows = [row for row in rows if row[1]]
     if not rows:
         return ""
-    left, row_h = 92, 64
+    follow = follow or set()
+    left, row_h = 112 if follow or len(rows) > 2 else 92, 64
     h = TOP + row_h * len(rows) + BOTTOM
     hi = max(t.score for t in r.teams)
     tv = ticks(min(0, min(t.score for t in r.teams)), hi)
@@ -266,24 +285,24 @@ def group_strips(r: RoundReport, width: int = W) -> str:
     parts: list[str] = []
     for v in tv:
         parts.append(f'<line class="grid" x1="{x(v):.1f}" x2="{x(v):.1f}" y1="{TOP}" y2="{h - BOTTOM}"/>')
-    for k, (name, teams) in enumerate(rows):
+    for k, (name, teams, hl) in enumerate(rows):
         cy = TOP + row_h * (k + 0.5)
         values = [t.score for t in teams]
         d = describe(values)
-        _hbox(parts, cy, 11, d, values, x, "hl" if k else "")
+        _hbox(parts, cy, 11, d, values, x, "hl" if hl else "")
         parts.append(f'<text class="row-label" x="{left - 10}" y="{cy + 4:.1f}" text-anchor="end">'
                      f'{escape(name)}</text>')
         parts.append(f'<text class="tick" x="{left - 10}" y="{cy + 18:.1f}" text-anchor="end">'
-                     f'{d.n} teams</text>')
-        for t in sorted(teams, key=lambda t: _ORDER[team_class(t, r.state)]):
+                     f'{d.n} team{"" if d.n == 1 else "s"}</text>')
+        for t in sorted(teams, key=lambda t: (t.team_number in follow, _ORDER[team_class(t, r.state)])):
             cls = team_class(t, r.state)
             if k == 0 and cls in ("state",):
                 cls = "other"
-            _dot(parts, x(t.score), cy + jitter(t.team_number) * 22, cls,
-                 team_tip(t) if cls != "other" or k else None, t.team_number)
+            tip = team_tip(t) if cls != "other" or k or t.team_number in follow else None
+            _dot(parts, x(t.score), cy + jitter(t.team_number) * 22, cls, tip, t.team_number)
     parts.append(f'<line class="axis" x1="{left}" x2="{width - RIGHT}" y1="{h - BOTTOM}" y2="{h - BOTTOM}"/>')
     _x_ticks(parts, tv, x, h - BOTTOM, title="score", width=width)
-    return _svg(width, h, f"Scores nationally and in {r.state}, every team a dot", parts)
+    return _svg(width, h, label, parts)
 
 
 def histogram(r: RoundReport, value: Callable[[TeamRow], float | None], *, bin_size: float, label: str,

@@ -47,6 +47,40 @@
 <p class="muted small">Outscored (bold), then score and place in the state.</p>
 {% endif %}
 
+<h2 id="compare">Teams we follow</h2>
+{% if view.follow_chart %}
+<div class="charts">
+  <section class="chart-card wide"><h3>The teams we follow, percentile by round</h3>
+    <p class="chart-note">The share of the division each team outscored.{% if view.other_state %} The {{ view.other_state }}
+      and {{ sums[0].state }} lines are each state's median team.{% else %} The {{ sums[0].state }} line is the state's median team.{% endif %}
+      {% if view.followed | length > 6 %}The first 6 teams are drawn; the table has them all.{% endif %}</p>
+    {{ view.follow_chart | safe }}</section>
+</div>
+{% endif %}
+{% if view.followed or view.other_state %}
+<div class="table-wrap">
+<table class="board">
+  <thead><tr><th>Team</th>{% for s in sums %}<th class="num">{{ s.info.label }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for number, results in view.followed %}
+  <tr><td>{{ number }}{% set any = results.values() | first %}{% if any.team.name %} <span class="muted">{{ any.team.name }}</span>{% endif %}
+    <span class="muted small">{{ any.team.location }}</span></td>{% for s in sums %}{% set f = results.get(s.info.id) %}
+    <td class="num">{% if f %}<span class="strong">{{ '%.0f%%' % f.percentile }}</span>
+      <span class="muted small">{{ f.team.score | num }} pts{% if f.state_place %} · {{ f.state_place }} in {{ f.team.location }}{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}
+  {% if view.other_state %}<tr><td>{{ view.other_state }} median team</td>{% for s in sums %}{% set m = view.other_median.get(s.info.id) %}
+    <td class="num">{% if m %}<span class="strong">{{ '%.0f%%' % m[1] }}</span> <span class="muted small">{{ m[0] | num }} pts</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}</tr>{% endif %}
+  </tbody>
+</table>
+</div>
+<p class="muted small">Outscored (bold), then score and place in the team's state.</p>
+{% else %}
+<p class="empty">{% if choices.teams %}None of the teams we follow are in this season's data sets.{% else %}No teams followed yet: choose them below.{% endif %}</p>
+{% endif %}
+{% if view.follow_missing and view.followed %}<p class="muted small">Not in this season's data sets: {{ view.follow_missing | join(', ') }}.</p>{% endif %}
+{% set back = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+{% set ch = choices %}
+{% include "_analysis_choices.html" %}
+
 {% if view.strength %}
 <h2>Image families against our overall results</h2>
 <div class="table-wrap">
