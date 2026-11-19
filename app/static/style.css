@@ -310,3 +310,33 @@ svg.chart .box.few { opacity: 0.45; }
 .focus-team h4 { margin: 0.5rem 0; }
 .rel-up { background: color-mix(in srgb, var(--s1) 18%, transparent); }
 .rel-down { background: color-mix(in srgb, var(--warn) 20%, transparent); }
+/* Interactive charts (#65; static/analysis_charts.js) */
+.report-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin: 8px 0 4px; font-size: 14px; }
+.report-tools .team-find { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.legend-toggle { all: unset; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 4px; padding: 1px 3px; }
+.legend-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.legend-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+svg.chart .off { display: none; }
+svg.chart .label-toggle { cursor: pointer; }
+svg.chart .label-toggle[aria-pressed="false"] { opacity: 0.4; }
+svg.chart .label-toggle:focus-visible { outline: 2px solid var(--accent); }
+.hide-ours svg.chart .dot.ours:not(.picked), .hide-district svg.chart .dot.district:not(.picked),
+.hide-state svg.chart .dot.state:not(.picked), .hide-other svg.chart .dot.other:not(.picked) { display: none; }
+svg.chart [data-team] { cursor: pointer; }
+.has-pick svg.chart .dot[data-team]:not(.picked), .has-pick svg.chart .series[data-team]:not(.picked),
+.has-pick svg.chart .need:not(.picked) { opacity: 0.25; }
+svg.chart .dot.picked { stroke: var(--text); stroke-width: 2.5; r: 6px; fill-opacity: 1; }
+svg.chart .series.picked { stroke-width: 3.5; }
+svg.chart .need.picked { stroke: var(--text); }
+svg.chart .end-label.picked { text-decoration: underline; }
+tr[data-team] { cursor: pointer; }
+tr.picked > td { background: color-mix(in srgb, var(--s2) 18%, transparent); }
+tr.picked > td:first-child { box-shadow: inset 3px 0 0 var(--s2); }
+svg.chart .brush { fill: var(--s1); fill-opacity: 0.15; stroke: var(--s1); stroke-width: 1; pointer-events: none; }
+.chart-wrap[data-zoom] svg.chart { cursor: crosshair; }
+.chart-wrap.loading { opacity: 0.5; }
+.zoom-controls { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 6px; }
+.zoom-controls details { display: inline-block; }
+.zoom-controls form { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin-top: 4px; }
+.zoom-controls input { width: 6em; }
+.projection-toggle { font-size: 13px; }

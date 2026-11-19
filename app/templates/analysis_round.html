@@ -28,6 +28,25 @@
   now.</div>
 {% endif %}
 
+<div class="report-tools" data-report="{{ info.id }}" data-state="{{ r.state }}">
+  <form method="get" class="inline">
+    <label>Read for <select name="state" onchange="this.form.submit()">
+      {% for s in states %}<option value="{{ s }}" {{ 'selected' if s == r.state }}>{{ s }}</option>{% endfor %}
+    </select></label>
+    {% if top != 25 %}<input type="hidden" name="top" value="{{ top }}">{% endif %}
+    <noscript><button type="submit">Show</button></noscript>
+  </form>
+  <span class="js-only team-find" hidden>
+    <label for="team-find">Highlight a team</label>
+    <input id="team-find" list="team-list" size="10" placeholder="{{ info.season }}-1234" autocomplete="off">
+    <button type="button" id="team-clear" class="link">Clear</button>
+    <span id="team-status" class="muted small" role="status"></span>
+  </span>
+  <datalist id="team-list">{% for t in r.teams %}<option value="{{ t.team_number }}" label="{{ t.location }} · {{ t.score | num }}"></option>{% endfor %}</datalist>
+</div>
+{% if r.state != home_state %}<p class="notice">Read for {{ r.state }}: the state comparisons, the state tables and the
+  blue highlights are {{ r.state }}'s; our teams stay orange. <a href="?{{ 'top=%d' % top if top != 25 }}">Back to {{ home_state }}</a></p>{% endif %}
+
 <h2>In brief</h2>
 <ul class="findings">{% for f in n.summary %}<li>{{ f }}</li>{% endfor %}</ul>
 {{ para(n.overview + context) }}
@@ -43,7 +62,7 @@
     {% for img in r.images %}<th class="num" title="Found · completion · score">{{ img.name }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for res in r.ems %}{% set t = res.team %}
-  <tr><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
+  <tr data-team="{{ t.team_number }}"><td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
     <td class="num strong">{{ t.score | num }}</td>
     {% if r.has_challenge %}<td class="num">{{ t.cisco | num }}{% if t.challenge_2 is not none and t.challenge_2 > 0 %} <span class="muted small">({{ t.challenge_1 | num }} + {{ t.challenge_2 | num }})</span>{% endif %}</td>{% endif %}
     <td class="num">{{ t.place_state_division or '' }}</td><td class="num">{{ t.place_division or '' }}</td>
@@ -107,7 +126,7 @@
 <h2>Score and play time</h2>
 {{ para(n.time) }}
 <div class="charts pair">
-  {{ card('Score distribution', charts.score_hist, legend) }}
+  {{ card('Score distribution', charts.score_hist, bar_legend) }}
   {{ card('Play time distribution', charts.time_hist) }}
   {{ card('Score against play time', charts.heatmap, '<p class="chart-note">Darker cells hold more teams (15 minutes × a score band); our teams are the orange dots.</p>', 'wide') }}
 </div>
@@ -201,7 +220,7 @@
 <table class="board relative">
   <thead><tr><th>Team</th><th class="num">Overall</th>{% for img in rel.images %}<th class="num">{{ img }}</th>{% endfor %}</tr></thead>
   <tbody>{% for res, cells in rel.rows %}
-  <tr><td>{{ res.label }}</td><td class="num">{{ '%.0f%%' % res.percentile }}</td>
+  <tr data-team="{{ res.team.team_number }}"><td>{{ res.label }}</td><td class="num">{{ '%.0f%%' % res.percentile }}</td>
     {% for img in rel.images %}{% set c = cells.get(img) %}
     {% if c %}{% set cls = 'rel-up' if c[1] >= rel.threshold else ('rel-down' if c[1] <= -rel.threshold else '') %}
     <td class="num {{ cls }}">{{ '%.0f%%' % c[0] }} <span class="small">({{ ('%+.0f' % c[1]) | replace('-', '−') }}){% if cls == 'rel-up' %} ▲{% elif cls == 'rel-down' %} ▼{% endif %}</span></td>
@@ -251,8 +270,10 @@
   {% endcall %}
 </h2>
 {{ para(n.advance) }}
-{% if n.advance_teams %}<ul class="narrative">{% for line in n.advance_teams %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
 {% if a.stage == "projection" %}
+<p><button type="button" class="projection-toggle" aria-controls="projection" aria-pressed="true" hidden>Hide the projection</button></p>
+<div id="projection">
+{% if n.advance_teams %}<ul class="narrative">{% for line in n.advance_teams %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
 <div class="charts">
   {{ card('State Round points needed (projected)', charts.advance, advance_legend ~ '<p class="chart-note">Bars: the likely range (middle 80% of simulations); line: the median.</p>', 'wide') }}
 </div>
@@ -262,14 +283,16 @@
     <th class="num">Needed: Semifinals</th><th class="num">Chance</th>
     <th class="num">Needed: top 3 in {{ r.state }}</th><th class="num">Chance</th></tr></thead>
   <tbody>{% for p in a.projections %}
-  <tr><td>{{ p.label }}</td><td class="num">{{ p.intro | num }}</td><td class="num">≈ {{ '%.0f' % p.expected }}</td>
+  <tr data-team="{{ p.team.team_number }}"><td>{{ p.label }}</td><td class="num">{{ p.intro | num }}</td><td class="num">≈ {{ '%.0f' % p.expected }}</td>
     {% for q in (p.semis, p.award) if q %}<td class="num">{% if q.hi <= 0 %}past the line{% else %}≈ {{ '%.0f' % q.median }} <span class="small">({{ '%.0f' % q.lo }}–{{ '%.0f' % q.hi }})</span>{% endif %}</td>
     <td class="num">{{ q.chance | chance }}</td>{% endfor %}
     {% if not p.award %}<td class="num">–</td><td class="num">–</td>{% endif %}</tr>
   {% endfor %}</tbody>
 </table>
 </div>
+</div>
 {% else %}
+{% if n.advance_teams %}<ul class="narrative">{% for line in n.advance_teams %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
 <div class="table-wrap">
 <table class="board">
   <thead><tr><th>Team</th>{% if a.stage == "state" %}<th class="num">{{ a.intro_label or 'Introductory Round' }}</th>
@@ -277,7 +300,7 @@
     <th class="num">To the line ({{ a.cut | num }})</th>{% if a.stage == "state" %}<th class="num">Place in {{ r.state }}</th>
     <th class="num">To a state award</th>{% endif %}</tr></thead>
   <tbody>{% for s in a.standings %}
-  <tr><td>{{ s.label }}</td>{% if a.stage == "state" %}<td class="num">{{ s.intro | num }}</td><td class="num">{{ s.state | num }}</td>{% endif %}
+  <tr data-team="{{ s.team.team_number }}"><td>{{ s.label }}</td>{% if a.stage == "state" %}<td class="num">{{ s.intro | num }}</td><td class="num">{{ s.state | num }}</td>{% endif %}
     <td class="num">{{ s.total | num }}</td>
     <td class="num {{ 'rel-up' if s.margin >= 0 else 'rel-down' }}">{{ '0' if s.margin == 0 else s.margin | signed }}</td>
     {% if a.stage == "state" %}<td class="num">{{ s.state_place or '–' }}</td>
@@ -329,7 +352,7 @@
   <caption class="small">Points behind the top quarter's median at each hour (− is ahead); the hour the gap grew most is marked.</caption>
   <thead><tr><th>Team</th>{% for h in range(1, hrs) %}<th class="num">{{ h }} h</th>{% endfor %}</tr></thead>
   <tbody>{% for t in pc.teams %}
-  <tr><td>{{ t.label }}</td>{% for h in range(1, hrs) %}{% set worst = h == t.worst_hour %}
+  <tr data-team="{{ t.team }}"><td>{{ t.label }}</td>{% for h in range(1, hrs) %}{% set worst = h == t.worst_hour %}
     <td class="num{{ ' rel-down' if worst else '' }}">{{ (t.gap[h] | round | int) | string | replace('-', '−') }}{% if worst %} <span class="small">(+{{ '%.0f' % t.worst_growth }}) ▼</span>{% endif %}</td>{% endfor %}</tr>
   {% endfor %}</tbody>
 </table>
@@ -357,6 +380,7 @@
 
 <h2 id="top">Top teams</h2>
 <form method="get" action="#top" class="inline">
+  {% if r.state != home_state %}<input type="hidden" name="state" value="{{ r.state }}">{% endif %}
   <label>Show
     <select name="top" onchange="this.form.submit()">
       {% for k in top_choices %}<option value="{{ k }}" {{ 'selected' if k == top }}>{{ k }}</option>{% endfor %}
@@ -367,7 +391,7 @@
 <table class="board">
   <thead><tr><th class="num">National</th><th>Team</th><th>State</th><th class="num">State place</th><th class="num">Score</th></tr></thead>
   <tbody>{% for t in r.teams[:top] %}
-  <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_division or loop.index }}</td>
+  <tr class="{{ 'watched' if t.grp == 'ems' }}" data-team="{{ t.team_number }}"><td class="num">{{ t.place_division or loop.index }}</td>
     <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td><td>{{ t.location }}</td>
     <td class="num">{{ t.place_state_division or '' }}</td><td class="num strong">{{ t.score | num }}</td></tr>{% endfor %}</tbody>
 </table>
@@ -380,7 +404,7 @@
     <th class="num">Behind the team above</th><th class="num">Behind the leader</th></tr></thead>
   <tbody>
   {% for t, gap, lead in r.state_table %}
-  <tr class="{{ 'watched' if t.grp == 'ems' }}"><td class="num">{{ t.place_state_division or loop.index }}</td>
+  <tr class="{{ 'watched' if t.grp == 'ems' }}" data-team="{{ t.team_number }}"><td class="num">{{ t.place_state_division or loop.index }}</td>
     <td>{{ t.team_number }}{% if t.name %} <span class="muted">{{ t.name }}</span>{% endif %}</td>
     <td class="num">{{ t.place_division or '' }}</td>{% if r.has_challenge %}<td class="num">{{ t.cisco | num }}</td>{% endif %}<td class="num strong">{{ t.score | num }}</td>
     <td class="num">{{ gap | num if gap else '' }}</td><td class="num">{{ lead | num if lead else '' }}</td></tr>
