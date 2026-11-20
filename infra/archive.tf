@@ -56,6 +56,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "archive" {
     noncurrent_version_expiration {
       noncurrent_days = var.archive_noncurrent_days
     }
+  }
+
+  # Its own rule: S3 rejects AbortIncompleteMultipartUpload in a rule with a size filter.
+  rule {
+    id     = "abort-unfinished-uploads"
+    status = "Enabled"
+    filter {}
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
