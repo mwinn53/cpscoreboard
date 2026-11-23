@@ -7,12 +7,13 @@
 {% block content %}
 {% set r = report %}
 {% set n = r.narrative %}
-<p class="small"><a href="/analysis?division={{ info.division | urlencode }}">← Analysis</a> ·
+<p class="small crumbs"><a href="/analysis?division={{ info.division | urlencode }}">← Analysis</a> ·
   <a href="/analysis/seasons/{{ info.season }}?division={{ info.division | urlencode }}">CP-{{ info.season }} season</a></p>
 <h1>{{ info.title }} <span class="muted">· {{ info.division }}</span></h1>
 <p class="muted">{{ info.status | capitalize }} scores · {{ 'legacy file' if info.source == 'legacy' else 'collected from the live board' }},
   updated {{ info.sampled_at | local }}{% if info.revision > 1 %} (revision {{ info.revision }}){% endif %} ·
   images: {{ info.images | join(', ') }}</p>
+{% with filename = info.title ~ ' - ' ~ info.division %}{% include "_analysis_export.html" %}{% endwith %}
 {% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
 {% if info.report_run_at %}
 <p class="muted small">Report run {{ info.report_run_at | local }}; the data set is final.
@@ -467,7 +468,8 @@
 </form>
 {% endif %}
 
-<h2 id="notes">Coaches' notes</h2>
+<h2 id="notes"{% if not info.notes %} class="no-print"{% endif %}>Coaches' notes</h2>
+{% if info.notes %}<div class="print-only notes-print">{{ info.notes }}</div>{% endif %}
 <form method="post" action="/analysis/reports/{{ info.id }}" class="stack compact">
   <label for="label">Report name</label>
   <input id="label" name="label" value="{{ info.label }}" maxlength="100">
@@ -484,8 +486,8 @@
   </select>
   <button type="submit">Save</button>
 </form>
-<h3 id="groups">Correct a team's group</h3>
-<p class="muted small">Our teams and district teams come from the watchlist and the district schools (or, in legacy files,
+<h3 id="groups" class="no-print">Correct a team's group</h3>
+<p class="muted small no-print">Our teams and district teams come from the watchlist and the district schools (or, in legacy files,
   from team names). Fix one here if it's wrong in this data set; the report updates at once. A live data set's team is
   regrouped from the board settings if it's collected again.</p>
 <form method="post" action="/analysis/reports/{{ info.id }}/group" class="inline group-form">

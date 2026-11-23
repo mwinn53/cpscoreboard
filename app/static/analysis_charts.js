@@ -12,6 +12,8 @@
 // * Zoom: drag across a .chart-wrap[data-zoom] (or use its Zoom form) and the server draws
 //   that x range (/analysis/reports/{id}/charts/{name}); "Reset zoom" restores it.
 // * Projection: .projection-toggle shows or hides the State Round projection (remembered).
+// * Export: .export-print opens the print dialog on the print layout (style.css); while printing,
+//   the page title is the bar's data-filename, which browsers use to name a saved PDF (#69).
 (function () {
   "use strict";
   var NS = "http://www.w3.org/2000/svg";
@@ -263,5 +265,13 @@
     zoomable(wrap);
   });
   applyPick();
+
+  // --- print or save as PDF (#69): the browser's dialog; the page title names the PDF ---
+  var bar = document.querySelector(".export-bar"), pageTitle = document.title;
+  if (bar) {
+    bar.querySelector(".export-print").addEventListener("click", function () { window.print(); });
+    window.addEventListener("beforeprint", function () { document.title = bar.getAttribute("data-filename") || pageTitle; });
+    window.addEventListener("afterprint", function () { document.title = pageTitle; });
+  }
   document.querySelectorAll(".js-only").forEach(function (el) { el.hidden = false; });
 })();
