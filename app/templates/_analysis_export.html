@@ -1,0 +1,6 @@
+{# #69 Print or save as PDF: the browser's own print dialog on the print layout (style.css, @media print).
+   `filename` becomes the page title while printing, which browsers use as the PDF's name. #}
+<p class="export-bar js-only" data-filename="{{ filename }}" hidden>
+  <button type="button" class="export-print">Print or save as PDF</button>
+  <span class="muted small">Prints the page as shown here (a highlighted team, hidden series, a zoom), without the
+    controls.</span></p>

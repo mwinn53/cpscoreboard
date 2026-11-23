@@ -11,7 +11,7 @@
   --up: #067647;
   --dev: #6941c6;
 }
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root {
     --bg: #0f1216;
     --surface: #171b21;
@@ -147,7 +147,7 @@ button.link { border: none; background: none; padding: 0; color: var(--accent); 
 
 /* Team history charts (app/charts.py). One series per chart: no legend, the title names it. */
 :root { --series-1: #2a78d6; }
-@media (prefers-color-scheme: dark) { :root { --series-1: #3987e5; } }
+@media screen and (prefers-color-scheme: dark) { :root { --series-1: #3987e5; } }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
 .chart-card h3 { margin: 0 0 4px; font-size: 14px; }
@@ -177,7 +177,7 @@ fieldset.choices label { font-weight: normal; font-size: 14px; }
 
 /* Categorical slots for multi-series charts (image scores): fixed order, never cycled. */
 :root { --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948; }
-@media (prefers-color-scheme: dark) {
+@media screen and (prefers-color-scheme: dark) {
   :root { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; }
 }
 svg.chart .series.s1 { stroke: var(--s1); } svg.chart .end.s1, .swatch.s1 { fill: var(--s1); background: var(--s1); }
@@ -350,3 +350,31 @@ details.choices summary { cursor: pointer; font-weight: 600; }
 details.choices form { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 40rem; }
 details.choices textarea { width: 100%; box-sizing: border-box; font: inherit; height: 4.5em; min-height: 0; }
 details.choices .row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; }
+
+/* #69 Print or save as PDF: the page as it's shown (highlighted team, toggles, zoom, projection hidden or not),
+   without the controls, and in the light colors whatever the screen's theme (dark mode is screen-only). */
+.print-only { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff; font-size: 10pt; }
+  main { max-width: none; padding: 0; }
+  .topbar { padding: 0 0 8px; background: none; }
+  .topbar .logo { width: 36px; height: 36px; }
+  .topbar .nav, .topbar .badge-dev, .crumbs, main form, noscript, .report-tools, .export-bar, details.choices,
+  details.table-view, .zoom-controls, .chart-tip, .info, .projection-toggle, .notice[role="status"], .run-report,
+  .no-print, .legend li:has(.legend-toggle[aria-pressed="false"]) { display: none !important; }
+  .print-only { display: block; }
+  .notes-print { white-space: pre-wrap; }
+  .table-wrap { overflow: visible; }
+  table.board { font-size: 8.5pt; white-space: normal; }
+  .board th, .board td { padding: 3px 5px; }
+  .board th { position: static; font-size: 8pt; }
+  .charts, .charts.placement, .charts.scoring, .charts.pair, .charts.small-multiples {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .chart-card { padding: 8px; }
+  .chart-card, .focus-team, tr, .findings li { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+  a { color: inherit; text-decoration: none; }
+  .foot { padding: 8px 0 0; }
+}

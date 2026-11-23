@@ -2,8 +2,9 @@
 {% block title %}Compare · Analysis · {{ site_title }}{% endblock %}
 {% block content %}
 {% set a, b = view.a, view.b %}
-<p class="small"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a></p>
+<p class="small crumbs"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a></p>
 <h1>{{ a.short }} <span class="muted">vs</span> {{ b.short }} <span class="muted">· {{ division }}</span></h1>
+{% with filename = a.short ~ ' vs ' ~ b.short ~ ' - ' ~ division %}{% include "_analysis_export.html" %}{% endwith %}
 <p class="narrative">{{ view.narrative | join(' ') }}</p>
 
 <div class="charts">

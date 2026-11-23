@@ -2,9 +2,10 @@
 {% block title %}CP-{{ view.season }} · Analysis · {{ site_title }}{% endblock %}
 {% block content %}
 {% set sums = view.summaries %}
-<p class="small"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a> ·
+<p class="small crumbs"><a href="/analysis?division={{ division | urlencode }}">← Analysis</a> ·
   <a href="/analysis/seasons?division={{ division | urlencode }}">All seasons</a></p>
 <h1>CP-{{ view.season }} <span class="muted">· {{ division }}</span></h1>
+{% with filename = 'CP-%s season - %s' % (view.season, division) %}{% include "_analysis_export.html" %}{% endwith %}
 <p class="narrative">{{ view.narrative | join(' ') }}</p>
 
 <div class="charts">
